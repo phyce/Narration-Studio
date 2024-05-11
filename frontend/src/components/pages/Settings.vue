@@ -4,6 +4,8 @@
 
 <template>
 Settings
+	Add highlighting color change options (color pickers)
+
 </template>
 
 <style scoped>

@@ -1,15 +1,18 @@
 <script lang="ts" setup>
-// import HelloWorld from './components/HelloWorld.vue'
-// import ColorPicker from 'primevue/colorpicker';
 import Header from './components/Header.vue'
+import Footer from './components/Footer.vue'
 import {ComponentOptionsMixin, DefineComponent, ref} from "vue";
 import Sandbox from './components/pages/Sandbox.vue';
 import ScriptEditor from './components/pages/ScriptEditor.vue';
 import CharacterVoices from './components/pages/CharacterVoices.vue';
 import VoicePacks from './components/pages/VoicePacks.vue';
 import Settings from './components/pages/Settings.vue';
+import Start from './components/pages/Start.vue';
+import {Status} from "./components/enums/status";
+import Toast from 'primevue/toast';
 
-const activePage = ref('sandbox');
+const activePage = ref<string>('start');
+const status = ref<number>(Status.Ready);
 
 function handleUpdateActivePage(newPage: string) {
 	activePage.value = newPage;
@@ -22,6 +25,7 @@ interface pageComponent {
 
 
 const pageComponents: pageComponent = {
+	'start': Start,
 	'sandbox': Sandbox,
 	'script-editor': ScriptEditor,
 	'character-voices': CharacterVoices,
@@ -35,13 +39,10 @@ const pageComponents: pageComponent = {
 <template>
 	<div class="flex flex-col h-full">
 		<Header :activePage="activePage" @updateActivePage="handleUpdateActivePage"/>
-		<main class="flex-grow bg-gray-400">
+		<main class="flex-grow bg-neutral-700 overflow-y-auto">
 			<component :is="pageComponents[activePage]" />
 		</main>
-
-		<footer class="bg-gray-600">
-			Made by Phyce
-		</footer>
+		<Footer :status="status" />
 	</div>
 </template>
 

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "allowjs": true,
+    "allowJs": true,
     "checkJs": false,
     "target": "ESNext",
     "useDefineForClassFields": true,

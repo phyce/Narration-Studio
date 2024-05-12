@@ -8,7 +8,7 @@ import badgedirective from './badgedirective';
 // import breadcrumb from './breadcrumb';
 import button from './button';
 // import calendar from './calendar';
-// import card from './card';
+import card from './card';
 // import carousel from './carousel';
 import cascadeselect from './cascadeselect';
 import checkbox from './checkbox';
@@ -27,7 +27,7 @@ import checkbox from './checkbox';
 import dropdown from './dropdown';
 // import fieldset from './fieldset';
 // import fileupload from './fileupload';
-// import floatlabel from './floatlabel';
+import floatlabel from './floatlabel';
 // import galleria from './galleria';
 import global from './global';
 // import iconfield from './iconfield';
@@ -35,11 +35,11 @@ import global from './global';
 // import inlinemessage from './inlinemessage';
 // import inplace from './inplace';
 import inputgroup from './inputgroup';
-// import inputgroupaddon from './inputgroupaddon';
+import inputgroupaddon from './inputgroupaddon';
 // import inputmask from './inputmask';
 // import inputnumber from './inputnumber';
 // import inputotp from './inputotp';
-// import inputswitch from './inputswitch';
+import inputswitch from './inputswitch';
 import inputtext from './inputtext';
 // import knob from './knob';
 // import listbox from './listbox';
@@ -106,7 +106,7 @@ export default {
     // calendar,
     checkbox,
     // radiobutton,
-    // inputswitch,
+    inputswitch,
     // selectbutton,
     // slider,
     // chips,
@@ -117,7 +117,7 @@ export default {
     // listbox,
     // colorpicker,
     inputgroup,
-    // inputgroupaddon,
+    inputgroupaddon,
     // inputmask,
     // knob,
     treeselect,
@@ -125,7 +125,7 @@ export default {
     // textarea,
     // password,
     // iconfield,
-    // floatlabel,
+    floatlabel,
     // inputotp,
     //
     // //buttons
@@ -149,7 +149,7 @@ export default {
     // accordion,
     // panel,
     // fieldset,
-    // card,
+    card,
     // tabview,
     // divider,
     // toolbar,

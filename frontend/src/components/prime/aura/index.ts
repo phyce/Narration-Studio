@@ -24,7 +24,7 @@ import checkbox from './checkbox';
 // import dialog from './dialog';
 // import divider from './divider';
 // import dock from './dock';
-// import dropdown from './dropdown';
+import dropdown from './dropdown';
 // import fieldset from './fieldset';
 // import fileupload from './fileupload';
 // import floatlabel from './floatlabel';
@@ -86,7 +86,7 @@ import toast from './toast';
 // import toolbar from './toolbar';
 import tooltip from './tooltip';
 // import tree from './tree';
-// import treeselect from './treeselect';
+import treeselect from './treeselect';
 // import treetable from './treetable';
 // import tristatecheckbox from './tristatecheckbox';
 
@@ -100,7 +100,7 @@ export default {
 
     //forms
     // autocomplete,
-    // dropdown,
+    dropdown,
     // inputnumber,
     inputtext,
     // calendar,
@@ -120,7 +120,7 @@ export default {
     // inputgroupaddon,
     // inputmask,
     // knob,
-    // treeselect,
+    treeselect,
     // tristatecheckbox,
     // textarea,
     // password,

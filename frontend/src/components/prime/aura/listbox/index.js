@@ -114,8 +114,8 @@ export default {
             'leading-[normal]',
 
             // Sizing
-            'py-2 pl-3 pr-7',
-            '-mr-7',
+            'py-2',
+            '',
             'w-full',
 
             //Color

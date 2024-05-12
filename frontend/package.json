@@ -11,10 +11,8 @@
   "dependencies": {
     "@codemirror/rangeset": "^0.19.9",
     "@guolao/vue-monaco-editor": "^1.5.1",
-    "@uiw/codemirror-theme-monokai": "^4.22.0",
     "primeicons": "^7.0.0",
     "primevue": "^3.52.0",
-    "quill": "^2.0.1",
     "vue": "^3.2.37"
   },
   "devDependencies": {

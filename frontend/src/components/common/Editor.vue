@@ -15,7 +15,6 @@
 import * as monaco from 'monaco-editor'
 import { ref, shallowRef, onUnmounted, watch } from 'vue'
 
-// Accept regexes as a prop
 const props = defineProps<{
 	regexes: Array<{ regex: RegExp, className: string }>
 }>()
@@ -40,7 +39,7 @@ const handleEditorChange = () => {
 }
 
 onUnmounted(() => {
-	editorRef.value?.deltaDecorations(decorations.value, []); // Use optional chaining
+	editorRef.value?.deltaDecorations(decorations.value, []);
 })
 
 watch(props.regexes, () => {
@@ -49,7 +48,7 @@ watch(props.regexes, () => {
 
 function applyRegexHighlighting() {
 	if (!editorRef.value) return;
-	const model = editorRef.value.getModel() ?? undefined; // Use nullish coalescing
+	const model = editorRef.value.getModel() ?? undefined;
 	if (!model) return;
 
 	let newDecorations: monaco.editor.IModelDeltaDecoration[] = [];

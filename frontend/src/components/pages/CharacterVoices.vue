@@ -3,171 +3,23 @@ import InputText from 'primevue/inputtext';
 import Button from "primevue/button";
 import Dropdown from "primevue/dropdown";
 import TreeSelect from "primevue/treeselect";
-import {computed, ref, watch} from "vue";
+import {ref} from "vue";
+import {Engine, Model, Voice, engines} from "../common/voiceData";
 
-interface Engine {
-	id: number;
-	name: string;
-	models: Model[];
-}
-interface Model {
-	id: number;
-	name: string;
-	voices: Voice[];
-}
-interface Voice {
-	id: number;
-	name: string;
-	gender: string;
-}
-
-const engines = ref<Engine[]>([
-	{
-		id: 1,
-		name: 'Piper',
-		models: [
-			{
-				id: 2,
-				name: 'LibriTTS',
-				voices: [
-					{
-						id: 23,
-						name: 'Piper Test voice 1',
-						gender: 'male',
-					},
-					{
-						id: 24,
-						name: 'Piper Test voice 2',
-						gender: 'Female',
-					},
-					{
-						id: 25,
-						name: 'Piper Test voice 3',
-						gender: 'Female',
-					},
-					{
-						id: 26,
-						name: 'Piper Test voice 4',
-						gender: 'Female',
-					},
-					{
-						id: 27,
-						name: 'Piper Test voice 5',
-						gender: 'Female',
-					},
-					{
-						id: 28,
-						name: 'Piper Test voice 6',
-						gender: 'Female',
-					},
-					{
-						id: 29,
-						name: 'Piper Test voice 8',
-						gender: 'Female',
-					},
-					{
-						id: 210,
-						name: 'Piper Test voice 2',
-						gender: 'Female',
-					},
-					{
-						id: 211,
-						name: 'Piper Test voice 2',
-						gender: 'Female',
-					},
-					{
-						id: 212,
-						name: 'Piper Test voice 2',
-						gender: 'Female',
-					},
-					{
-						id: 213,
-						name: 'Piper Test voice 2',
-						gender: 'Female',
-					},
-				]
-			},
-		]
-	},
-	{
-		id: 5,
-		name: 'Suno Bark',
-		models: [
-			{
-				id: 6,
-				name: 'Default',
-				voices: [
-					{
-						id: 7,
-						name: 'Suno Test voice 1',
-						gender: 'male',
-					},
-					{
-						id: 8,
-						name: 'Suno Test voice 2',
-						gender: 'Female',
-					},
-				]
-			},
-		]
-	},
-	{
-		id: 9,
-		name: 'Microsoft',
-		models: [
-			{
-				id: 10,
-				name: 'SAPI 4',
-				voices: [
-					{
-						id: 11,
-						name: 'MS Test voice 1',
-						gender: 'male',
-					},
-					{
-						id: 12,
-						name: 'MS Test voice 2',
-						gender: 'Female',
-					},
-				]
-			},
-			{
-				id: 13,
-				name: 'SAPI 5',
-				voices: [
-					{
-						id: 14,
-						name: 'MS Test voice 3',
-						gender: 'male',
-					},
-					{
-						id: 15,
-						name: 'MS Test voice 4',
-						gender: 'Female',
-					},
-				]
-			},
-		]
-	},
-])
 
 function findById(id: number, engines: Engine[]): Engine | Model | Voice | undefined {
 	for (const engine of engines) {
-		if (engine.id === id) {
-			return engine;
-		}
-		for (const model of engine.models) {
-			if (model.id === id) {
-				return model;
-			}
-			for (const voice of model.voices) {
-				if (voice.id === id) {
-					return voice;
-				}
+		if (engine.id === id) return engine;
+
+		if(engine.models !== undefined) for (const model of engine.models) {
+			if (model.id === id) return model;
+
+			if(model.voices !== undefined) for (const voice of model.voices) {
+				if (voice.id === id) return voice;
 			}
 		}
 	}
-	return undefined;  // Return undefined if the id is not found
+	return undefined;
 }
 
 function formatToTreeSelectData(engines: Engine[]) {
@@ -178,7 +30,7 @@ function formatToTreeSelectData(engines: Engine[]) {
 		data: engine.name,
 		selectable:false,
 		icon: 'pi pi-fw pi-folder',
-		children: engine.models.map(model => ({
+		children: engine.models?.map(model => ({
 			key: `model-${model.id}`,
 			id: model.id,
 			label: model.name,
@@ -199,7 +51,7 @@ const nodes = engines.value.map(engine => ({
 	key: engine.id,
 	label: engine.name,
 	selectable: false,
-	children: engine.models.map(model => ({
+	children: engine.models?.map(model => ({
 		selectable: true,
 		key: model.id,
 		label: model.name,
@@ -207,16 +59,12 @@ const nodes = engines.value.map(engine => ({
 	}))
 }));
 
-//Get selected node,
-function onModelSelect(node: any) {
-	console.log('updating voices');
-	console.log(node);
 
+function onModelSelect(node: any) {
 	const selected = findById(node.id, engines.value);
 	console.log(selected);
-	if (selected && 'voices' in selected) {  // Type guard to check if it is a Model
-		console.log('Selected model:', selected);
-		voices.value = selected.voices;  // Update the voices ref
+	if (selected && 'voices' in selected) {
+		voices.value = selected.voices as Voice[];
 	}
 }
 

@@ -59,7 +59,7 @@ import inputtext from './inputtext';
 // import picklist from './picklist';
 // import progressbar from './progressbar';
 // import progressspinner from './progressspinner';
-// import radiobutton from './radiobutton';
+import radiobutton from './radiobutton';
 // import rating from './rating';
 import ripple from './ripple';
 // import scrollpanel from './scrollpanel';
@@ -105,7 +105,7 @@ export default {
     inputtext,
     // calendar,
     checkbox,
-    // radiobutton,
+    radiobutton,
     inputswitch,
     // selectbutton,
     // slider,

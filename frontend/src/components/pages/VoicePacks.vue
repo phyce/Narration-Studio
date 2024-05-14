@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Card from 'primevue/card';
 import InputSwitch from 'primevue/inputswitch';
-import {Engine, getEngines, Model, getModels} from "../common/voiceData";
+import { Model, getModels} from "../common/voiceData";
 import {onMounted, ref} from "vue";
 
 // const engines = ref<Engine[]>([]);

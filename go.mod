@@ -1,4 +1,4 @@
-module changeme
+module nstudio
 
 go 1.21
 

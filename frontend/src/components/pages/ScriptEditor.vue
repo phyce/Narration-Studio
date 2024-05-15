@@ -21,7 +21,7 @@ const regexes = [
 			<Button class="w-full mt-2" icon="pi pi-upload" title="Generate" aria-label="Generate" />
 		</div>
 		<div class="w-4/5">
-			<Editor :regexes="regexes"/>
+			<Editor :regexes="regexes" text=""/>
 		</div>
 	</div>
 </template>

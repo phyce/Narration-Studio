@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"nstudio/app/config"
 	"nstudio/app/tts"
+	ttsUtil "nstudio/app/tts/util"
 	"regexp"
 	"strings"
 )
@@ -13,13 +15,14 @@ import (
 /* sandbox Play button action*/
 func (app *App) Play(script string) string {
 	lines := strings.Split(script, "\n")
-	var messages []tts.VoiceMessage
+	var messages []ttsUtil.CharacterMessage
 
 	re := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
 		if ttsLine := re.FindStringSubmatch(line); ttsLine != nil {
 			character, text := ttsLine[1], ttsLine[2]
-			messages = append(messages, tts.VoiceMessage{
+			fmt.Println(character, text)
+			messages = append(messages, ttsUtil.CharacterMessage{
 				Character: character,
 				Text:      text,
 			})
@@ -51,8 +54,8 @@ func (app *App) SaveSettings(settings string) {
 
 //script editor Generate button action
 
-//Character voices Start Preview button action
-//Character voices Stop Preview button action (toggle?)
+//Character voiceManager Start Preview button action
+//Character voiceManager Stop Preview button action (toggle?)
 
 //save character voice settings button action
 //preview character voice button action

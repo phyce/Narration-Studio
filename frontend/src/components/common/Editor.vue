@@ -1,7 +1,7 @@
 <template>
 	<div class="overflow-y-auto h-full">
 		<vue-monaco-editor
-			v-model:value="code"
+			v-model:value="internalText"
 			language="plaintext"
 			theme="vs-dark"
 			:options="MONACO_EDITOR_OPTIONS"
@@ -12,39 +12,55 @@
 </template>
 
 <script lang="ts" setup>
-import * as monaco from 'monaco-editor'
-import { ref, shallowRef, onUnmounted, watch } from 'vue'
+import * as monaco from 'monaco-editor';
+import { ref, shallowRef, onUnmounted, watch, defineProps, defineEmits } from 'vue';
 
 const props = defineProps<{
-	regexes: Array<{ regex: RegExp, className: string }>
-}>()
+	regexes: Array<{ regex: RegExp, className: string }>,
+	text: string
+}>();
+
+const emit = defineEmits(['update:text']);
 
 const MONACO_EDITOR_OPTIONS = {
 	automaticLayout: true,
 	formatOnType: true,
 	formatOnPaste: true,
-}
+};
 
-const code = ref('// some code...')
-const editorRef = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-const decorations = ref<string[]>([])
+const internalText = ref(props.text);
+const editorRef = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+const decorations = ref<string[]>([]);
 
 const handleMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
-	editorRef.value = editor
-	applyRegexHighlighting()
-}
+	editorRef.value = editor;
+	applyRegexHighlighting();
+};
 
 const handleEditorChange = () => {
-	applyRegexHighlighting()
-}
+	if (editorRef.value) {
+		const value = editorRef.value.getValue();
+		internalText.value = value;
+		emit('update:text', value);
+		applyRegexHighlighting();
+	}
+};
 
 onUnmounted(() => {
 	editorRef.value?.deltaDecorations(decorations.value, []);
-})
+});
 
 watch(props.regexes, () => {
-	applyRegexHighlighting()
-}, { deep: true })
+	applyRegexHighlighting();
+}, { deep: true });
+
+watch(() => props.text, (newValue) => {
+	internalText.value = newValue;
+	console.log(internalText.value);
+	if (editorRef.value && editorRef.value.getValue() !== newValue) {
+		editorRef.value.setValue(newValue);
+	}
+});
 
 function applyRegexHighlighting() {
 	if (!editorRef.value) return;
@@ -65,6 +81,6 @@ function applyRegexHighlighting() {
 			});
 		}
 	});
-	decorations.value = editorRef.value?.deltaDecorations(decorations.value, newDecorations) ?? decorations.value; // Use optional chaining and nullish coalescing
+	decorations.value = editorRef.value?.deltaDecorations(decorations.value, newDecorations) ?? decorations.value;
 }
 </script>

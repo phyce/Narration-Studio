@@ -5,12 +5,24 @@ import CascadeSelect from 'primevue/cascadeselect'
 import Checkbox from 'primevue/checkbox';
 import {ref} from "vue"
 import { Engine, Model, Voice, engines } from '../common/voiceData';
+import { useLocalStorage } from '@vueuse/core';
+import { Play } from '../../../wailsjs/go/main/App'
+import Toast from 'primevue/toast';
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
 
 const regexes = [
 	{ regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence' },
 	{ regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character' }
 ];
 
+async function generateSpeech() {
+	console.log(text.value);
+	const result = await Play(text.value);
+	if (result === '') toast.add({ severity: 'success', summary: 'Success', detail: 'Generation completed', life: 3000 });
+}
+
+const text = useLocalStorage<string>('sandboxText', 'user: hello world');
 const selectedVoice = ref<Voice>();
 const overrideVoices = ref<boolean>(false);
 const saveNewCharacters = ref<boolean>(false);
@@ -19,8 +31,8 @@ const saveNewCharacters = ref<boolean>(false);
 <template>
 	<div class="flex w-full h-full">
 		<div class="w-1/5 p-2">
-
-			<Button class="w-full" icon="pi pi-play" title="Play All" aria-label="Play" />
+			<Toast position="bottom-center" />
+			<Button @click="generateSpeech" class="w-full" icon="pi pi-play" title="Play All" aria-label="Play" />
 			<CascadeSelect
 				:options="engines"
 				:changeOnSelect="true"
@@ -41,7 +53,7 @@ const saveNewCharacters = ref<boolean>(false);
 			</div>
 		</div>
 		<div class="w-4/5">
-			<Editor :regexes="regexes"/>
+			<Editor v-model:text="text" :regexes="regexes" model-value=""/>
 		</div>
 	</div>
 </template>

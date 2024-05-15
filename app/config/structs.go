@@ -30,7 +30,7 @@ func (cv *Value) UnmarshalJSON(data []byte) error {
 
 type ConfigManager struct {
 	settings map[string]Value `json:"settings"`
-	//voices   map[string]Value
+	//voiceManager   map[string]Value
 	filePath string     `json:"filePath"`
 	lock     sync.Mutex `json:"lock"`
 }

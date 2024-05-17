@@ -5,7 +5,10 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/tts"
 	ttsUtil "nstudio/app/tts/util"
+	"os"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -14,6 +17,11 @@ import (
 //<editor-fold desc="Sandbox">
 /* sandbox Play button action*/
 func (app *App) Play(script string) string {
+	//if err := clearConsole(); err != nil {
+	//	panic(err)
+	//}
+	clearConsole()
+	fmt.Println("\n\n\n\n\n\n\n\n-----------------------------------")
 	lines := strings.Split(script, "\n")
 	var messages []ttsUtil.CharacterMessage
 
@@ -62,3 +70,14 @@ func (app *App) SaveSettings(settings string) {
 //delete character voice button action
 
 // toggle voice pack button action
+
+func clearConsole() error {
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls") // Clear console command for Windows
+	} else {
+		cmd = exec.Command("clear") // Clear console command for Linux and MacOS
+	}
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
+}

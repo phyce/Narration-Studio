@@ -7,8 +7,9 @@ import (
 )
 
 type EngineBase interface {
-	Initialize()
-	Play(message util.CharacterMessage)
+	Initialize() error
+	Prepare() error
+	Play(message util.CharacterMessage) error
 }
 
 type Engine[T EngineBase] struct {
@@ -22,5 +23,10 @@ func (engine *Engine[T]) Initialize() error {
 
 func (engine *Engine[T]) Play(message util.CharacterMessage) error {
 	fmt.Println("Base play: %s", message.Text)
+	return nil
+}
+
+func (engine *Engine[T]) Prepare() error {
+	fmt.Println("Base prepare: %s")
 	return nil
 }

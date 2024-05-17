@@ -16,10 +16,10 @@ var assets embed.FS
 
 func main() {
 	app := NewApp()
+	err := config.GetInstance().Initialize()
 
 	voiceManager.GetInstance().RegisterEngine("piper", &piper.Piper{})
 
-	err := config.GetInstance().Initialize()
 	if err != nil {
 		panic(err)
 	}

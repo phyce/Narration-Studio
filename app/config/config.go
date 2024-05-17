@@ -36,8 +36,14 @@ func (manager *ConfigManager) Initialize() error {
 		}
 		return err
 	}
+	fmt.Println("File")
+	fmt.Println(string(file))
 
 	err = json.Unmarshal(file, &manager.settings)
+	fmt.Println("File")
+	fmt.Println(string(file))
+	fmt.Println("Settings")
+	fmt.Println(manager.settings)
 	return err
 }
 

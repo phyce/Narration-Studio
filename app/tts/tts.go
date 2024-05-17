@@ -1,6 +1,7 @@
 package tts
 
 import (
+	"fmt"
 	"nstudio/app/tts/util"
 	VoiceManger "nstudio/app/tts/voiceManager"
 )
@@ -35,6 +36,8 @@ type Voice struct {
 
 func GenerateSpeech(messages []util.CharacterMessage, save bool) string {
 	voiceManager := VoiceManger.GetInstance()
+	//Get all required engines
+	//Initialize and/or prepare each engine instance/model
 	for _, message := range messages {
 		voice := voiceManager.GetVoice(message.Character)
 
@@ -42,8 +45,11 @@ func GenerateSpeech(messages []util.CharacterMessage, save bool) string {
 		if !ok {
 			return "Error getting engine"
 		}
-
-		engine.Play(message)
+		fmt.Println("ENGINE")
+		err := engine.Play(message)
+		if err != nil {
+			return "Error playing message"
+		}
 	}
 
 	//loop through each message

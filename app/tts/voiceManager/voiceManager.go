@@ -1,6 +1,7 @@
 package voiceManager
 
 import (
+	"fmt"
 	"nstudio/app/tts/engine"
 	"sync"
 )
@@ -14,7 +15,7 @@ type CharacterVoice struct {
 
 type VoiceManager struct {
 	sync.Mutex
-	Engines         map[string]engine.EngineBase
+	Engines         map[string]engine.Engine
 	CharacterVoices map[string]CharacterVoice
 }
 
@@ -26,7 +27,7 @@ var (
 func GetInstance() *VoiceManager {
 	once.Do(func() {
 		instance = &VoiceManager{
-			Engines:         make(map[string]engine.EngineBase),
+			Engines:         make(map[string]engine.Engine),
 			CharacterVoices: make(map[string]CharacterVoice),
 		}
 	})
@@ -49,15 +50,20 @@ func (manager *VoiceManager) GetVoice(name string) CharacterVoice {
 	return manager.CharacterVoices[name]
 }
 
-func (manager *VoiceManager) RegisterEngine(name string, engine engine.EngineBase) {
+func (manager *VoiceManager) RegisterEngine(newEngine engine.Engine) {
+	err := newEngine.Engine.Initialize()
+	if err != nil {
+		fmt.Println("error initializing engine")
+		fmt.Println(err)
+	}
 	manager.Lock()
 	defer manager.Unlock()
 
-	manager.Engines[name] = engine
+	manager.Engines[newEngine.ID] = newEngine
 }
 
-func (manager *VoiceManager) GetEngine(name string) (engine.EngineBase, bool) {
-	selectedEngine, ok := manager.Engines[name]
+func (manager *VoiceManager) GetEngine(ID string) (engine.Engine, bool) {
+	selectedEngine, ok := manager.Engines[ID]
 	return selectedEngine, ok
 }
 
@@ -66,6 +72,18 @@ func (manager *VoiceManager) UnregisterEngine(name string) {
 	defer manager.Unlock()
 
 	delete(manager.Engines, name)
+}
+
+func (manager *VoiceManager) GetEngines() []engine.Engine {
+	var allEngines []engine.Engine
+	for _, managerEngine := range manager.Engines {
+		allEngines = append(allEngines, managerEngine)
+	}
+	return allEngines
+}
+
+func (manager *VoiceManager) GetVoices(engine string, model string) {
+
 }
 
 //func selectVoice(character string) Voice {

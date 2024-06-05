@@ -5,43 +5,10 @@ import Dropdown from "primevue/dropdown";
 import TreeSelect from "primevue/treeselect";
 import {ref} from "vue";
 import {Engine, Model, Voice, engines} from "../common/voiceData";
+import {findById, formatToTreeSelectData} from "../../util/util";
 
 
-function findById(id: number, engines: Engine[]): Engine | Model | Voice | undefined {
-	for (const engine of engines) {
-		if (engine.id === id) return engine;
-
-		if(engine.models !== undefined) for (const model of engine.models) {
-			if (model.id === id) return model;
-
-			if(model.voices !== undefined) for (const voice of model.voices) {
-				if (voice.id === id) return voice;
-			}
-		}
-	}
-	return undefined;
-}
-
-function formatToTreeSelectData(engines: Engine[]) {
-	return engines.map(engine => ({
-		key: `engine-${engine.id}`,
-		id: engine.id,
-		label: engine.name,
-		data: engine.name,
-		selectable:false,
-		icon: 'pi pi-fw pi-folder',
-		children: engine.models?.map(model => ({
-			key: `model-${model.id}`,
-			id: model.id,
-			label: model.name,
-			data: model.name,
-			selectable:true,
-			icon: 'pi pi-fw pi-cog'
-		}))
-	}));
-}
-
-const treeNodes = formatToTreeSelectData(engines.value);
+// const treeNodes = formatToTreeSelectData(engines);
 
 const selectedModel = ref<Model>();
 const selectedVoice = ref<Voice>();
@@ -59,14 +26,14 @@ const nodes = engines.value.map(engine => ({
 	}))
 }));
 
+// function onModelSelect(node: any) {
+// 	const selected = findById(node.id, engines);
+// 	console.log(selected);
+// 	if (selected && 'voices' in selected) {
+// 		voices.value = selected.voices as Voice[];
+// 	}
+// }
 
-function onModelSelect(node: any) {
-	const selected = findById(node.id, engines.value);
-	console.log(selected);
-	if (selected && 'voices' in selected) {
-		voices.value = selected.voices as Voice[];
-	}
-}
 
 </script>
 
@@ -81,7 +48,7 @@ function onModelSelect(node: any) {
 				<InputText class="w-full" type="text"  placeholder="Character" />
 			</div>
 			<div class="w-3/12">
-				<TreeSelect :options="treeNodes" v-model="selectedModel" @node-select="onModelSelect" placeholder="Select a model" class="w-full mt-2" />
+<!--				<TreeSelect :options="treeNodes" v-model="selectedModel" @node-select="onModelSelect" placeholder="Select a model" class="w-full mt-2" />-->
 			</div>
 			<div class="w-4/12">
 				<Dropdown v-model="selectedVoice" :options="voices" filter optionLabel="name" placeholder="Select a voice" class="w-full ml-2 mt-2" />

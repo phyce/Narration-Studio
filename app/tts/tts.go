@@ -6,33 +6,7 @@ import (
 	VoiceManger "nstudio/app/tts/voiceManager"
 )
 
-type Engine struct {
-	ID     int     `json:"id"`
-	Name   string  `json:"name"`
-	Models []Model `json:"models"`
-}
-
-type Model struct {
-	ID     int     `json:"id"`
-	Name   string  `json:"name"`
-	Engine *string `json:"engine"`
-	Voices []Voice `json:"voiceManager"`
-}
-
-type Voice struct {
-	ID     int    `json:"id"`
-	Name   string `json:"name"`
-	Gender int    `json:"gender"`
-}
-
 ///////////////////////////////
-
-//func (voice *Voice) Synthesize(message string) {
-//	//figure out which engine
-//	//figure out which model
-//	//call engine with model and voice ID
-//	//return audio data
-//}
 
 func GenerateSpeech(messages []util.CharacterMessage, save bool) string {
 	voiceManager := VoiceManger.GetInstance()
@@ -46,7 +20,7 @@ func GenerateSpeech(messages []util.CharacterMessage, save bool) string {
 			return "Error getting engine"
 		}
 		fmt.Println("ENGINE")
-		err := engine.Play(message)
+		err := engine.Engine.Play(message)
 		if err != nil {
 			return "Error playing message"
 		}

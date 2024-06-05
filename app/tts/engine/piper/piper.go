@@ -10,7 +10,9 @@ import (
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/speaker"
 	"io"
+	"io/ioutil"
 	"nstudio/app/config"
+	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"nstudio/app/tts/voiceManager"
 	"os/exec"
@@ -42,7 +44,7 @@ func (ab *AudioBuffer) Reset() {
 	ab.buffer.Reset()
 }
 
-type SpeechSynthesizer struct {
+type VoiceSynthesizer struct {
 	//modelsDirectory string
 	//piperPath       string
 	command   *exec.Cmd
@@ -50,6 +52,7 @@ type SpeechSynthesizer struct {
 	stderr    io.ReadCloser
 	stdout    io.ReadCloser
 	audioData *AudioBuffer
+	voices    []engine.Voice
 }
 
 var Format = beep.Format{
@@ -70,7 +73,7 @@ type PiperInputLite struct {
 }
 
 type Piper struct {
-	models    map[string]SpeechSynthesizer
+	models    map[string]VoiceSynthesizer
 	piperPath string
 	modelPath string
 	initOnce  sync.Once
@@ -81,7 +84,6 @@ func (piper *Piper) Initialize() error {
 
 	fmt.Println("Piper engine initializing")
 
-	// Retrieve piperPath setting
 	piperPathValue := config.GetInstance().GetSetting("piperPath")
 	if piperPathValue.String == nil {
 		err = errors.New("piperPath is nil")
@@ -90,7 +92,6 @@ func (piper *Piper) Initialize() error {
 	fmt.Println("Piper path:", *piperPathValue.String)
 	piper.piperPath = *piperPathValue.String
 
-	// Retrieve modelPath setting
 	modelPathValue := config.GetInstance().GetSetting("piperModelsDirectory")
 	if modelPathValue.String == nil {
 		err = errors.New("modelPath is nil")
@@ -99,27 +100,40 @@ func (piper *Piper) Initialize() error {
 	fmt.Println("Model path:", *modelPathValue.String)
 	piper.modelPath = *modelPathValue.String
 
-	piper.models = make(map[string]SpeechSynthesizer)
-
+	piper.models = make(map[string]VoiceSynthesizer)
 	return err
 }
 
 func (piper *Piper) Prepare() error {
 	fmt.Println("Piper prepare launched")
 
+	metadataPath := piper.modelPath + "\\libritts\\libritts.metadata.json"
+	data, err := ioutil.ReadFile(metadataPath)
+	if err != nil {
+		return fmt.Errorf("failed to read voice metadata: %v", err)
+	}
+	fmt.Println("read from metadata")
+	fmt.Println(string(data))
+	var voices []engine.Voice
+	if err := json.Unmarshal(data, &voices); err != nil {
+		fmt.Println("didn't get to unmarshal voices")
+		fmt.Println(err)
+		return fmt.Errorf("failed to parse voice metadata: %v", err)
+	}
+	fmt.Println("unmarshaled voices")
 	// Command preparation
 	//TODO: get appropriate model name
 	cmdArgs := []string{"--model", piper.modelPath + "\\libritts\\libritts.onnx", "--json-input", "--output-raw"}
 	command := exec.Command(piper.piperPath, cmdArgs...)
-	fmt.Printf("Executing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
+	fmt.Println("Executing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
 
-	instance := SpeechSynthesizer{
+	instance := VoiceSynthesizer{
 		command:   command,
 		audioData: &AudioBuffer{},
+		voices:    voices,
 	}
 
 	// TODO this will need to load all the models based on user's choices
-	var err error
 	instance.stdin, err = instance.command.StdinPipe()
 	if err != nil {
 		return err
@@ -215,7 +229,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	return nil
 }
 
-func (piper *Piper) StartAudioCapture(instance SpeechSynthesizer) {
+func (piper *Piper) StartAudioCapture(instance VoiceSynthesizer) {
 	fmt.Println("Capturing audio")
 	//instance.audioData = &AudioBuffer{}
 
@@ -263,18 +277,7 @@ func playRawAudioBytes(audioClip []byte) error {
 	return nil
 }
 
-//func (synth *SpeechSynthesizer) Prepare() {
-//	synth.audioData = &AudioBuffer{}
-//
-//	go func() {
-//		_, err := io.Copy(synth.audioData, synth.stdout)
-//		if err != nil {
-//			fmt.Printf("Error during audio capture: %v\n", err)
-//		}
-//	}()
-//}
-
-//func (ss *SpeechSynthesizer) Stop() error {
+//func (ss *VoiceSynthesizer) Stop() error {
 //	if err := ss.stdin.Close(); err != nil {
 //		return err
 //	}

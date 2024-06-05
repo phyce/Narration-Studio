@@ -36,14 +36,8 @@ func (manager *ConfigManager) Initialize() error {
 		}
 		return err
 	}
-	fmt.Println("File")
-	fmt.Println(string(file))
 
 	err = json.Unmarshal(file, &manager.settings)
-	fmt.Println("File")
-	fmt.Println(string(file))
-	fmt.Println("Settings")
-	fmt.Println(manager.settings)
 	return err
 }
 
@@ -65,6 +59,9 @@ func (manager *ConfigManager) GetSetting(name string) *Value {
 	if value, exists := manager.settings[name]; exists {
 		return &value
 	}
+
+	fmt.Println("Not found any matching settings")
+
 	return nil
 }
 
@@ -96,8 +93,6 @@ func (manager *ConfigManager) Export() (string, error) {
 
 func (manager *ConfigManager) Import(jsonString string) error {
 	var newConfigs map[string]Value
-	fmt.Println("\n\n\n\n\n\nOutput:")
-	fmt.Println(jsonString)
 	err := json.Unmarshal([]byte(jsonString), &newConfigs)
 	if err != nil {
 		return err

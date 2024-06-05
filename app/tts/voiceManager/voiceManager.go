@@ -3,6 +3,7 @@ package voiceManager
 import (
 	"fmt"
 	"nstudio/app/tts/engine"
+	"nstudio/app/tts/util"
 	"sync"
 )
 
@@ -16,6 +17,7 @@ type CharacterVoice struct {
 type VoiceManager struct {
 	sync.Mutex
 	Engines         map[string]engine.Engine
+	Models          map[string]engine.Model
 	CharacterVoices map[string]CharacterVoice
 }
 
@@ -51,7 +53,8 @@ func (manager *VoiceManager) GetVoice(name string) CharacterVoice {
 }
 
 func (manager *VoiceManager) RegisterEngine(newEngine engine.Engine) {
-	err := newEngine.Engine.Initialize()
+	models := util.GetKeys(newEngine.Models)
+	err := newEngine.Engine.Initialize(models)
 	if err != nil {
 		fmt.Println("error initializing engine")
 		fmt.Println(err)
@@ -59,7 +62,15 @@ func (manager *VoiceManager) RegisterEngine(newEngine engine.Engine) {
 	manager.Lock()
 	defer manager.Unlock()
 
+	for _, model := range newEngine.Models {
+		manager.RegisterModel(model)
+	}
+
 	manager.Engines[newEngine.ID] = newEngine
+}
+
+func (manager *VoiceManager) RegisterModel(newModel engine.Model) {
+
 }
 
 func (manager *VoiceManager) GetEngine(ID string) (engine.Engine, bool) {

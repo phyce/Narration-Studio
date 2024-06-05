@@ -5,9 +5,10 @@ import (
 )
 
 type Base interface {
-	Initialize() error
+	Initialize([]string) error
 	Prepare() error
 	Play(message util.CharacterMessage) error
+	//GetVoices() []Voice
 	//GetModels() []Model
 }
 

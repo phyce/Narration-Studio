@@ -15,6 +15,7 @@ import (
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"nstudio/app/tts/voiceManager"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -79,9 +80,8 @@ type Piper struct {
 	initOnce  sync.Once
 }
 
-func (piper *Piper) Initialize() error {
+func (piper *Piper) Initialize(models []string) error {
 	var err error
-
 	fmt.Println("Piper engine initializing")
 
 	piperPathValue := config.GetInstance().GetSetting("piperPath")
@@ -101,7 +101,57 @@ func (piper *Piper) Initialize() error {
 	piper.modelPath = *modelPathValue.String
 
 	piper.models = make(map[string]VoiceSynthesizer)
+	for _, model := range models {
+		piper.InitializeModel(model)
+	}
+
 	return err
+}
+
+func (piper *Piper) InitializeModel(model string) error {
+	metadata := piper.modelPath + "\\" + model + "\\" + model + ".metadata.json"
+	data, err := os.ReadFile(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to read voice metadata: %v", err)
+	}
+	fmt.Println("read from metadata")
+	fmt.Println(string(data))
+
+	var voices []engine.Voice
+	if err := json.Unmarshal(data, &voices); err != nil {
+		fmt.Println("didn't get to unmarshal voices")
+		fmt.Println(err)
+		return fmt.Errorf("failed to parse voice metadata: %v", err)
+	}
+	fmt.Println("unmarshaled voices")
+
+	cmdArgs := []string{"--model", piper.modelPath + "\\" + model + "\\" + model + ".onnx", "--json-input", "--output-raw"}
+	command := exec.Command(piper.piperPath, cmdArgs...)
+	fmt.Println("Executing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
+
+	instance := VoiceSynthesizer{
+		command:   command,
+		audioData: &AudioBuffer{},
+		voices:    voices,
+	}
+
+	instance.stdin, err = instance.command.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	instance.stderr, err = instance.command.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	instance.stdout, err = instance.command.StdoutPipe() // Capture stdout
+	if err != nil {
+		return err
+	}
+
+	piper.models[model] = instance
+	return nil
 }
 
 func (piper *Piper) Prepare() error {
@@ -122,42 +172,14 @@ func (piper *Piper) Prepare() error {
 	}
 	fmt.Println("unmarshaled voices")
 	// Command preparation
-	//TODO: get appropriate model name
-	cmdArgs := []string{"--model", piper.modelPath + "\\libritts\\libritts.onnx", "--json-input", "--output-raw"}
-	command := exec.Command(piper.piperPath, cmdArgs...)
-	fmt.Println("Executing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
-
-	instance := VoiceSynthesizer{
-		command:   command,
-		audioData: &AudioBuffer{},
-		voices:    voices,
-	}
-
-	// TODO this will need to load all the models based on user's choices
-	instance.stdin, err = instance.command.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	instance.stderr, err = instance.command.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	instance.stdout, err = instance.command.StdoutPipe() // Capture stdout
-	if err != nil {
-		return err
-	}
-
-	piper.models["libritts"] = instance
-
-	err = instance.command.Start()
+	//TODO: Loop through models and start them as needed. start all for now
+	err = piper.models["libritts"].command.Start()
 	if err != nil {
 		return err
 	}
 
 	// Start capturing audio
-	piper.StartAudioCapture(instance)
+	piper.StartAudioCapture(piper.models["libritts"])
 
 	// Initialize speaker
 	format := Format
@@ -170,7 +192,7 @@ func (piper *Piper) Prepare() error {
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
 	piper.initOnce.Do(func() {
-		err := piper.Initialize()
+		err := piper.Initialize([]string{"libritts"})
 		if err != nil {
 			return
 		}

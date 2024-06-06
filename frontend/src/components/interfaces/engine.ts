@@ -1,7 +1,7 @@
 export interface Engine {
 	id: string;
 	name: string;
-	models: Model[];
+	models: Record<string, Model>;
 }
 
 export interface Model {

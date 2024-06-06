@@ -8,7 +8,7 @@ type Base interface {
 	Initialize([]string) error
 	Prepare() error
 	Play(message util.CharacterMessage) error
-	//GetVoices() []Voice
+	GetVoices(string) ([]Voice, error)
 	//GetModels() []Model
 }
 

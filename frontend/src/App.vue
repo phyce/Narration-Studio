@@ -16,7 +16,6 @@ const status = ref<number>(Status.Ready);
 
 function handleUpdateActivePage(newPage: string) {
 	activePage.value = newPage;
-	console.log(activePage.value);
 }
 
 interface pageComponent {

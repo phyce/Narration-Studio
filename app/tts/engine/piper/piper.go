@@ -22,6 +22,7 @@ import (
 	"time"
 )
 
+// <editor-fold desc="Audio Buffer">
 type AudioBuffer struct {
 	sync.Mutex
 	buffer bytes.Buffer
@@ -44,6 +45,8 @@ func (ab *AudioBuffer) Reset() {
 	defer ab.Unlock()
 	ab.buffer.Reset()
 }
+
+//</editor-fold>
 
 type VoiceSynthesizer struct {
 	//modelsDirectory string
@@ -80,6 +83,7 @@ type Piper struct {
 	initOnce  sync.Once
 }
 
+// <editor-fold desc="Engine Interface">
 func (piper *Piper) Initialize(models []string) error {
 	var err error
 	fmt.Println("Piper engine initializing")
@@ -106,52 +110,6 @@ func (piper *Piper) Initialize(models []string) error {
 	}
 
 	return err
-}
-
-func (piper *Piper) InitializeModel(model string) error {
-	metadata := piper.modelPath + "\\" + model + "\\" + model + ".metadata.json"
-	data, err := os.ReadFile(metadata)
-	if err != nil {
-		return fmt.Errorf("failed to read voice metadata: %v", err)
-	}
-	fmt.Println("read from metadata")
-	fmt.Println(string(data))
-
-	var voices []engine.Voice
-	if err := json.Unmarshal(data, &voices); err != nil {
-		fmt.Println("didn't get to unmarshal voices")
-		fmt.Println(err)
-		return fmt.Errorf("failed to parse voice metadata: %v", err)
-	}
-	fmt.Println("unmarshaled voices")
-
-	cmdArgs := []string{"--model", piper.modelPath + "\\" + model + "\\" + model + ".onnx", "--json-input", "--output-raw"}
-	command := exec.Command(piper.piperPath, cmdArgs...)
-	fmt.Println("Executing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
-
-	instance := VoiceSynthesizer{
-		command:   command,
-		audioData: &AudioBuffer{},
-		voices:    voices,
-	}
-
-	instance.stdin, err = instance.command.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	instance.stderr, err = instance.command.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	instance.stdout, err = instance.command.StdoutPipe() // Capture stdout
-	if err != nil {
-		return err
-	}
-
-	piper.models[model] = instance
-	return nil
 }
 
 func (piper *Piper) Prepare() error {
@@ -248,6 +206,62 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 		return err
 	}
 	piper.models["libritts"].audioData.Reset()
+	return nil
+}
+
+func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
+	modelData, exists := piper.models[model]
+	if !exists {
+		return nil, fmt.Errorf("model %s does not exist", model)
+	}
+	return modelData.voices, nil
+}
+
+//</editor-fold>
+
+func (piper *Piper) InitializeModel(model string) error {
+	metadata := piper.modelPath + "\\" + model + "\\" + model + ".metadata.json"
+	data, err := os.ReadFile(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to read voice metadata: %v", err)
+	}
+	fmt.Println("read from metadata")
+	fmt.Println(string(data))
+
+	var voices []engine.Voice
+	if err := json.Unmarshal(data, &voices); err != nil {
+		fmt.Println("didn't get to unmarshal voices")
+		fmt.Println(err)
+		return fmt.Errorf("failed to parse voice metadata: %v", err)
+	}
+	fmt.Println("unmarshaled voices")
+
+	cmdArgs := []string{"--model", piper.modelPath + "\\" + model + "\\" + model + ".onnx", "--json-input", "--output-raw"}
+	command := exec.Command(piper.piperPath, cmdArgs...)
+	fmt.Println("Executing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
+
+	instance := VoiceSynthesizer{
+		command:   command,
+		audioData: &AudioBuffer{},
+		voices:    voices,
+	}
+
+	instance.stdin, err = instance.command.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	instance.stderr, err = instance.command.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	instance.stdout, err = instance.command.StdoutPipe() // Capture stdout
+	if err != nil {
+		return err
+	}
+
+	piper.models[model] = instance
 	return nil
 }
 

@@ -57,7 +57,17 @@ func (app *App) GetEngines() string {
 }
 
 func (app *App) GetVoices(engine string, model string) string {
-	return ""
+	voices, err := voiceManager.GetInstance().GetVoices(engine, model)
+	if err != nil {
+		return "Failed to get voices"
+	}
+
+	jsonData, err := json.Marshal(voices)
+	if err != nil {
+		return "Failed to marshal voices"
+	}
+
+	return string(jsonData)
 }
 
 //</editor-fold>

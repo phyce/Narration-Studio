@@ -93,8 +93,13 @@ func (manager *VoiceManager) GetEngines() []engine.Engine {
 	return allEngines
 }
 
-func (manager *VoiceManager) GetVoices(engine string, model string) {
+func (manager *VoiceManager) GetVoices(engineName string, model string) ([]engine.Voice, error) {
+	engine, exists := manager.Engines[engineName]
+	if !exists {
+		return nil, fmt.Errorf("engine %s does not exist", engineName)
+	}
 
+	return engine.Engine.GetVoices(model)
 }
 
 //func selectVoice(character string) Voice {

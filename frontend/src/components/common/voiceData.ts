@@ -1,18 +1,18 @@
 import {ref} from "vue";
 
 export interface Engine {
-	id: number;
+	id: string;
 	name: string;
 	models?: Model[];
 }
 export interface Model {
-	id: number;
+	id: string;
 	name: string;
 	engine?: string;
 	voices?: Voice[];
 }
 export interface Voice {
-	id: number;
+	id: string;
 	name: string;
 	gender: string;
 }
@@ -40,65 +40,65 @@ export function getModels() : Model[] {
 
 export const engines = ref<Engine[]>([
 	{
-		id: 1,
+		id: "1",
 		name: 'Piper',
 		models: [
 			{
-				id: 2,
+				id: "2",
 				name: 'LibriTTS',
 				voices: [
 					{
-						id: 23,
+						id: "23",
 						name: 'Piper Test voice 1',
 						gender: 'male',
 					},
 					{
-						id: 24,
+						id: "24",
 						name: 'Piper Test voice 2',
 						gender: 'Female',
 					},
 					{
-						id: 25,
+						id: "25",
 						name: 'Piper Test voice 3',
 						gender: 'Female',
 					},
 					{
-						id: 26,
+						id: "26",
 						name: 'Piper Test voice 4',
 						gender: 'Female',
 					},
 					{
-						id: 27,
+						id: "27",
 						name: 'Piper Test voice 5',
 						gender: 'Female',
 					},
 					{
-						id: 28,
+						id: "28",
 						name: 'Piper Test voice 6',
 						gender: 'Female',
 					},
 					{
-						id: 29,
+						id: "29",
 						name: 'Piper Test voice 8',
 						gender: 'Female',
 					},
 					{
-						id: 210,
+						id: "210",
 						name: 'Piper Test voice 2',
 						gender: 'Female',
 					},
 					{
-						id: 211,
+						id: "211",
 						name: 'Piper Test voice 2',
 						gender: 'Female',
 					},
 					{
-						id: 212,
+						id: "212",
 						name: 'Piper Test voice 2',
 						gender: 'Female',
 					},
 					{
-						id: 213,
+						id: "213",
 						name: 'Piper Test voice 2',
 						gender: 'Female',
 					},
@@ -107,20 +107,20 @@ export const engines = ref<Engine[]>([
 		]
 	},
 	{
-		id: 5,
+		id: "5",
 		name: 'Suno Bark',
 		models: [
 			{
-				id: 6,
+				id: "6",
 				name: 'Default',
 				voices: [
 					{
-						id: 7,
+						id: "7",
 						name: 'Suno Test voice 1',
 						gender: 'male',
 					},
 					{
-						id: 8,
+						id: "8",
 						name: 'Suno Test voice 2',
 						gender: 'Female',
 					},
@@ -129,36 +129,36 @@ export const engines = ref<Engine[]>([
 		]
 	},
 	{
-		id: 9,
+		id: '9',
 		name: 'Microsoft',
 		models: [
 			{
-				id: 10,
+				id: '10',
 				name: 'SAPI 4',
 				voices: [
 					{
-						id: 11,
+						id: '11',
 						name: 'MS Test voice 1',
 						gender: 'male',
 					},
 					{
-						id: 12,
+						id: '12',
 						name: 'MS Test voice 2',
 						gender: 'Female',
 					},
 				]
 			},
 			{
-				id: 13,
+				id: '13',
 				name: 'SAPI 5',
 				voices: [
 					{
-						id: 14,
+						id: '14',
 						name: 'MS Test voice 3',
 						gender: 'male',
 					},
 					{
-						id: 15,
+						id: '15',
 						name: 'MS Test voice 4',
 						gender: 'Female',
 					},

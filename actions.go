@@ -18,7 +18,7 @@ import (
 
 //<editor-fold desc="Sandbox">
 /* sandbox Play button action*/
-func (app *App) Play(script string) string {
+func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) string {
 	//if err := clearConsole(); err != nil {
 	//	panic(err)
 	//}
@@ -30,7 +30,13 @@ func (app *App) Play(script string) string {
 	re := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
 		if ttsLine := re.FindStringSubmatch(line); ttsLine != nil {
-			character, text := ttsLine[1], ttsLine[2]
+			var character string
+			if overrideVoices != "" {
+				character = overrideVoices
+			} else {
+				character = ttsLine[1]
+			}
+			text := ttsLine[2]
 			fmt.Println(character, text)
 			messages = append(messages, ttsUtil.CharacterMessage{
 				Character: character,
@@ -59,12 +65,12 @@ func (app *App) GetEngines() string {
 func (app *App) GetVoices(engine string, model string) string {
 	voices, err := voiceManager.GetInstance().GetVoices(engine, model)
 	if err != nil {
-		return "Failed to get voices"
+		return "Failed to get voices: " + err.Error()
 	}
 
 	jsonData, err := json.Marshal(voices)
 	if err != nil {
-		return "Failed to marshal voices"
+		return "Failed to marshal voices: " + err.Error()
 	}
 
 	return string(jsonData)

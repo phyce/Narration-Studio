@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
+	"strings"
 	"sync"
 )
 
@@ -11,7 +12,7 @@ type CharacterVoice struct {
 	Name   string `json:"name"`
 	Engine string `json:"engine"`
 	Model  string `json:"model"`
-	Voice  int    `json:"voice"`
+	Voice  string `json:"voice"`
 }
 
 type VoiceManager struct {
@@ -41,11 +42,28 @@ func (manager *VoiceManager) GetVoice(name string) CharacterVoice {
 	defer manager.Unlock()
 
 	if _, ok := manager.CharacterVoices[name]; !ok {
-		manager.CharacterVoices[name] = CharacterVoice{
-			Name:   name,
-			Engine: "piper",    //TODO: Add logic to select engine
-			Model:  "libritts", //TODO: Add logic to select model
-			Voice:  0,          //TODO: Add logic to select voice
+
+		if strings.Contains(name, ":") {
+			model, voice := func(name string) (string, string) {
+				segments := strings.Split(name, ":")
+				if len(segments) < 2 {
+					panic("Failed to parse voice name: " + name)
+				}
+				return segments[0], segments[1]
+			}(name)
+			manager.CharacterVoices[name] = CharacterVoice{
+				Name:   name,
+				Engine: "piper", //TODO: Add logic to select engine
+				Model:  model,
+				Voice:  voice,
+			}
+		} else {
+			manager.CharacterVoices[name] = CharacterVoice{
+				Name:   name,
+				Engine: "piper",    //TODO: Add logic to select engine
+				Model:  "libritts", //TODO: Add logic to select model
+				Voice:  "0",        //TODO: Add logic to select voice
+			}
 		}
 	}
 
@@ -62,16 +80,16 @@ func (manager *VoiceManager) RegisterEngine(newEngine engine.Engine) {
 	manager.Lock()
 	defer manager.Unlock()
 
-	for _, model := range newEngine.Models {
-		manager.RegisterModel(model)
-	}
+	//for _, model := range newEngine.Models {
+	//	manager.RegisterModel(model)
+	//}
 
 	manager.Engines[newEngine.ID] = newEngine
 }
 
-func (manager *VoiceManager) RegisterModel(newModel engine.Model) {
-
-}
+//func (manager *VoiceManager) RegisterModel(newModel engine.Model) {
+//
+//}
 
 func (manager *VoiceManager) GetEngine(ID string) (engine.Engine, bool) {
 	selectedEngine, ok := manager.Engines[ID]
@@ -94,12 +112,19 @@ func (manager *VoiceManager) GetEngines() []engine.Engine {
 }
 
 func (manager *VoiceManager) GetVoices(engineName string, model string) ([]engine.Voice, error) {
-	engine, exists := manager.Engines[engineName]
+	voiceEngine, exists := manager.Engines[engineName]
+	fmt.Println(manager.Engines)
+	fmt.Println("/Engines done")
+	fmt.Println(engineName)
+	fmt.Print("manager:")
+	fmt.Println(manager.Engines[engineName])
+	fmt.Print("voiceEngine:")
+	fmt.Println(voiceEngine)
 	if !exists {
 		return nil, fmt.Errorf("engine %s does not exist", engineName)
 	}
 
-	return engine.Engine.GetVoices(model)
+	return voiceEngine.Engine.GetVoices(model)
 }
 
 //func selectVoice(character string) Voice {

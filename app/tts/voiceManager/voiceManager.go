@@ -2,6 +2,7 @@ package voiceManager
 
 import (
 	"fmt"
+	"math/rand"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"strings"
@@ -42,32 +43,57 @@ func (manager *VoiceManager) GetVoice(name string) CharacterVoice {
 	defer manager.Unlock()
 
 	if _, ok := manager.CharacterVoices[name]; !ok {
-
-		if strings.Contains(name, ":") {
-			model, voice := func(name string) (string, string) {
-				segments := strings.Split(name, ":")
-				if len(segments) < 2 {
-					panic("Failed to parse voice name: " + name)
-				}
-				return segments[0], segments[1]
-			}(name)
-			manager.CharacterVoices[name] = CharacterVoice{
-				Name:   name,
-				Engine: "piper", //TODO: Add logic to select engine
-				Model:  model,
-				Voice:  voice,
-			}
-		} else {
-			manager.CharacterVoices[name] = CharacterVoice{
-				Name:   name,
-				Engine: "piper",    //TODO: Add logic to select engine
-				Model:  "libritts", //TODO: Add logic to select model
-				Voice:  "0",        //TODO: Add logic to select voice
-			}
+		engine := manager.calculateEngine(name)
+		model, voice := manager.calculateVoice(engine, name)
+		manager.CharacterVoices[name] = CharacterVoice{
+			Name:   name,
+			Engine: engine,
+			Model:  model,
+			Voice:  voice,
 		}
 	}
 
 	return manager.CharacterVoices[name]
+}
+
+func (manager *VoiceManager) calculateEngine(value string) string {
+	return "piper" //TODO add proper engine selection
+}
+
+func (manager *VoiceManager) calculateVoice(engineID string, value string) (string, string) {
+	if strings.Contains(value, ":") {
+		segments := strings.Split(value, ":")
+		if len(segments) < 2 {
+			panic("Failed to parse voice name: " + value)
+		}
+		return segments[0], segments[1]
+	} else {
+		selectedEngine, _ := manager.GetEngine(engineID)
+
+		seed := int64(0)
+		for _, r := range value {
+			seed = seed*31 + int64(r)
+		}
+
+		rand.Seed(seed)
+
+		models := make([]string, 0, len(selectedEngine.Models))
+		for model := range selectedEngine.Models {
+			models = append(models, model)
+		}
+		if len(models) == 0 {
+			panic("No models available")
+		}
+		selectedModel := models[rand.Intn(len(models))]
+
+		voices, _ := selectedEngine.Engine.GetVoices(selectedModel)
+		if len(voices) == 0 {
+			panic("No voices available")
+		}
+		selectedVoice := voices[rand.Intn(len(voices))]
+
+		return selectedModel, selectedVoice.ID
+	}
 }
 
 func (manager *VoiceManager) RegisterEngine(newEngine engine.Engine) {
@@ -86,10 +112,6 @@ func (manager *VoiceManager) RegisterEngine(newEngine engine.Engine) {
 
 	manager.Engines[newEngine.ID] = newEngine
 }
-
-//func (manager *VoiceManager) RegisterModel(newModel engine.Model) {
-//
-//}
 
 func (manager *VoiceManager) GetEngine(ID string) (engine.Engine, bool) {
 	selectedEngine, ok := manager.Engines[ID]

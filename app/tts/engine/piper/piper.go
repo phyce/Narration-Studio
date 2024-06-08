@@ -57,7 +57,7 @@ type VoiceSynthesizer struct {
 	stderr    io.ReadCloser
 	stdout    io.ReadCloser
 	audioData *AudioBuffer
-	voices    []engine.Voice
+	Voices    []engine.Voice
 }
 
 var Format = beep.Format{
@@ -226,7 +226,7 @@ func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	if !exists {
 		return nil, fmt.Errorf("model %s does not exist", model)
 	}
-	return modelData.voices, nil
+	return modelData.Voices, nil
 }
 
 //</editor-fold>
@@ -255,7 +255,7 @@ func (piper *Piper) InitializeModel(model string) error {
 	instance := VoiceSynthesizer{
 		command:   command,
 		audioData: &AudioBuffer{},
-		voices:    voices,
+		Voices:    voices,
 	}
 
 	instance.stdin, err = instance.command.StdinPipe()

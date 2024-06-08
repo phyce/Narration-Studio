@@ -17,6 +17,7 @@ import (
 	"nstudio/app/tts/voiceManager"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -105,8 +106,13 @@ func (piper *Piper) Initialize(models []string) error {
 	piper.modelPath = *modelPathValue.String
 
 	piper.models = make(map[string]VoiceSynthesizer)
+	fmt.Println("About to initialize models")
 	for _, model := range models {
-		piper.InitializeModel(model)
+		fmt.Println(model)
+		err := piper.InitializeModel(model)
+		if err != nil {
+			return err
+		}
 	}
 
 	return err
@@ -165,9 +171,11 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	fmt.Println("Voice")
 	fmt.Println(voice)
 
+	speakerID, _ := strconv.Atoi(voice.Voice)
+
 	input := PiperInputLite{
 		Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
-		SpeakerID: voice.Voice,
+		SpeakerID: speakerID,
 	}
 
 	jsonBytes, err := json.Marshal(input)
@@ -210,6 +218,10 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
+	fmt.Println("in GetVoices")
+	fmt.Println(model)
+	fmt.Println(piper.models)
+	fmt.Println(piper.models[model])
 	modelData, exists := piper.models[model]
 	if !exists {
 		return nil, fmt.Errorf("model %s does not exist", model)
@@ -261,6 +273,9 @@ func (piper *Piper) InitializeModel(model string) error {
 		return err
 	}
 
+	fmt.Println("Adding model to list:")
+	fmt.Println(model)
+	fmt.Println(instance)
 	piper.models[model] = instance
 	return nil
 }

@@ -30,15 +30,20 @@ const regexes = [
 ];
 
 async function generateSpeech() {
-	console.log(text.value);
-	const result = await Play(text.value);
-	console.log(result);
+	console.log("generating speech: ", text.value);
+	let voiceID = "";
+	if(overrideVoices.value) {
+		if (selectedModel.value === undefined || selectedVoice.value === undefined) return;
+		voiceID = selectedModel.value.id + ":" + selectedVoice.value.piperVoiceID ;
+	}
+	console.log("voiceid:", voiceID);
+	const result = await Play(text.value, saveNewCharacters.value, voiceID);
 	if (result === '') toast.add({ severity: 'success', summary: 'Success', detail: 'Generation completed', life: 3000 });
+	else toast.add({ severity: 'error', summary: 'Failed to generate audio', detail: result, life: 3000});
 }
 
 async function getEngines() {
 	const result = await GetEngines();
-
 	try {
 		const engines: Engine[] = JSON.parse(result);
 
@@ -53,6 +58,7 @@ async function getEngines() {
 async function getVoices(engine: string, model: string) {
 	console.log([engine, model]);
 	const result = await GetVoices(engine, model);
+	console.log(result);
 	try {
 		const voices: Voice[] = JSON.parse(result);
 

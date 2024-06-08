@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"encoding/json"
+	"fmt"
 	"nstudio/app/tts/util"
 )
 
@@ -28,9 +30,30 @@ type Model struct {
 }
 
 type Voice struct {
-	ID     int    `json:"piperVoiceID"`
+	ID     string `json:"piperVoiceID"`
 	Name   string `json:"name"`
 	Gender string `json:"gender"`
+}
+
+func (v *Voice) UnmarshalJSON(data []byte) error {
+	// Define a helper struct with ID as an int
+	type helper struct {
+		ID     int    `json:"piperVoiceID"`
+		Name   string `json:"name"`
+		Gender string `json:"gender"`
+	}
+
+	var h helper
+	if err := json.Unmarshal(data, &h); err != nil {
+		return err
+	}
+
+	// Convert the int ID to a string and assign values
+	v.ID = fmt.Sprintf("%d", h.ID)
+	v.Name = h.Name
+	v.Gender = h.Gender
+
+	return nil
 }
 
 //func (engine *Engine) Initialize() error {

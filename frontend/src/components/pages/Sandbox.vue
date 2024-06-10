@@ -2,7 +2,7 @@
 import Editor from '../common/Editor.vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox';
-import {onMounted, ref} from "vue"
+import {computed, onMounted, ref} from "vue"
 import { /*Engine, Model, Voice,*/} from '../common/voiceData';
 import {Engine, Model, Voice } from '../interfaces/engine';
 import { useLocalStorage } from '@vueuse/core';
@@ -34,7 +34,7 @@ async function generateSpeech() {
 	let voiceID = "";
 	if(overrideVoices.value) {
 		if (selectedModel.value === undefined || selectedVoice.value === undefined) return;
-		voiceID = selectedModel.value.id + ":" + selectedVoice.value.piperVoiceID ;
+		voiceID = selectedModel.value.id + ":" + selectedVoice.value.voiceID ;
 	}
 	console.log("voiceid:", voiceID);
 	const result = await Play(text.value, saveNewCharacters.value, voiceID);
@@ -89,13 +89,26 @@ onMounted(async () => {
 	treeNodes.value = formatToTreeSelectData(engines.value);
 });
 
+const isDisabled = computed(() => {
+	// return !overrideVoices.value || selectedVoice.value === undefined;
+	// return !(overrideVoices.value && selectedVoice.value !== undefined);
+	return (overrideVoices.value && selectedVoice.value === undefined);
+});
+
 </script>
 
 <template>
 	<div class="flex w-full h-full">
 		<div class="w-1/5 p-2">
 			<Toast position="bottom-center" />
-			<Button @click="generateSpeech" class="w-full" icon="pi pi-play" title="Play All" aria-label="Play" />
+			<Button
+				@click="generateSpeech"
+				class="w-full"
+				icon="pi pi-play"
+				title="Play All"
+				aria-label="Play"
+				:disabled="isDisabled"
+			/>
 			<TreeSelect :options="treeNodes" v-model="selectedModel" @node-select="onModelSelect" placeholder="Select a model" class="w-full mt-2" />
 			<Dropdown v-model="selectedVoice" :options="voices" filter optionLabel="name" placeholder="Select a voice" class="w-full mt-2 text-left" />
 			<div class="flex items-center justify-start w-full pt-1">

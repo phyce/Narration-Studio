@@ -10,7 +10,7 @@ export interface Model {
 }
 
 export interface Voice {
-	piperVoiceID: number;
+	voiceID: number;
 	name: string;
 	gender: string;
 }

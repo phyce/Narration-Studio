@@ -30,7 +30,7 @@ type Model struct {
 }
 
 type Voice struct {
-	ID     string `json:"piperVoiceID"`
+	ID     string `json:"voiceID"`
 	Name   string `json:"name"`
 	Gender string `json:"gender"`
 }
@@ -38,7 +38,7 @@ type Voice struct {
 func (v *Voice) UnmarshalJSON(data []byte) error {
 	// Define a helper struct with ID as an int
 	type helper struct {
-		ID     int    `json:"piperVoiceID"`
+		ID     int    `json:"voiceID"`
 		Name   string `json:"name"`
 		Gender string `json:"gender"`
 	}

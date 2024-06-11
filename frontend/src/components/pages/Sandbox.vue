@@ -3,13 +3,12 @@ import Editor from '../common/Editor.vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox';
 import {computed, onMounted, ref} from "vue"
-import { /*Engine, Model, Voice,*/} from '../common/voiceData';
 import {Engine, Model, Voice } from '../interfaces/engine';
 import { useLocalStorage } from '@vueuse/core';
 import {GetVoices, GetEngines,  Play} from '../../../wailsjs/go/main/App'
 import Toast from 'primevue/toast';
 import { useToast } from "primevue/usetoast";
-import {/*findById,*/ formatToTreeSelectData} from "../../util/util";
+import {formatToTreeSelectData} from "../../util/util";
 import TreeSelect from "primevue/treeselect";
 import Dropdown from "primevue/dropdown";
 const toast = useToast();
@@ -30,14 +29,14 @@ const regexes = [
 ];
 
 async function generateSpeech() {
-	console.log("generating speech: ", text.value);
 	let voiceID = "";
 	if(overrideVoices.value) {
 		if (selectedModel.value === undefined || selectedVoice.value === undefined) return;
 		voiceID = selectedModel.value.id + ":" + selectedVoice.value.voiceID ;
 	}
-	console.log("voiceid:", voiceID);
-	const result = await Play(text.value, saveNewCharacters.value, voiceID);
+
+	const result = await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
+
 	if (result === '') toast.add({ severity: 'success', summary: 'Success', detail: 'Generation completed', life: 3000 });
 	else toast.add({ severity: 'error', summary: 'Failed to generate audio', detail: result, life: 3000});
 }
@@ -47,11 +46,9 @@ async function getEngines() {
 	try {
 		const engines: Engine[] = JSON.parse(result);
 
-		console.log(engines);
-
 		return engines;
 	} catch (error) {
-	console.error("Error parsing JSON:", error);
+		toast.add({ severity: 'error', summary: 'Error getting engines:', detail: error, life: 5000});
 	}
 }
 
@@ -64,7 +61,7 @@ async function getVoices(engine: string, model: string) {
 
 		return voices;
 	} catch (error) {
-		console.error("Error parsing JSON:", error);
+		toast.add({ severity: 'error', summary: 'Error getting Voices:', detail: error, life: 5000});
 	}
 }
 
@@ -90,11 +87,8 @@ onMounted(async () => {
 });
 
 const isDisabled = computed(() => {
-	// return !overrideVoices.value || selectedVoice.value === undefined;
-	// return !(overrideVoices.value && selectedVoice.value !== undefined);
 	return (overrideVoices.value && selectedVoice.value === undefined);
 });
-
 </script>
 
 <template>

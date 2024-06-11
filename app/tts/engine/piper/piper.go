@@ -87,14 +87,12 @@ type Piper struct {
 // <editor-fold desc="Engine Interface">
 func (piper *Piper) Initialize(models []string) error {
 	var err error
-	fmt.Println("Piper engine initializing")
 
 	piperPathValue := config.GetInstance().GetSetting("piperPath")
 	if piperPathValue.String == nil {
 		err = errors.New("piperPath is nil")
 		return err
 	}
-	fmt.Println("Piper path:", *piperPathValue.String)
 	piper.piperPath = *piperPathValue.String
 
 	modelPathValue := config.GetInstance().GetSetting("piperModelsDirectory")
@@ -102,13 +100,10 @@ func (piper *Piper) Initialize(models []string) error {
 		err = errors.New("modelPath is nil")
 		return err
 	}
-	fmt.Println("Model path:", *modelPathValue.String)
 	piper.modelPath = *modelPathValue.String
 
 	piper.models = make(map[string]VoiceSynthesizer)
-	fmt.Println("About to initialize models")
 	for _, model := range models {
-		fmt.Println(model)
 		err := piper.InitializeModel(model)
 		if err != nil {
 			return err
@@ -119,57 +114,42 @@ func (piper *Piper) Initialize(models []string) error {
 }
 
 func (piper *Piper) Prepare() error {
-	fmt.Println("Piper prepare launched")
-
 	metadataPath := piper.modelPath + "\\libritts\\libritts.metadata.json"
 	data, err := ioutil.ReadFile(metadataPath)
 	if err != nil {
 		return fmt.Errorf("failed to read voice metadata: %v", err)
 	}
-	fmt.Println("read from metadata")
-	fmt.Println(string(data))
+
 	var voices []engine.Voice
 	if err := json.Unmarshal(data, &voices); err != nil {
-		fmt.Println("didn't get to unmarshal voices")
-		fmt.Println(err)
 		return fmt.Errorf("failed to parse voice metadata: %v", err)
 	}
-	fmt.Println("unmarshaled voices")
-	// Command preparation
+
 	//TODO: Loop through models and start them as needed. start all for now
 	err = piper.models["libritts"].command.Start()
 	if err != nil {
 		return err
 	}
 
-	// Start capturing audio
 	piper.StartAudioCapture(piper.models["libritts"])
 
-	// Initialize speaker
 	format := Format
 	if err := speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
 		return err
 	}
-	fmt.Println("Done preparing piper")
 	return nil
 }
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
 	piper.initOnce.Do(func() {
-		err := piper.Initialize([]string{"libritts"})
-		if err != nil {
-			return
-		}
-		err = piper.Prepare()
+		err := piper.Prepare()
 		if err != nil {
 			return
 		}
 	})
 	fmt.Printf("Piper playing: Character=%s, Message=%s\n", message.Character, message.Text)
 
-	voice := voiceManager.GetInstance().GetVoice(message.Character)
-	fmt.Println("Voice")
-	fmt.Println(voice)
+	voice := voiceManager.GetInstance().GetVoice(message.Character, false)
 
 	speakerID, _ := strconv.Atoi(voice.Voice)
 
@@ -183,7 +163,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 		return err
 	}
 	jsonBytes = append(jsonBytes, '\n')
-	fmt.Println(string(jsonBytes))
+
 	if _, err := piper.models["libritts"].stdin.Write(jsonBytes); err != nil {
 		return err
 	}
@@ -191,11 +171,9 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	endSignal := make(chan bool)
 	go func() {
 		scanner := bufio.NewScanner(piper.models["libritts"].stderr)
-		fmt.Println("About to start scanning")
 		for scanner.Scan() {
 			text := scanner.Text()
-			fmt.Println("sdterr text")
-			fmt.Println(text)
+
 			if strings.HasSuffix(text, " sec)") {
 				endSignal <- true
 				return
@@ -207,8 +185,6 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	audioBytes := piper.models["libritts"].audioData.buffer.Bytes()
 	audioClip := make([]byte, len(audioBytes))
 	copy(audioClip, audioBytes)
-	fmt.Println("AudioBytes")
-	fmt.Println(len(audioBytes))
 
 	if err := playRawAudioBytes(audioClip); err != nil {
 		return err
@@ -218,10 +194,6 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
-	fmt.Println("in GetVoices")
-	fmt.Println(model)
-	fmt.Println(piper.models)
-	fmt.Println(piper.models[model])
 	modelData, exists := piper.models[model]
 	if !exists {
 		return nil, fmt.Errorf("model %s does not exist", model)
@@ -237,20 +209,15 @@ func (piper *Piper) InitializeModel(model string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read voice metadata: %v", err)
 	}
-	fmt.Println("read from metadata")
-	fmt.Println(string(data))
 
 	var voices []engine.Voice
 	if err := json.Unmarshal(data, &voices); err != nil {
-		fmt.Println("didn't get to unmarshal voices")
-		fmt.Println(err)
 		return fmt.Errorf("failed to parse voice metadata: %v", err)
 	}
-	fmt.Println("unmarshaled voices")
 
 	cmdArgs := []string{"--model", piper.modelPath + "\\" + model + "\\" + model + ".onnx", "--json-input", "--output-raw"}
 	command := exec.Command(piper.piperPath, cmdArgs...)
-	fmt.Println("Executing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
+	fmt.Println("Preparing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
 
 	instance := VoiceSynthesizer{
 		command:   command,
@@ -273,23 +240,15 @@ func (piper *Piper) InitializeModel(model string) error {
 		return err
 	}
 
-	fmt.Println("Adding model to list:")
-	fmt.Println(model)
-	fmt.Println(instance)
 	piper.models[model] = instance
 	return nil
 }
 
 func (piper *Piper) StartAudioCapture(instance VoiceSynthesizer) {
-	fmt.Println("Capturing audio")
-	//instance.audioData = &AudioBuffer{}
-
 	go func() {
-		fmt.Println("should be copying stuff from stdout to audioData buffer")
 		_, err := io.Copy(instance.audioData, instance.stdout)
 		if err != nil {
-			// Handle the error. Note: This might happen if the stream ends or an unexpected error occurs.
-			fmt.Printf("Error during audio capture: %v\n", err)
+			panic("Error during audio capture: " + err.Error())
 		}
 	}()
 }

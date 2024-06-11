@@ -37,45 +37,22 @@ type Voice struct {
 
 func (v *Voice) UnmarshalJSON(data []byte) error {
 	// Define a helper struct with ID as an int
-	type helper struct {
-		ID     int    `json:"voiceID"`
-		Name   string `json:"name"`
-		Gender string `json:"gender"`
+	type tempVoice struct {
+		VoiceID      int    `json:"voiceID"`
+		PiperVoiceID int    `json:"piperVoiceID"`
+		Name         string `json:"name"`
+		Gender       string `json:"gender"`
 	}
 
-	var h helper
-	if err := json.Unmarshal(data, &h); err != nil {
+	var tempStruct tempVoice
+	if err := json.Unmarshal(data, &tempStruct); err != nil {
 		return err
 	}
 
 	// Convert the int ID to a string and assign values
-	v.ID = fmt.Sprintf("%d", h.ID)
-	v.Name = h.Name
-	v.Gender = h.Gender
+	v.ID = fmt.Sprintf("%d", tempStruct.VoiceID+tempStruct.PiperVoiceID)
+	v.Name = tempStruct.Name
+	v.Gender = tempStruct.Gender
 
 	return nil
 }
-
-//func (engine *Engine) Initialize() error {
-//	//tType := reflect.TypeOf((*T)(nil)).Elem()
-//	//panic(fmt.Sprintf("Initialize for %s engine has not been defined", tType.Name()))
-//	panic(fmt.Sprintf("Initialize for engine has not been defined"))
-//}
-//
-//func (engine *Engine) Play(message util.CharacterMessage) error {
-//	fmt.Println("Base play: %s", message.Text)
-//	return nil
-//}
-//
-//func (engine *Engine) Prepare() error {
-//	fmt.Println("Base prepare: %s")
-//	return nil
-//}
-//
-//func (engine *Engine) GetID() string {
-//	return "not set"
-//}
-//
-//func (engine *Engine) GetName() string {
-//	return "not set"
-//}

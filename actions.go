@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"nstudio/app/config"
 	"nstudio/app/tts"
 	ttsUtil "nstudio/app/tts/util"
@@ -19,11 +18,7 @@ import (
 //<editor-fold desc="Sandbox">
 /* sandbox Play button action*/
 func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) string {
-	//if err := clearConsole(); err != nil {
-	//	panic(err)
-	//}
 	clearConsole()
-	fmt.Println("\n\n\n\n\n\n\n\n-----------------------------------")
 	lines := strings.Split(script, "\n")
 	var messages []ttsUtil.CharacterMessage
 
@@ -37,15 +32,15 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 				character = ttsLine[1]
 			}
 			text := ttsLine[2]
-			fmt.Println(character, text)
 			messages = append(messages, ttsUtil.CharacterMessage{
 				Character: character,
 				Text:      text,
+				Save:      saveNewCharacters,
 			})
 		}
 	}
 
-	return tts.GenerateSpeech(messages, false)
+	return tts.GenerateSpeech(messages)
 }
 
 //</editor-fold>
@@ -77,33 +72,6 @@ func (app *App) GetVoices(engine string, model string) string {
 }
 
 //</editor-fold>
-
-//func (app *App) GetEngineVoiceData() string {
-//	engines := voiceManager.GetInstance().GetEngines()
-//
-//	fmt.Println("In get engine voice data")
-//	var voiceData []engine.Voice
-//	for _, engineItem := range engines {
-//		fmt.Println("engine")
-//		fmt.Println(engineItem)
-//		for _, model := range engine.Models {
-//			fmt.Println("model")
-//			fmt.Println(model)
-//			for _, voice := range model.Voices {
-//				fmt.Println("voice")
-//				fmt.Println(voice)
-//				voiceData = append(voiceData, voice)
-//			}
-//		}
-//	}
-//
-//	engineString, err := json.Marshal(voiceData)
-//	if err != nil {
-//		fmt.Println(err)
-//	}
-//
-//	return string(engineString)
-//}
 
 // <editor-fold desc="Settings">
 func (app *App) GetSettings() string {

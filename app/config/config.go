@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -59,8 +58,6 @@ func (manager *ConfigManager) GetSetting(name string) *Value {
 	if value, exists := manager.settings[name]; exists {
 		return &value
 	}
-
-	fmt.Println("Not found any matching settings")
 
 	return nil
 }

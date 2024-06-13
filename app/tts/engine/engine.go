@@ -10,6 +10,8 @@ type Base interface {
 	Initialize([]string) error
 	Prepare() error
 	Play(message util.CharacterMessage) error
+	Save(messages []util.CharacterMessage, play bool) error
+	Generate(jsonBytes []byte) ([]byte, error)
 	GetVoices(string) ([]Voice, error)
 	//GetModels() []Model
 }

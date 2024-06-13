@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // <editor-fold desc="Audio Buffer">
@@ -141,12 +142,6 @@ func (piper *Piper) Prepare() error {
 }
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
-	piper.initOnce.Do(func() {
-		err := piper.Prepare()
-		if err != nil {
-			return
-		}
-	})
 	fmt.Printf("Piper playing: Character=%s, Message=%s\n", message.Character, message.Text)
 
 	voice := voiceManager.GetInstance().GetVoice(message.Character, false)
@@ -160,12 +155,73 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
-		return err
+		return util.GenerateError(err, "Failed to marshal input")
 	}
 	jsonBytes = append(jsonBytes, '\n')
 
-	if _, err := piper.models["libritts"].stdin.Write(jsonBytes); err != nil {
+	audioClip, error := piper.Generate(jsonBytes)
+	if error != nil {
+		return error
+	}
+
+	if err := playRawAudioBytes(audioClip); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
+
+	for index, message := range messages {
+
+		voice := voiceManager.GetInstance().GetVoice(message.Character, false)
+
+		speakerID, _ := strconv.Atoi(voice.Voice)
+
+		input := PiperInput{
+			Text:       strings.ReplaceAll(message.Text, `"`, `\"`),
+			SpeakerID:  speakerID,
+			OutputFile: util.GenerateFilename(message, index),
+		}
+		fmt.Println("Piper Input")
+		fmt.Println(input)
+
+		jsonBytes, err := json.Marshal(input)
+		if err != nil {
+			return util.GenerateError(err, "Failed to marshal input")
+		}
+		jsonBytes = append(jsonBytes, '\n')
+
+		audioClip, error := piper.Generate(jsonBytes)
+		if error != nil {
+			return error
+		}
+
+		if play {
+			if err := playRawAudioBytes(audioClip); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (piper *Piper) Generate(jsonBytes []byte) ([]byte, error) {
+	piper.initOnce.Do(func() {
+		err := piper.Prepare()
+		if err != nil {
+			return
+		}
+	})
+
+	if utf8.Valid(jsonBytes) == false {
+		return nil, errors.New("input JSON is not valid UTF-8")
+	}
+
+	if _, err := piper.models["libritts"].stdin.Write(jsonBytes); err != nil {
+		return nil, err
 	}
 
 	endSignal := make(chan bool)
@@ -173,6 +229,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 		scanner := bufio.NewScanner(piper.models["libritts"].stderr)
 		for scanner.Scan() {
 			text := scanner.Text()
+			fmt.Println(text)
 
 			if strings.HasSuffix(text, " sec)") {
 				endSignal <- true
@@ -185,12 +242,8 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	audioBytes := piper.models["libritts"].audioData.buffer.Bytes()
 	audioClip := make([]byte, len(audioBytes))
 	copy(audioClip, audioBytes)
-
-	if err := playRawAudioBytes(audioClip); err != nil {
-		return err
-	}
 	piper.models["libritts"].audioData.Reset()
-	return nil
+	return audioClip, nil
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {

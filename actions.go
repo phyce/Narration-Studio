@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"nstudio/app/config"
 	"nstudio/app/tts"
 	ttsUtil "nstudio/app/tts/util"
@@ -15,16 +17,16 @@ import (
 
 //This is the entry point for all actions coming from the frontend
 
-//<editor-fold desc="Sandbox">
-/* sandbox Play button action*/
+// <editor-fold desc="Sandbox">
+// TODO: combine with ProcessScript as they're mostly identical
 func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) string {
 	clearConsole()
 	lines := strings.Split(script, "\n")
 	var messages []ttsUtil.CharacterMessage
 
-	re := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
+	regex := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
-		if ttsLine := re.FindStringSubmatch(line); ttsLine != nil {
+		if ttsLine := regex.FindStringSubmatch(line); ttsLine != nil {
 			var character string
 			if overrideVoices != "" {
 				character = overrideVoices
@@ -40,7 +42,40 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 		}
 	}
 
-	return tts.GenerateSpeech(messages)
+	return tts.GenerateSpeech(messages, false)
+}
+
+//</editor-fold>
+
+// <editor-fold desc="Script Editor">
+// TODO: combine with Play as they're mostly identical
+func (app *App) ProcessScript(script string) string {
+	clearConsole()
+	lines := strings.Split(script, "\n")
+	var messages []ttsUtil.CharacterMessage
+
+	regex := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
+	for _, line := range lines {
+		if ttsLine := regex.FindStringSubmatch(line); ttsLine != nil {
+			// Extract and sanitize the character and text
+			character := strings.TrimSpace(ttsLine[1])
+			text := strings.TrimSpace(ttsLine[2])
+
+			fmt.Println("Character:", character)
+			fmt.Println("Text:", text)
+
+			// Append sanitized message to messages slice
+			messages = append(messages, ttsUtil.CharacterMessage{
+				Character: character,
+				Text:      text,
+				Save:      true,
+			})
+		}
+	}
+
+	//TODO HERE
+	//Need to sanitise input
+	return tts.GenerateSpeech(messages, true)
 }
 
 //</editor-fold>
@@ -83,15 +118,29 @@ func (app *App) GetSettings() string {
 }
 
 func (app *App) SaveSettings(settings string) {
-	error := config.GetInstance().Import(settings)
-	if error != nil {
-		panic(error)
+	err := config.GetInstance().Import(settings)
+	if err != nil {
+		panic(err)
 	}
 }
 
-//</editor-fold>
+func (app *App) SelectDirectory(defaultDirectory string) (string, error) {
+	directory, err := wailsRuntime.OpenDirectoryDialog(
+		app.ctx,
+		wailsRuntime.OpenDialogOptions{
+			DefaultDirectory: defaultDirectory,
+			Title:            "Select Directory",
+		},
+	)
 
-//script editor Generate button action
+	if err != nil {
+		return "", err
+	}
+
+	return directory, nil
+}
+
+//</editor-fold>
 
 //Character voiceManager Start Preview button action
 //Character voiceManager Stop Preview button action (toggle?)

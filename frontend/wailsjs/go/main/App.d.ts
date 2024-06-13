@@ -9,4 +9,8 @@ export function GetVoices(arg1:string,arg2:string):Promise<string>;
 
 export function Play(arg1:string,arg2:boolean,arg3:string):Promise<string>;
 
+export function ProcessScript(arg1:string):Promise<string>;
+
 export function SaveSettings(arg1:string):Promise<void>;
+
+export function SelectDirectory(arg1:string):Promise<string>;

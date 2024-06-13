@@ -230,20 +230,3 @@ func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.V
 
 	return voiceEngine.Engine.GetVoices(model)
 }
-
-//func selectVoice(character string) Voice {
-//	voices := getAllVoices()
-//	seed := hashStringToUint64(character)
-//	rand.Seed(int64(seed))
-//	randomIndex := rand.Intn(len(voices))
-//	return voices[randomIndex]
-//}
-//
-//func hashStringToUint64(text string) uint64 {
-//	hash := fnv.New64a()
-//	_, err := hash.Write([]byte(text))
-//	if err != nil {
-//		return uint64(time.Now().UnixNano())
-//	}
-//	return hash.Sum64()
-//}

@@ -5,10 +5,10 @@ import Checkbox from 'primevue/checkbox';
 import {computed, onMounted, ref} from "vue"
 import {Engine, Model, Voice } from '../interfaces/engine';
 import { useLocalStorage } from '@vueuse/core';
-import {GetVoices, GetEngines,  Play} from '../../../wailsjs/go/main/App'
+import { GetVoices, GetEngines, Play } from '../../../wailsjs/go/main/App'
 import Toast from 'primevue/toast';
 import { useToast } from "primevue/usetoast";
-import {formatToTreeSelectData} from "../../util/util";
+import { formatToTreeSelectData } from "../../util/util";
 import TreeSelect from "primevue/treeselect";
 import Dropdown from "primevue/dropdown";
 const toast = useToast();

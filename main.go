@@ -36,7 +36,7 @@ func main() {
 	}
 
 	err = wails.Run(&options.App{
-		Title:            "Narrator Studio v0.1.0",
+		Title:            "Narrator Studio v0.2.0",
 		Width:            1024,
 		Height:           768,
 		WindowStartState: options.Minimised,

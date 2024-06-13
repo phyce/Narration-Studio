@@ -18,6 +18,14 @@ export function Play(arg1, arg2, arg3) {
   return window['go']['main']['App']['Play'](arg1, arg2, arg3);
 }
 
+export function ProcessScript(arg1) {
+  return window['go']['main']['App']['ProcessScript'](arg1);
+}
+
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
+}
+
+export function SelectDirectory(arg1) {
+  return window['go']['main']['App']['SelectDirectory'](arg1);
 }

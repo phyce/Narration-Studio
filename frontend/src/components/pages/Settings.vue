@@ -47,7 +47,7 @@ onMounted(async () => {
 		const settingsString = await GetSettings();
 		settings.value = JSON.parse(settingsString) as UserSettings;
 	} catch (error) {
-		console.error("Error: ", error);
+		toast.add({ severity: 'error', summary: 'Failed to load settings', detail: error, life: 5000});
 	}
 });
 </script>

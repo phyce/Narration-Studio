@@ -48,8 +48,9 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 //</editor-fold>
 
 // <editor-fold desc="Script Editor">
-// TODO: combine with Play as they're mostly identical
+
 func (app *App) ProcessScript(script string) string {
+	// TODO: combine with Play as they're mostly identical
 	clearConsole()
 	lines := strings.Split(script, "\n")
 	var messages []ttsUtil.CharacterMessage
@@ -76,6 +77,20 @@ func (app *App) ProcessScript(script string) string {
 	//TODO HERE
 	//Need to sanitise input
 	return tts.GenerateSpeech(messages, true)
+}
+
+//</editor-fold>
+
+// <editor-fold desc="Character Voices">
+func (app *App) GetCharacterVoices() (string, error) {
+	voices := voiceManager.GetInstance().CharacterVoices
+
+	voicesJSON, err := json.Marshal(voices)
+	if err != nil {
+		return "", err
+	}
+
+	return string(voicesJSON), nil
 }
 
 //</editor-fold>

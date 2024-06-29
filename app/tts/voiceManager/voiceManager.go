@@ -34,6 +34,17 @@ func (characterVoice *CharacterVoice) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (characterVoice CharacterVoice) MarshalJSON() ([]byte, error) {
+	type Alias CharacterVoice
+	return json.Marshal(&struct {
+		Key string `json:"key"`
+		Alias
+	}{
+		Key:   fmt.Sprintf("%s:%s", characterVoice.Engine, characterVoice.Model),
+		Alias: (Alias)(characterVoice),
+	})
+}
+
 type VoiceManager struct {
 	sync.Mutex
 	Engines         map[string]tts.Engine

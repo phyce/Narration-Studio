@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import InputText from 'primevue/inputtext';
 import Button from "primevue/button";
-import Dropdown from "primevue/dropdown";
+import Dropdown, {DropdownChangeEvent} from "primevue/dropdown";
 import {computed, nextTick, onMounted, reactive, ref, watch} from "vue";
-import {GetVoices, GetEngines, Play, GetCharacterVoices} from '../../../wailsjs/go/main/App'
+import {GetVoices, GetEngines, Play, GetCharacterVoices, SaveCharacterVoices} from '../../../wailsjs/go/main/App'
 import {CharacterVoice, Engine, Model, Voice} from '../interfaces/engine';
 import {formatToTreeSelectData} from "../../util/util";
 import {useToast} from "primevue/usetoast";
@@ -17,6 +17,7 @@ const engineModelNodes = ref<any[]>([]);
 const engines = ref<{ [key: string]: Engine }>({});
 
 const voiceOptions = ref<Record<string, Voice[]>>({});
+const voiceOptionsMap = ref<Record<string, Voice[]>>({});
 // const characterVoices = ref<{ [key: string]: CharacterVoice }>({});
 
 const characterVoices = ref<Record<string, CharacterVoice>>({});
@@ -59,54 +60,34 @@ async function getVoices(engine: string, model: string) {
 	}
 }
 
-/*
-* TODO: Get all Character voices using GetChracterVoices
-*  need to make it store the available voices for all voice packs, as in characters we
-*  will have them all.
-*  then loop through them and create a row for each. each row needs to have a dropdown
-* for the engine and for the voice. then preview + delete buttons
-*
-* -Get voices from a pack, save it in a string index array
-* -use those to show available options
-* -make sure the selected dropdown matches the username in the row
-*/
-
 async function getCharacterVoices() {
 	try {
 		const result = await GetCharacterVoices();
 		const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
 		characterVoices.value = characterVoiceData;
 
-		// console.log("characterVoices");
-		// console.log(characterVoices);
-
-		for (const key in characterVoiceData) {
-			const { engine, model } = characterVoiceData[key];
-			selectedModels[key] = {
-				[`${engine}:${model}`]: true
+		for (const name in characterVoiceData) {
+			const { engine, model, voice } = characterVoiceData[name];
+			selectedModels[name] = {
+				[characterVoiceData[name].key]: true
 			};
-			selectedVoices[key] = {
-
-			}
+			selectedVoices[name] = voiceOptions.value[characterVoiceData[name].key][parseInt(voice)];
+			voiceOptionsMap.value[name] = voiceOptions.value[engine + ":" + model];
 		}
 
 	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Error getting character voices:', detail: String(error), life: 5000 });
+		toast.add({
+			severity: 'error',
+			summary: 'Error getting character voices:',
+			detail: String(error),
+			life: 5000
+		});
 	}
 }
 
 onMounted(async () => {
 	await getEngines();
 	await getCharacterVoices();
-
-	// for (const engine of Object.values(engines.value)) {
-	// 	if (engine.models) {
-	// 		for (const [modelId, modelData] of Object.entries(engine.models)) {
-	// 			await getVoices(engine.id, modelId);  // Fetch voices for each model
-	// 		}
-	// 	}
-	// }
-
 	await nextTick();
 
 	engineModelNodes.value = Object.values(engines.value).map(engine => ({
@@ -119,44 +100,52 @@ onMounted(async () => {
 			label: modelData.name,
 		}))
 	}));
-
-
-
-	// engineTreeNodes.value = formatToTreeSelectData(Object.values(engines.value));
-	console.log("engineModelNodes");
-	console.log(engineModelNodes.value);
-	console.log("selectedModels");
-	console.log(selectedModels);
-	// console.log("selectedCharacterModel");
-	// console.log(selectedCharacterModel);
 });
 
 function onModelSelect(nodeKey: TreeNode, characterKey: string) {
 	const [engineId, modelId] = nodeKey.key?.split(':') ?? '';
-	// console.log("selectedCharacterModel");
-	// console.log(selectedCharacterModel);
-	console.log("On Model Select");
-	console.log(nodeKey.key);
-	console.log(nodeKey);
 	const character = characterVoices.value[characterKey];
 	character.engine = engineId;
 	character.model = modelId;
 
-	// console.log("character");
-	// console.log(character);
-	// console.log(nodeKey);
+	voiceOptionsMap.value[characterKey] = voiceOptions.value[`${engineId}:${modelId}`] || [];
+
 }
 
-function onVoiceSelect(newValue, oldValue) {
+function onVoiceSelect(event: DropdownChangeEvent) {
+	console.log(selectedVoices);
+	console.log(event);
+}
 
+const saveCharacterVoices = () => {
+	console.log(characterVoices.value);
+	console.log("characterVoices.value");
+	const dataToSave = Object.entries(characterVoices.value).map(([key, voice]) => {
+		const modelKey = Object.keys(selectedModels[key])[0];
+		const [engine, model] = modelKey.split(':');
+		const voiceID = selectedVoices[key].voiceID;
+
+		return {
+			key: modelKey,
+			name: voice.name,
+			engine: engine,
+			model: model,
+			voice: voiceID
+		};
+	});
+	console.log("dataToSave");
+	console.log(dataToSave);
+	const dataString = JSON.stringify(dataToSave);
+	console.log(dataString);
+
+	SaveCharacterVoices(dataString);
 }
 
 </script>
 <template>
 	<div class="flex flex-col w-full h-full">
 		<div class="w-full px-2 mb-2 flex">
-			<Button class="mt-2 mr-2" icon="pi pi-save" title="Save All" label="Save All" aria-label="Save All" />
-			<Button class="mt-2 button-start" icon="pi pi-power-off" title="Start Preview" label="Start Preview" aria-label="Start Preview" />
+			<Button class="mt-2 mr-2" icon="pi pi-save" title="Save All" label="Save All" aria-label="Save All" @click="saveCharacterVoices()" />
 		</div>
 		<div v-for="(voice, key) in characterVoices" :key="key" class="flex p-2 border-b">
 			<div class="flex-grow p-2">
@@ -176,7 +165,7 @@ function onVoiceSelect(newValue, oldValue) {
 				 <Dropdown
 					 @change="onVoiceSelect"
 					 v-model="selectedVoices[key]"
-					 :options="voiceOptions[voice.key]"
+					 :options="voiceOptionsMap[key]"
 					 filter
 					 optionLabel="name"
 					 placeholder="Select a voice"

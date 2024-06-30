@@ -93,6 +93,10 @@ func (app *App) GetCharacterVoices() (string, error) {
 	return string(voicesJSON), nil
 }
 
+func (app *App) SaveCharacterVoices(voices string) {
+	voiceManager.GetInstance().UpdateCharacterVoices(voices)
+}
+
 //</editor-fold>
 
 // <editor-fold desc="Common">

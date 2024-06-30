@@ -26,6 +26,10 @@ export function ProcessScript(arg1) {
   return window['go']['main']['App']['ProcessScript'](arg1);
 }
 
+export function SaveCharacterVoices(arg1) {
+  return window['go']['main']['App']['SaveCharacterVoices'](arg1);
+}
+
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }

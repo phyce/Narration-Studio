@@ -50,7 +50,12 @@ async function getEngines() {
 
 		return engines;
 	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Error getting engines:', detail: error, life: 5000});
+		toast.add({
+			severity: 'error',
+			summary: 'Error getting engines:',
+			detail: error,
+			life: 5000
+		});
 	}
 }
 

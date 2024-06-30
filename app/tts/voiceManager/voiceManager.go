@@ -105,6 +105,32 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 	}
 }
 
+func (manager *VoiceManager) UpdateCharacterVoices(data string) {
+	var newVoices []CharacterVoice
+	err := json.Unmarshal([]byte(data), &newVoices)
+	if err != nil {
+		panic("Failed to unmarshal voices: " + err.Error())
+	}
+
+	manager.CharacterVoices = make(map[string]CharacterVoice)
+	for _, voice := range newVoices {
+		manager.CharacterVoices[voice.Name] = voice
+	}
+
+	executablePath, err := os.Executable()
+	if err != nil {
+		panic("Failed to get executable path: " + err.Error())
+	}
+
+	voiceConfigPath := filepath.Join(filepath.Dir(executablePath), "voiceConfig.json")
+
+	byteData := []byte(data)
+
+	if err := os.WriteFile(voiceConfigPath, byteData, 0644); err != nil {
+		panic("Failed to write updated voice config file: " + err.Error())
+	}
+}
+
 func (manager *VoiceManager) GetVoice(name string, save bool) CharacterVoice {
 	manager.Lock()
 	defer manager.Unlock()

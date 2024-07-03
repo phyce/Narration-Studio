@@ -7,6 +7,7 @@ export interface Engine {
 export interface Model {
 	id:     string;
 	name:   string;
+	engine: string;
 	key:    string;
 }
 

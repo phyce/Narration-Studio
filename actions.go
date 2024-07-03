@@ -97,6 +97,16 @@ func (app *App) SaveCharacterVoices(voices string) {
 	voiceManager.GetInstance().UpdateCharacterVoices(voices)
 }
 
+func (app *App) GetAvailableModels() (string, error) {
+	models := voiceManager.GetInstance().GetAllModels()
+
+	modelsJSON, err := json.Marshal(models)
+	if err != nil {
+		return "", err
+	}
+	return string(modelsJSON), nil
+}
+
 //</editor-fold>
 
 // <editor-fold desc="Common">
@@ -136,8 +146,36 @@ func (app *App) GetSettings() string {
 	return result
 }
 
+func (app *App) GetSetting(name string) string {
+	result := config.GetInstance().GetSetting(name)
+	data, error := json.Marshal(result)
+	if error != nil {
+		panic(error)
+	}
+	return string(data)
+}
+
 func (app *App) SaveSettings(settings string) {
 	err := config.GetInstance().Import(settings)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (app *App) SaveSetting(name string, newValue string) {
+	var value config.Value
+
+	fmt.Println("name")
+	fmt.Println(name)
+	fmt.Println("newValue")
+	fmt.Println(newValue)
+
+	err := json.Unmarshal([]byte(newValue), &value)
+	if err != nil {
+		panic(err)
+	}
+
+	err = config.GetInstance().SetSetting(name, value)
 	if err != nil {
 		panic(err)
 	}

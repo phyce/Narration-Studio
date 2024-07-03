@@ -24,8 +24,8 @@ func main() {
 		Name:   "Piper",
 		Engine: &piper.Piper{},
 		Models: map[string]engine.Model{
-			"libritts": {ID: "libritts", Name: "LibriTTS"},
-			"vctk":     {ID: "vctk", Name: "VCTK"},
+			"libritts": {ID: "libritts", Name: "LibriTTS", Engine: "piper"},
+			"vctk":     {ID: "vctk", Name: "VCTK", Engine: "piper"},
 		},
 	}
 

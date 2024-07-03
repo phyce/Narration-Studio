@@ -100,7 +100,6 @@ func (manager *ConfigManager) Import(jsonString string) error {
 
 	manager.settings = newConfigs
 
-	// Persist the new configuration to the file.
 	updatedConfigs, err := json.Marshal(manager.settings)
 	if err != nil {
 		return err

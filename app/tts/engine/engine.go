@@ -24,11 +24,21 @@ type Engine struct {
 }
 
 type Model struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	//Voices []Voice `json:"voices"`
-	//Engine *string `json:"engine"`
-	//Voices []Voice `json:"voiceManager"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Engine string `json:"engine"`
+}
+
+func (m *Model) MarshalJSON() ([]byte, error) {
+	// Define a temporary structure that includes all the fields you want to serialize
+	type Alias Model
+	return json.Marshal(&struct {
+		*Alias
+		Key string `json:"key"`
+	}{
+		Alias: (*Alias)(m),
+		Key:   fmt.Sprintf("%s:%s", m.Engine, m.Name),
+	})
 }
 
 type Voice struct {

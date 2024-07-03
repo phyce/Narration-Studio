@@ -61,6 +61,7 @@ func GetInstance() *VoiceManager {
 	once.Do(func() {
 		instance = &VoiceManager{
 			Engines:         make(map[string]tts.Engine),
+			Models:          make(map[string]tts.Model),
 			CharacterVoices: make(map[string]CharacterVoice),
 		}
 
@@ -231,11 +232,15 @@ func (manager *VoiceManager) RegisterEngine(newEngine tts.Engine) {
 	manager.Lock()
 	defer manager.Unlock()
 
-	//for _, model := range newEngine.Models {
-	//	manager.RegisterModel(model)
-	//}
+	for _, model := range newEngine.Models {
+		manager.RegisterModel(model)
+	}
 
 	manager.Engines[newEngine.ID] = newEngine
+}
+
+func (manager *VoiceManager) RegisterModel(model tts.Model) {
+	manager.Models[model.ID] = model
 }
 
 func (manager *VoiceManager) GetEngine(ID string) (tts.Engine, bool) {
@@ -256,6 +261,10 @@ func (manager *VoiceManager) GetEngines() []tts.Engine {
 		allEngines = append(allEngines, managerEngine)
 	}
 	return allEngines
+}
+
+func (manager *VoiceManager) GetAllModels() map[string]tts.Model {
+	return manager.Models
 }
 
 func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.Voice, error) {

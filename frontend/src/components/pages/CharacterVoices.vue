@@ -141,27 +141,36 @@ const saveCharacterVoices = () => {
 	SaveCharacterVoices(dataString);
 }
 
+async function previewVoice(voice: CharacterVoice) {
+	console.log("in previewVoice");
+	console.log(voice);
+
+	const result = await Play(voice.name + ": " + voice.name, false, voice.model + voice.voice);
+
+	if (result !== '')  toast.add({ severity: 'error', summary: 'Failed to preview voice', detail: result, life: 3000});
+}
+
 </script>
 <template>
 	<div class="flex flex-col w-full h-full">
-		<div class="w-full px-2 mb-2 flex">
+		<div class="w-full px-2 mb-3 flex">
 			<Button class="mt-2 mr-2" icon="pi pi-save" title="Save All" label="Save All" aria-label="Save All" @click="saveCharacterVoices()" />
 		</div>
-		<div v-for="(voice, key) in characterVoices" :key="key" class="flex p-2 border-b">
-			<div class="flex-grow p-2">
+		<div v-for="(voice, key) in characterVoices" :key="key" class="flex mx-2">
+			<div class="flex-grow p-1">
 				<InputText v-model="voice.name" class="w-full" type="text" placeholder="Character name" />
 			</div>
-			<div class="flex-none p-2 flex items-center">
+			<div class="flex-initial p-1 w-1/4 flex items-center">
 				<TreeSelect
 					v-if="engineModelNodes && engineModelNodes.length > 0"
 					:options="engineModelNodes"
 					v-model="selectedModels[key]"
 					@node-select="node => onModelSelect(node, key)"
 					placeholder="Select a model"
-					class="w-full"
+					class="w-full pt-0"
 				/>
 			</div>
-			<div class="flex-none p-2 flex items-center">
+			<div class="flex-initial p-1 w-1/4 flex items-center">
 				 <Dropdown
 					 @change="onVoiceSelect"
 					 v-model="selectedVoices[key]"
@@ -169,13 +178,19 @@ const saveCharacterVoices = () => {
 					 filter
 					 optionLabel="name"
 					 placeholder="Select a voice"
-					 class="w-full ml-2 mt-2"
+					 class="w-full"
 				 />
 			</div>
 			<div class="flex-none pl-2 flex flex-col items-start">
 				<div class="flex justify-end w-full">
-					<Button class="mt-2 mr-2 inline-block button-start" icon="pi pi-volume-up" title="Preview" aria-label="Preview" />
-					<Button class="mt-2 inline-block button-stop" icon="pi pi-trash" title="Remove" aria-label="Remove" />
+					<Button
+						@click="previewVoice(voice)"
+						class="mt-1 mr-2 inline-block button-start"
+						icon="pi pi-volume-up"
+						title="Preview"
+						aria-label="Preview"
+					/>
+					<Button class="mt-1 inline-block button-stop" icon="pi pi-trash" title="Remove" aria-label="Remove" />
 				</div>
 			</div>
 		</div>

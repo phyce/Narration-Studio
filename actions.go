@@ -24,6 +24,8 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 	lines := strings.Split(script, "\n")
 	var messages []ttsUtil.CharacterMessage
 
+	fmt.Println(script)
+
 	regex := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
 		if ttsLine := regex.FindStringSubmatch(line); ttsLine != nil {

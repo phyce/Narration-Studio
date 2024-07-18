@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import Header from './components/Header.vue'
 import Footer from './components/Footer.vue'
-import {ComponentOptionsMixin, DefineComponent, ref} from "vue";
+import {ComponentOptionsMixin, DefineComponent, onMounted, onUnmounted, ref} from "vue";
 import Sandbox from './components/pages/Sandbox.vue';
 import ScriptEditor from './components/pages/ScriptEditor.vue';
 import CharacterVoices from './components/pages/CharacterVoices.vue';
@@ -9,7 +9,10 @@ import VoicePacks from './components/pages/VoicePacks.vue';
 import Settings from './components/pages/Settings.vue';
 import Start from './components/pages/Start.vue';
 import {Status} from "./components/enums/status";
-import Toast from 'primevue/toast';
+import {useToast} from "primevue/usetoast";
+import {eventManager} from "./util/eventManager";
+
+const toast = useToast();
 
 const activePage = ref<string>('start');
 const status = ref<number>(Status.Ready);
@@ -31,6 +34,23 @@ const pageComponents: pageComponent = {
 	'voice-packs': VoicePacks,
 	'settings': Settings
 };
+
+onMounted(() => {
+	eventManager.subscribe('notification', showNotification);
+});
+
+onUnmounted(() => {
+	eventManager.unsubscribe('notification');
+});
+
+function showNotification(data: any) {
+	const severity = data.severity || 'info';
+	const summary = data.summary || '';
+	const detail = data.detail || '';
+	const life = data.life || 5000;
+
+	toast.add({ severity, summary, detail, life });
+}
 
 </script>
 
@@ -58,7 +78,3 @@ const pageComponents: pageComponent = {
   background-origin: content-box;
 }
 </style>
-
-<script lang="ts">
-
-</script>

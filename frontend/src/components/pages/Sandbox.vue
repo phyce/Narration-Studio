@@ -34,6 +34,10 @@ async function generateSpeech() {
 		if (selectedModel.value === undefined || selectedVoice.value === undefined) return;
 		voiceID = selectedModel.value.id + ":" + selectedVoice.value.voiceID ;
 	}
+	console.log("Generate Speech");
+	console.log("text.value", text.value);
+	console.log("(saveNewCharacters.value? true: false)", (saveNewCharacters.value? true: false));
+	console.log("voiceID", voiceID);
 
 	const result = await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
 

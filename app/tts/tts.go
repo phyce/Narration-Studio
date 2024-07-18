@@ -13,6 +13,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) string {
 	//Get all required engines
 	//Initialize and/or prepare each engine instance/model
 	fmt.Println("In GenerateSpeech")
+	fmt.Println(messages)
 
 	for _, message := range messages {
 		fmt.Println(message)

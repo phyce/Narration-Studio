@@ -118,8 +118,6 @@ function onVoiceSelect(event: DropdownChangeEvent) {
 }
 
 const saveCharacterVoices = () => {
-	console.log(characterVoices.value);
-	console.log("characterVoices.value");
 	const dataToSave = Object.entries(characterVoices.value).map(([key, voice]) => {
 		const modelKey = Object.keys(selectedModels[key])[0];
 		const [engine, model] = modelKey.split(':');
@@ -133,10 +131,7 @@ const saveCharacterVoices = () => {
 			voice: voiceID
 		};
 	});
-	console.log("dataToSave");
-	console.log(dataToSave);
 	const dataString = JSON.stringify(dataToSave);
-	console.log(dataString);
 
 	SaveCharacterVoices(dataString);
 }
@@ -148,6 +143,10 @@ async function previewVoice(voice: CharacterVoice) {
 	const result = await Play(voice.name + ": " + voice.name, false, voice.model + voice.voice);
 
 	if (result !== '')  toast.add({ severity: 'error', summary: 'Failed to preview voice', detail: result, life: 3000});
+}
+
+async function removeVoice(key: string, voice: CharacterVoice) {
+	if(key in characterVoices.value) delete characterVoices.value[key];
 }
 
 </script>
@@ -190,7 +189,13 @@ async function previewVoice(voice: CharacterVoice) {
 						title="Preview"
 						aria-label="Preview"
 					/>
-					<Button class="mt-1 inline-block button-stop" icon="pi pi-trash" title="Remove" aria-label="Remove" />
+					<Button
+						@click="removeVoice(key, voice)"
+						class="mt-1 inline-block button-stop"
+						icon="pi pi-trash"
+						title="Remove"
+						aria-label="Remove"
+					/>
 				</div>
 			</div>
 		</div>

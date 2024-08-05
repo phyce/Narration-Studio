@@ -115,34 +115,65 @@ func (piper *Piper) Initialize(models []string) error {
 }
 
 func (piper *Piper) Prepare() error {
-	metadataPath := piper.modelPath + "\\libritts\\libritts.metadata.json"
-	data, err := ioutil.ReadFile(metadataPath)
-	if err != nil {
-		return fmt.Errorf("failed to read voice metadata: %v", err)
+	//metadataPath := piper.modelPath + "\\libritts\\libritts.metadata.json"
+	//data, err := ioutil.ReadFile(metadataPath)
+	//if err != nil {
+	//	return fmt.Errorf("failed to read voice metadata: %v", err)
+	//}
+	//
+	//var voices []engine.Voice
+	//if err := json.Unmarshal(data, &voices); err != nil {
+	//	return fmt.Errorf("failed to parse voice metadata: %v", err)
+	//}
+	//
+	////TODO: Loop through models and start them as needed. start all for now
+	//err = piper.models["libritts"].command.Start()
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//piper.StartAudioCapture(piper.models["libritts"])
+	//
+	//format := Format
+	//if err := speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
+	//	return err
+	//}
+	//return nil
+	for modelName, model := range piper.models {
+		metadataPath := fmt.Sprintf("%s\\%s\\%s.metadata.json", piper.modelPath, modelName, modelName)
+		data, err := ioutil.ReadFile(metadataPath)
+		if err != nil {
+			err = fmt.Errorf("failed to read voice metadata for model %s: %v", modelName, err)
+			return err
+		}
+
+		var voices []engine.Voice
+		if err := json.Unmarshal(data, &voices); err != nil {
+			err = fmt.Errorf("failed to parse voice metadata for model %s: %v", modelName, err)
+			return err
+		}
+
+		if err = model.command.Start(); err != nil {
+			return err
+		}
+
+		piper.StartAudioCapture(model)
+
+		format := Format
+		if err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
+			return err
+		}
 	}
 
-	var voices []engine.Voice
-	if err := json.Unmarshal(data, &voices); err != nil {
-		return fmt.Errorf("failed to parse voice metadata: %v", err)
-	}
-
-	//TODO: Loop through models and start them as needed. start all for now
-	err = piper.models["libritts"].command.Start()
-	if err != nil {
-		return err
-	}
-
-	piper.StartAudioCapture(piper.models["libritts"])
-
-	format := Format
-	if err := speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
-		return err
-	}
 	return nil
 }
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
 	fmt.Printf("Piper playing: Character=%s, Message=%s\n", message.Character, message.Text)
+
+	if strings.HasPrefix(message.Character, "::") {
+
+	}
 
 	voice := voiceManager.GetInstance().GetVoice(message.Character, false)
 
@@ -159,9 +190,9 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	}
 	jsonBytes = append(jsonBytes, '\n')
 
-	audioClip, error := piper.Generate(jsonBytes)
-	if error != nil {
-		return error
+	audioClip, err := piper.Generate(voice.Model, jsonBytes)
+	if err != nil {
+		return err
 	}
 
 	if err := playRawAudioBytes(audioClip); err != nil {
@@ -193,9 +224,9 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 		}
 		jsonBytes = append(jsonBytes, '\n')
 
-		audioClip, error := piper.Generate(jsonBytes)
-		if error != nil {
-			return error
+		audioClip, err := piper.Generate(voice.Model, jsonBytes)
+		if err != nil {
+			return err
 		}
 
 		if play {
@@ -208,7 +239,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
-func (piper *Piper) Generate(jsonBytes []byte) ([]byte, error) {
+func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 	piper.initOnce.Do(func() {
 		err := piper.Prepare()
 		if err != nil {
@@ -220,13 +251,16 @@ func (piper *Piper) Generate(jsonBytes []byte) ([]byte, error) {
 		return nil, errors.New("input JSON is not valid UTF-8")
 	}
 
-	if _, err := piper.models["libritts"].stdin.Write(jsonBytes); err != nil {
+	fmt.Println("About to send to engine's stdin")
+	fmt.Println(model)
+	fmt.Println(piper.models[model])
+	if _, err := piper.models[model].stdin.Write(jsonBytes); err != nil {
 		return nil, err
 	}
 
 	endSignal := make(chan bool)
 	go func() {
-		scanner := bufio.NewScanner(piper.models["libritts"].stderr)
+		scanner := bufio.NewScanner(piper.models[model].stderr)
 		for scanner.Scan() {
 			text := scanner.Text()
 			fmt.Println(text)
@@ -239,10 +273,10 @@ func (piper *Piper) Generate(jsonBytes []byte) ([]byte, error) {
 	}()
 	<-endSignal
 
-	audioBytes := piper.models["libritts"].audioData.buffer.Bytes()
+	audioBytes := piper.models[model].audioData.buffer.Bytes()
 	audioClip := make([]byte, len(audioBytes))
 	copy(audioClip, audioBytes)
-	piper.models["libritts"].audioData.Reset()
+	piper.models[model].audioData.Reset()
 	return audioClip, nil
 }
 

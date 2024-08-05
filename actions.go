@@ -18,7 +18,7 @@ import (
 //This is the entry point for all actions coming from the frontend
 
 // <editor-fold desc="Sandbox">
-// TODO: combine with ProcessScript as they're mostly identical
+/* TODO: combine with ProcessScript as they're mostly identical */
 func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) string {
 	clearConsole()
 	lines := strings.Split(script, "\n")
@@ -200,15 +200,6 @@ func (app *App) SelectDirectory(defaultDirectory string) (string, error) {
 }
 
 //</editor-fold>
-
-//Character voiceManager Start Preview button action
-//Character voiceManager Stop Preview button action (toggle?)
-
-//save character voice settings button action
-//preview character voice button action
-//delete character voice button action
-
-// toggle voice pack button action
 
 func clearConsole() error {
 	var cmd *exec.Cmd

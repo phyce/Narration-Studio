@@ -32,12 +32,12 @@ async function generateSpeech() {
 	let voiceID = "";
 	if(overrideVoices.value) {
 		if (selectedModel.value === undefined || selectedVoice.value === undefined) return;
-		voiceID = selectedModel.value.id + ":" + selectedVoice.value.voiceID ;
+
+		voiceID = "::" + Object.keys(selectedModel.value)[0] + ":" + selectedVoice.value.voiceID;
 	}
-	console.log("Generate Speech");
-	console.log("text.value", text.value);
-	console.log("(saveNewCharacters.value? true: false)", (saveNewCharacters.value? true: false));
-	console.log("voiceID", voiceID);
+	// console.log("text.value", text.value);
+	// console.log("(saveNewCharacters.value? true: false)", (saveNewCharacters.value? true: false));
+	// console.log("voiceID", voiceID);
 
 	const result = await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
 

@@ -136,6 +136,24 @@ func (manager *VoiceManager) GetVoice(name string, save bool) CharacterVoice {
 	manager.Lock()
 	defer manager.Unlock()
 
+	if strings.HasPrefix(name, "::") {
+		fmt.Println(name)
+		parts := strings.Split(name, ":")
+		if len(parts) == 5 {
+			characterVoice := CharacterVoice{
+				Name:   "",
+				Engine: parts[2],
+				Model:  parts[3],
+				Voice:  parts[4],
+			}
+			fmt.Println(characterVoice)
+			return characterVoice
+		} else {
+			panic("Incorrect amount of segments for custom voice")
+			//TODO proper error handling
+		}
+	}
+
 	if _, ok := manager.CharacterVoices[name]; !ok {
 		engine := manager.calculateEngine(name)
 		model, voice := manager.calculateVoice(engine, name)
@@ -180,7 +198,9 @@ func (manager *VoiceManager) SaveVoice(name string, voice CharacterVoice) {
 	}
 }
 
-func (manager *VoiceManager) calculateEngine(value string) string {
+func (manager *VoiceManager) calculateEngine(name string) string {
+	//return manager.CharacterVoices[name].Engine
+	//randomly pick an engine from the available ones
 	return "piper" //TODO add proper engine selection
 }
 

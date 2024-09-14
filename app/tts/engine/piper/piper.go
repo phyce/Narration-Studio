@@ -17,6 +17,8 @@ import (
 	"nstudio/app/tts/voiceManager"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,17 +93,26 @@ func (piper *Piper) Initialize(models []string) error {
 
 	piperPathValue := config.GetInstance().GetSetting("piperPath")
 	if piperPathValue.String == nil {
-		err = errors.New("piperPath is nil")
+		err = errors.New("Piper:Initialize:piperPathValue: is nil")
 		return err
 	}
-	piper.piperPath = *piperPathValue.String
+	err, piper.piperPath = util.ExpandPath(*piperPathValue.String)
+	if err != nil {
+		err = errors.New("Piper:Initialize:piperPath: " + err.Error())
+		return err
+	}
 
 	modelPathValue := config.GetInstance().GetSetting("piperModelsDirectory")
 	if modelPathValue.String == nil {
-		err = errors.New("modelPath is nil")
+		err = errors.New("Piper:Initialize:modelPathValue: is nil")
 		return err
 	}
-	piper.modelPath = *modelPathValue.String
+
+	err, piper.modelPath = util.ExpandPath(*modelPathValue.String)
+	if err != nil {
+		err = errors.New("Piper:Initialize:modelPath: " + err.Error())
+		return err
+	}
 
 	piper.models = make(map[string]VoiceSynthesizer)
 	for _, model := range models {
@@ -140,7 +151,7 @@ func (piper *Piper) Prepare() error {
 	//}
 	//return nil
 	for modelName, model := range piper.models {
-		metadataPath := fmt.Sprintf("%s\\%s\\%s.metadata.json", piper.modelPath, modelName, modelName)
+		metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
 		data, err := ioutil.ReadFile(metadataPath)
 		if err != nil {
 			err = fmt.Errorf("failed to read voice metadata for model %s: %v", modelName, err)
@@ -252,8 +263,8 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 	}
 
 	fmt.Println("About to send to engine's stdin")
-	fmt.Println(model)
-	fmt.Println(piper.models[model])
+	//fmt.Println(model)
+	//fmt.Println(piper.models[model])
 	if _, err := piper.models[model].stdin.Write(jsonBytes); err != nil {
 		return nil, err
 	}
@@ -290,19 +301,35 @@ func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 
 //</editor-fold>
 
-func (piper *Piper) InitializeModel(model string) error {
-	metadata := piper.modelPath + "\\" + model + "\\" + model + ".metadata.json"
-	data, err := os.ReadFile(metadata)
+func (piper *Piper) InitializeModel(modelName string) error {
+	var err error
+	modelPath := piper.modelPath
+	fmt.Println("Should start initializing")
+
+	if runtime.GOOS == "darwin" {
+		err, modelPath = util.ExpandPath(modelPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	metadataPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
+	data, err := os.ReadFile(metadataPath)
 	if err != nil {
 		return fmt.Errorf("failed to read voice metadata: %v", err)
 	}
 
+	fmt.Println("Continuing initialization")
+
 	var voices []engine.Voice
+	fmt.Println(string(data))
 	if err := json.Unmarshal(data, &voices); err != nil {
 		return fmt.Errorf("failed to parse voice metadata: %v", err)
 	}
 
-	cmdArgs := []string{"--model", piper.modelPath + "\\" + model + "\\" + model + ".onnx", "--json-input", "--output-raw"}
+	onnxPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
+
+	cmdArgs := []string{"--model", onnxPath, "--json-input", "--output-raw"}
 	command := exec.Command(piper.piperPath, cmdArgs...)
 	fmt.Println("Preparing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
 
@@ -322,12 +349,12 @@ func (piper *Piper) InitializeModel(model string) error {
 		return err
 	}
 
-	instance.stdout, err = instance.command.StdoutPipe() // Capture stdout
+	instance.stdout, err = instance.command.StdoutPipe()
 	if err != nil {
 		return err
 	}
 
-	piper.models[model] = instance
+	piper.models[modelName] = instance
 	return nil
 }
 

@@ -24,9 +24,16 @@ type Engine struct {
 }
 
 type Model struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Engine string `json:"engine"`
+	ID       string        `json:"id"`
+	Name     string        `json:"name"`
+	Engine   string        `json:"engine"`
+	Download ModelDownload `json:"modelDownload"`
+}
+
+type ModelDownload struct {
+	Metadata string `json:"metadata"`
+	Model    string `json:"model"`
+	Phonemes string `json:"phonemes"`
 }
 
 func (m *Model) MarshalJSON() ([]byte, error) {

@@ -1,0 +1,7 @@
+{
+	"modelToggles" : "{\"piper:libritts\":true,\"piper:vctk\":true}",
+	"outputType" : 0,
+	"piperModelsDirectory" : "~/piper/models",
+	"piperPath" : "~/piper/piper",
+	"scriptOutputPath" : "~/Desktop/Narrator Studio/output"
+}

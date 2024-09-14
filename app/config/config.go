@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -25,13 +26,24 @@ func (manager *ConfigManager) Initialize() error {
 	if err != nil {
 		return err
 	}
-	manager.filePath = filepath.Join(filepath.Dir(executablePath), "config.json")
+	manager.filePath = filepath.Join(filepath.Dir(executablePath), "narrator-studio-config.json")
 
 	file, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// File does not exist, create an empty file.
-			return ioutil.WriteFile(manager.filePath, []byte("{}"), 0644)
+			var defaultConfigPath string
+			if runtime.GOOS == "windows" {
+				defaultConfigPath = filepath.Join(".", "config", "config-windows-default.json")
+			} else if runtime.GOOS == "darwin" {
+				defaultConfigPath = filepath.Join(".", "config", "config-macos-default.json")
+			}
+
+			file, err = ioutil.ReadFile(defaultConfigPath)
+			if err != nil {
+				return err
+			}
+
+			err = ioutil.WriteFile(manager.filePath, file, 0644)
 		}
 		return err
 	}

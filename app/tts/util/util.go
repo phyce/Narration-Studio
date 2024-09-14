@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"nstudio/app/config"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -53,6 +54,17 @@ func GenerateFilename(message CharacterMessage, index int) string {
 
 	fullPath := filepath.Join(basePath, datePath, filename)
 	return fullPath
+}
+
+func ExpandPath(path string) (error, string) {
+	if strings.HasPrefix(path, "~") {
+		usr, err := user.Current()
+		if err != nil {
+			return err, ""
+		}
+		path = filepath.Join(usr.HomeDir, path[1:])
+	}
+	return nil, path
 }
 
 func truncateString(str string, maxLength int) string {

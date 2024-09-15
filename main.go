@@ -62,7 +62,7 @@ func main() {
 	voiceManager.GetInstance().RegisterEngine(piperEngine)
 
 	err = wails.Run(&options.App{
-		Title:            "Narrator Studio v0.4.0",
+		Title:            "Narrator Studio v0.5.0",
 		Width:            1024,
 		Height:           768,
 		WindowStartState: options.Minimised,

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"nstudio/app/common/eventManager"
 	"nstudio/app/config"
 	"nstudio/app/tts"
 	ttsUtil "nstudio/app/tts/util"
@@ -138,6 +139,17 @@ func (app *App) GetVoices(engine string, model string) string {
 }
 
 //</editor-fold>
+
+// <editor-fold desc="Events">
+func (app *App) EventSubscribe(eventName string, handler func(data interface{})) {
+	eventManager.GetInstance().SubscribeToEvent(eventName, handler)
+}
+
+func (a *App) EventTrigger(eventName string, data interface{}) {
+	eventManager.GetInstance().TriggerEvent(eventName, data)
+}
+
+// </editor-fold>
 
 // <editor-fold desc="Settings">
 func (app *App) GetSettings() string {

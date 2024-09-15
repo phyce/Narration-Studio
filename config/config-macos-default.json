@@ -3,5 +3,6 @@
 	"outputType" : 0,
 	"piperModelsDirectory" : "~/piper/models",
 	"piperPath" : "~/piper/piper",
-	"scriptOutputPath" : "~/Desktop/Narrator Studio/output"
+	"scriptOutputPath" : "~/Desktop/Narrator Studio/output",
+	"debugMode" : 0
 }

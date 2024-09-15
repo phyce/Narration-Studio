@@ -106,11 +106,11 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 	}
 }
 
-func (manager *VoiceManager) UpdateCharacterVoices(data string) {
+func (manager *VoiceManager) UpdateCharacterVoices(data string) error {
 	var newVoices []CharacterVoice
 	err := json.Unmarshal([]byte(data), &newVoices)
 	if err != nil {
-		panic("Failed to unmarshal voices: " + err.Error())
+		return util.TraceError(err)
 	}
 
 	manager.CharacterVoices = make(map[string]CharacterVoice)
@@ -120,7 +120,7 @@ func (manager *VoiceManager) UpdateCharacterVoices(data string) {
 
 	executablePath, err := os.Executable()
 	if err != nil {
-		panic("Failed to get executable path: " + err.Error())
+		return util.TraceError(err)
 	}
 
 	voiceConfigPath := filepath.Join(filepath.Dir(executablePath), "voiceConfig.json")
@@ -128,16 +128,17 @@ func (manager *VoiceManager) UpdateCharacterVoices(data string) {
 	byteData := []byte(data)
 
 	if err := os.WriteFile(voiceConfigPath, byteData, 0644); err != nil {
-		panic("Failed to write updated voice config file: " + err.Error())
+		return util.TraceError(err)
 	}
+
+	return nil
 }
 
-func (manager *VoiceManager) GetVoice(name string, save bool) CharacterVoice {
+func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, error) {
 	manager.Lock()
 	defer manager.Unlock()
 
 	if strings.HasPrefix(name, "::") {
-		fmt.Println(name)
 		parts := strings.Split(name, ":")
 		if len(parts) == 5 {
 			characterVoice := CharacterVoice{
@@ -146,17 +147,20 @@ func (manager *VoiceManager) GetVoice(name string, save bool) CharacterVoice {
 				Model:  parts[3],
 				Voice:  parts[4],
 			}
-			fmt.Println(characterVoice)
-			return characterVoice
+			return characterVoice, nil
 		} else {
-			panic("Incorrect amount of segments for custom voice")
-			//TODO proper error handling
+			return CharacterVoice{}, util.TraceError(
+				fmt.Errorf("invalid line could not be processed: " + name),
+			)
 		}
 	}
 
 	if _, ok := manager.CharacterVoices[name]; !ok {
 		engine := manager.calculateEngine(name)
-		model, voice := manager.calculateVoice(engine, name)
+		model, voice, err := manager.calculateVoice(engine, name)
+		if err != nil {
+			return CharacterVoice{}, util.TraceError(err)
+		}
 
 		characterVoice := CharacterVoice{
 			Name:   name,
@@ -165,15 +169,18 @@ func (manager *VoiceManager) GetVoice(name string, save bool) CharacterVoice {
 			Voice:  voice,
 		}
 		if save {
-			manager.SaveVoice(name, characterVoice)
+			err = manager.SaveVoice(name, characterVoice)
+			if err != nil {
+				return CharacterVoice{}, util.TraceError(err)
+			}
 		}
-		return characterVoice
+		return characterVoice, nil
 	}
 
-	return manager.CharacterVoices[name]
+	return manager.CharacterVoices[name], nil
 }
 
-func (manager *VoiceManager) SaveVoice(name string, voice CharacterVoice) {
+func (manager *VoiceManager) SaveVoice(name string, voice CharacterVoice) error {
 	manager.CharacterVoices[name] = voice
 
 	voicesArray := make([]CharacterVoice, 0, len(manager.CharacterVoices))
@@ -183,19 +190,20 @@ func (manager *VoiceManager) SaveVoice(name string, voice CharacterVoice) {
 
 	data, err := json.Marshal(voicesArray)
 	if err != nil {
-		panic("Failed to marshal voices: " + err.Error())
+		return util.TraceError(err)
 	}
 
 	executablePath, err := os.Executable()
 	if err != nil {
-		panic("Failed to get executable path: " + err.Error())
+		return util.TraceError(err)
 	}
 	voiceConfigPath := filepath.Join(filepath.Dir(executablePath), "voiceConfig.json")
 
 	err = os.WriteFile(voiceConfigPath, data, 0644)
 	if err != nil {
-		panic("Failed to write to voice config file: " + err.Error())
+		return util.TraceError(err)
 	}
+	return nil
 }
 
 func (manager *VoiceManager) calculateEngine(name string) string {
@@ -204,15 +212,15 @@ func (manager *VoiceManager) calculateEngine(name string) string {
 	return "piper" //TODO add proper engine selection
 }
 
-func (manager *VoiceManager) calculateVoice(engineID string, value string) (string, string) {
+func (manager *VoiceManager) calculateVoice(engineID string, value string) (string, string, error) {
 	if strings.Contains(value, ":") {
 		segments := strings.Split(value, ":")
 
 		if len(segments) < 2 {
-			panic("Failed to parse voice name: " + value)
+			return "", "", util.TraceError(fmt.Errorf("Failed to parse voice name:" + value))
 		}
 
-		return segments[0], segments[1]
+		return segments[0], segments[1], nil
 	} else {
 		selectedEngine, _ := manager.GetEngine(engineID)
 
@@ -220,34 +228,37 @@ func (manager *VoiceManager) calculateVoice(engineID string, value string) (stri
 		for _, r := range value {
 			seed = seed*31 + int64(r)
 		}
-
 		rand.Seed(seed)
 
 		models := make([]string, 0, len(selectedEngine.Models))
-
 		for model := range selectedEngine.Models {
 			models = append(models, model)
 		}
+
 		if len(models) == 0 {
-			panic("No models available")
+			return "", "", util.TraceError(
+				fmt.Errorf("No models found for engine %s", selectedEngine),
+			)
 		}
 		selectedModel := models[rand.Intn(len(models)-1)]
 
 		voices, _ := selectedEngine.Engine.GetVoices(selectedModel)
 		if len(voices) == 0 {
-			panic("No voices available: " + engineID)
+			return "", "", util.TraceError(
+				fmt.Errorf("No voices found for engine %s", selectedEngine),
+			)
 		}
 		selectedVoice := voices[rand.Intn(len(voices)-1)]
 
-		return selectedModel, selectedVoice.ID
+		return selectedModel, selectedVoice.ID, nil
 	}
 }
 
-func (manager *VoiceManager) RegisterEngine(newEngine tts.Engine) {
+func (manager *VoiceManager) RegisterEngine(newEngine tts.Engine) error {
 	models := util.GetKeys(newEngine.Models)
 	err := newEngine.Engine.Initialize(models)
 	if err != nil {
-		panic("error initializing engine:" + err.Error())
+		return util.TraceError(err)
 	}
 	manager.Lock()
 	defer manager.Unlock()
@@ -257,6 +268,7 @@ func (manager *VoiceManager) RegisterEngine(newEngine tts.Engine) {
 	}
 
 	manager.Engines[newEngine.ID] = newEngine
+	return nil
 }
 
 func (manager *VoiceManager) RegisterModel(model tts.Model) {
@@ -291,7 +303,7 @@ func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.V
 	voiceEngine, exists := manager.Engines[engineName]
 
 	if !exists {
-		return nil, fmt.Errorf("engine %s does not exist", engineName)
+		return nil, util.TraceError(fmt.Errorf("Engine %s not found", engineName))
 	}
 
 	return voiceEngine.Engine.GetVoices(model)

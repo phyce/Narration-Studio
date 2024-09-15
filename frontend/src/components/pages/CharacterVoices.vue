@@ -109,7 +109,6 @@ function onModelSelect(nodeKey: TreeNode, characterKey: string) {
 	character.model = modelId;
 
 	voiceOptionsMap.value[characterKey] = voiceOptions.value[`${engineId}:${modelId}`] || [];
-
 }
 
 function onVoiceSelect(event: DropdownChangeEvent) {
@@ -137,12 +136,7 @@ const saveCharacterVoices = () => {
 }
 
 async function previewVoice(voice: CharacterVoice) {
-	console.log("in previewVoice");
-	console.log(voice);
-
-	const result = await Play(voice.name + ": " + voice.name, false, voice.model + voice.voice);
-
-	if (result !== '')  toast.add({ severity: 'error', summary: 'Failed to preview voice', detail: result, life: 3000});
+	await Play(voice.name + ": " + voice.name, false, voice.model + voice.voice);
 }
 
 async function removeVoice(key: string, voice: CharacterVoice) {

@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"nstudio/app/config"
 	"os/user"
 	"path/filepath"
 	"runtime"
@@ -26,21 +25,23 @@ func GetKeys[KeyType comparable, ValueType any](inputMap map[KeyType]ValueType) 
 	return keys
 }
 
-// TODO: user error generator everywhere
-func GenerateError(err error, message string) error {
-	_, file, line, ok := runtime.Caller(1)
-	if !ok {
-		return fmt.Errorf("error generating error: %v", err)
+func TraceError(err error) error {
+	if err == nil {
+		return nil
 	}
 
-	shortFile := file[strings.LastIndex(file, "/")+1:]
+	_, file, line, ok := runtime.Caller(1)
+	if !ok {
+		panic(fmt.Errorf("TraceError failed: %v", err))
+	}
 
-	newErrorMessage := fmt.Sprintf("%s:%d: %s - %v \n", shortFile, line, message, err)
+	shortFile := shortFileName(file)
+	traceLine := fmt.Sprintf("%s:%d", shortFile, line)
 
-	return fmt.Errorf(newErrorMessage)
+	return fmt.Errorf("%v\n%s", err, traceLine)
 }
 
-func GenerateFilename(message CharacterMessage, index int) string {
+func GenerateFilename(message CharacterMessage, index int, outputPath string) string {
 	currentTime := time.Now()
 	//datePath := currentTime.Format("2006-01-02_15-04-05")
 	datePath := currentTime.Format("2006-01-02")
@@ -50,9 +51,7 @@ func GenerateFilename(message CharacterMessage, index int) string {
 
 	filename := fmt.Sprintf("%d) %s-%s.wav", index, message.Character, text)
 
-	basePath := *config.GetInstance().GetSetting("scriptOutputPath").String
-
-	fullPath := filepath.Join(basePath, datePath, filename)
+	fullPath := filepath.Join(outputPath, datePath, filename)
 	return fullPath
 }
 
@@ -60,11 +59,22 @@ func ExpandPath(path string) (error, string) {
 	if strings.HasPrefix(path, "~") {
 		usr, err := user.Current()
 		if err != nil {
-			return err, ""
+			return TraceError(err), ""
 		}
 		path = filepath.Join(usr.HomeDir, path[1:])
 	}
 	return nil, path
+}
+
+func shortFileName(fullPath string) string {
+	lastSlash := strings.LastIndex(fullPath, "/")
+	if lastSlash == -1 {
+		lastSlash = strings.LastIndex(fullPath, "\\")
+	}
+	if lastSlash == -1 {
+		return fullPath
+	}
+	return fullPath[lastSlash+1:]
 }
 
 func truncateString(str string, maxLength int) string {

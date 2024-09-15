@@ -35,7 +35,9 @@ func (manager *EventManager) SubscribeToEvent(eventName string, callback func(da
 }
 
 func (manager *EventManager) EmitEvent(eventName string, data interface{}) {
-	runtime.EventsEmit(manager.context, eventName, data)
+	if manager.context != nil {
+		runtime.EventsEmit(manager.context, eventName, data)
+	}
 }
 
 func (manager *EventManager) TriggerEvent(eventName string, data interface{}) {

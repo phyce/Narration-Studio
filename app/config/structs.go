@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 )
 
@@ -25,16 +24,12 @@ func (cv Value) MarshalJSON() ([]byte, error) {
 
 func (cv *Value) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
-		return nil // it was null
+		return nil
 	}
-	fmt.Println("DATA[0]")
-	fmt.Println(string(data[0]))
-	fmt.Println(string(data))
 	if data[0] == '"' {
 		return json.Unmarshal(data, &cv.String)
 	}
 	if data[0] == '{' || data[0] == '[' {
-		fmt.Println("We got raw data")
 		cv.Raw = string(data)
 		return nil
 	}

@@ -2,17 +2,24 @@ package response
 
 import (
 	"errors"
+	"fmt"
 	"nstudio/app/common/eventManager"
 )
 
 type Data struct {
-	Severity string `json:"severity"`
 	Summary  string `json:"summary"`
 	Detail   string `json:"detail"`
+	Severity string `json:"severity"`
 	Life     uint   `json:"life"`
 }
 
 // TODO enable/disable logging
+func Debug(data Data) {
+	fmt.Println(data.Summary, data.Detail)
+	data.Severity = "info"
+	data.Life = 2500
+	emitEvent("notification", data)
+}
 
 func Info(data Data) error {
 	data.Severity = "info"
@@ -37,7 +44,6 @@ func Warning(data Data) error {
 
 func Error(data Data) error {
 	data.Severity = "error"
-	data.Life = 0
 	emitEvent("notification", data)
 	return errors.New(data.Summary)
 }

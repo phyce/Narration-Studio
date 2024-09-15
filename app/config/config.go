@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"io/ioutil"
+	"nstudio/app/tts/util"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,11 +25,11 @@ func GetInstance() *ConfigManager {
 func (manager *ConfigManager) Initialize() error {
 	executablePath, err := os.Executable()
 	if err != nil {
-		return err
+		return util.TraceError(err)
 	}
 	manager.filePath = filepath.Join(filepath.Dir(executablePath), "narrator-studio-config.json")
 
-	file, err := ioutil.ReadFile(manager.filePath)
+	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			var defaultConfigPath string
@@ -38,18 +39,59 @@ func (manager *ConfigManager) Initialize() error {
 				defaultConfigPath = filepath.Join(".", "config", "config-macos-default.json")
 			}
 
-			file, err = ioutil.ReadFile(defaultConfigPath)
+			configFile, err = ioutil.ReadFile(defaultConfigPath)
 			if err != nil {
-				return err
+				return util.TraceError(err)
 			}
 
-			err = ioutil.WriteFile(manager.filePath, file, 0644)
+			err = ioutil.WriteFile(manager.filePath, configFile, 0644)
 		}
 		return err
 	}
 
-	err = json.Unmarshal(file, &manager.settings)
+	err = json.Unmarshal(configFile, &manager.settings)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
 	return err
+}
+
+func (manager *ConfigManager) Export() (string, error) {
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+
+	settingsJSON, err := json.Marshal(manager.settings)
+	if err != nil {
+		return "", util.TraceError(err)
+	}
+
+	return string(settingsJSON), nil
+}
+
+func (manager *ConfigManager) Import(jsonString string) error {
+	var newConfigs map[string]Value
+	err := json.Unmarshal([]byte(jsonString), &newConfigs)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+
+	manager.settings = newConfigs
+
+	updatedConfigs, err := json.Marshal(manager.settings)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	err = ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	return nil
 }
 
 func (manager *ConfigManager) GetSettings() map[string]Value {
@@ -79,38 +121,6 @@ func (manager *ConfigManager) SetSetting(name string, value Value) error {
 	defer manager.lock.Unlock()
 
 	manager.settings[name] = value
-
-	updatedConfigs, err := json.Marshal(manager.settings)
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
-}
-
-func (manager *ConfigManager) Export() (string, error) {
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
-
-	settingsJSON, err := json.Marshal(manager.settings)
-	if err != nil {
-		return "", err
-	}
-
-	return string(settingsJSON), nil
-}
-
-func (manager *ConfigManager) Import(jsonString string) error {
-	var newConfigs map[string]Value
-	err := json.Unmarshal([]byte(jsonString), &newConfigs)
-	if err != nil {
-		return err
-	}
-
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
-
-	manager.settings = newConfigs
 
 	updatedConfigs, err := json.Marshal(manager.settings)
 	if err != nil {

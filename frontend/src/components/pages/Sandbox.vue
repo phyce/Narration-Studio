@@ -35,14 +35,8 @@ async function generateSpeech() {
 
 		voiceID = "::" + Object.keys(selectedModel.value)[0] + ":" + selectedVoice.value.voiceID;
 	}
-	// console.log("text.value", text.value);
-	// console.log("(saveNewCharacters.value? true: false)", (saveNewCharacters.value? true: false));
-	// console.log("voiceID", voiceID);
 
-	const result = await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
-
-	if (result === '') toast.add({ severity: 'success', summary: 'Success', detail: 'Generation completed', life: 3000 });
-	else toast.add({ severity: 'error', summary: 'Failed to generate audio', detail: result, life: 3000});
+	await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
 }
 
 

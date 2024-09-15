@@ -35,12 +35,14 @@ const pageComponents: pageComponent = {
 	'settings': Settings
 };
 
+let unsubscribeNotification: () => void;
+
 onMounted(() => {
-	eventManager.subscribe('notification', showNotification);
+  unsubscribeNotification = eventManager.subscribe('notification', showNotification);
 });
 
 onUnmounted(() => {
-	eventManager.unsubscribe('notification');
+	unsubscribeNotification();
 });
 
 function showNotification(data: any) {

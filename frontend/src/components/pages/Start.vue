@@ -4,7 +4,7 @@
 
 <template>
 	<div class="w-full h-full pt-2">
-		<h1 class="text-3xl mb-3">Narrator Studio v0.1.0</h1>
+		<h1 class="text-3xl mb-3">Narrator Studio v0.5.0</h1>
 		<img class="object-contain w-full h-full" id="logo" alt="Wails logo" src="../../assets/images/logo.png"/>
 		Made by <a href="https://phyce.dev" target="_blank" class="text-orange-600">Phyce</a>
 	</div>

@@ -19,16 +19,9 @@ const regexes = [
 ];
 
 const handleBrowseClick = async () => {
-	try {
-		settings.value.scriptOutputPath = await SelectDirectory(settings.value.scriptOutputPath as string);
+	settings.value.scriptOutputPath = await SelectDirectory(settings.value.scriptOutputPath as string);
 
-		await SaveSettings(JSON.stringify(settings.value)).then(() => {
-			toast.add({ severity: 'success', summary: 'Success', detail: 'Output path updated.', life: 3000 });
-		});
-
-	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Failed to read settings', detail: error, life: 3000});
-	}
+	await SaveSettings(JSON.stringify(settings.value));
 }
 
 const processScript = async () => {
@@ -36,11 +29,9 @@ const processScript = async () => {
 }
 
 onMounted(async () => {
-	console.log("OnMounted is running");
 	try {
 		const settingsString = await GetSettings();
 		settings.value = JSON.parse(settingsString) as UserSettings;
-		console.log(settings.value);
 	} catch (error) {
 		toast.add({ severity: 'error', summary: 'Failed to read settings', detail: error, life: 5000});
 	}

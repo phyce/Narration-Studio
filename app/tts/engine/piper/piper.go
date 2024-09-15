@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/speaker"
 	"io"
 	"io/ioutil"
+	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
@@ -93,32 +93,36 @@ func (piper *Piper) Initialize(models []string) error {
 
 	piperPathValue := config.GetInstance().GetSetting("piperPath")
 	if piperPathValue.String == nil {
-		err = errors.New("Piper:Initialize:piperPathValue: is nil")
-		return err
+		return util.TraceError(fmt.Errorf("Piper:Initialize:piperPathValue: is nil"))
 	}
+
 	err, piper.piperPath = util.ExpandPath(*piperPathValue.String)
 	if err != nil {
-		err = errors.New("Piper:Initialize:piperPath: " + err.Error())
-		return err
+		return util.TraceError(err)
 	}
 
 	modelPathValue := config.GetInstance().GetSetting("piperModelsDirectory")
 	if modelPathValue.String == nil {
-		err = errors.New("Piper:Initialize:modelPathValue: is nil")
-		return err
+		return util.TraceError(fmt.Errorf("Piper:Initialize:modelPathValue: is nil"))
 	}
 
 	err, piper.modelPath = util.ExpandPath(*modelPathValue.String)
 	if err != nil {
-		err = errors.New("Piper:Initialize:modelPath: " + err.Error())
-		return err
+		return util.TraceError(err)
+	}
+
+	if runtime.GOOS == "darwin" {
+		err, piper.modelPath = util.ExpandPath(piper.modelPath)
+		if err != nil {
+			return util.TraceError(err)
+		}
 	}
 
 	piper.models = make(map[string]VoiceSynthesizer)
 	for _, model := range models {
 		err := piper.InitializeModel(model)
 		if err != nil {
-			return err
+			return util.TraceError(err)
 		}
 	}
 
@@ -126,53 +130,29 @@ func (piper *Piper) Initialize(models []string) error {
 }
 
 func (piper *Piper) Prepare() error {
-	//metadataPath := piper.modelPath + "\\libritts\\libritts.metadata.json"
-	//data, err := ioutil.ReadFile(metadataPath)
-	//if err != nil {
-	//	return fmt.Errorf("failed to read voice metadata: %v", err)
-	//}
-	//
-	//var voices []engine.Voice
-	//if err := json.Unmarshal(data, &voices); err != nil {
-	//	return fmt.Errorf("failed to parse voice metadata: %v", err)
-	//}
-	//
-	////TODO: Loop through models and start them as needed. start all for now
-	//err = piper.models["libritts"].command.Start()
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//piper.StartAudioCapture(piper.models["libritts"])
-	//
-	//format := Format
-	//if err := speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
-	//	return err
-	//}
-	//return nil
 	for modelName, model := range piper.models {
 		metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
 		data, err := ioutil.ReadFile(metadataPath)
 		if err != nil {
 			err = fmt.Errorf("failed to read voice metadata for model %s: %v", modelName, err)
-			return err
+			return util.TraceError(err)
 		}
 
 		var voices []engine.Voice
 		if err := json.Unmarshal(data, &voices); err != nil {
 			err = fmt.Errorf("failed to parse voice metadata for model %s: %v", modelName, err)
-			return err
+			return util.TraceError(err)
 		}
 
 		if err = model.command.Start(); err != nil {
-			return err
+			return util.TraceError(err)
 		}
 
 		piper.StartAudioCapture(model)
 
 		format := Format
 		if err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
-			return err
+			return util.TraceError(err)
 		}
 	}
 
@@ -180,13 +160,19 @@ func (piper *Piper) Prepare() error {
 }
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
-	fmt.Printf("Piper playing: Character=%s, Message=%s\n", message.Character, message.Text)
+	response.Debug(response.Data{
+		Summary: "Piper playing:" + message.Character,
+		Detail:  message.Text,
+	})
 
 	if strings.HasPrefix(message.Character, "::") {
 
 	}
 
-	voice := voiceManager.GetInstance().GetVoice(message.Character, false)
+	voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
+	if err != nil {
+		return util.TraceError(err)
+	}
 
 	speakerID, _ := strconv.Atoi(voice.Voice)
 
@@ -197,53 +183,52 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
-		return util.GenerateError(err, "Failed to marshal input")
+		return util.TraceError(err)
 	}
 	jsonBytes = append(jsonBytes, '\n')
 
 	audioClip, err := piper.Generate(voice.Model, jsonBytes)
 	if err != nil {
-		return err
+		return util.TraceError(err)
 	}
 
-	if err := playRawAudioBytes(audioClip); err != nil {
-		return err
-	}
-
+	playRawAudioBytes(audioClip)
 	return nil
 }
 
 func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 
 	for index, message := range messages {
-
-		voice := voiceManager.GetInstance().GetVoice(message.Character, false)
+		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
+		if err != nil {
+			return util.TraceError(err)
+		}
 
 		speakerID, _ := strconv.Atoi(voice.Voice)
 
 		input := PiperInput{
-			Text:       strings.ReplaceAll(message.Text, `"`, `\"`),
-			SpeakerID:  speakerID,
-			OutputFile: util.GenerateFilename(message, index),
+			Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
+			SpeakerID: speakerID,
+			OutputFile: util.GenerateFilename(
+				message,
+				index,
+				*config.GetInstance().GetSetting("scriptOutputPath").String,
+			),
 		}
-		fmt.Println("Piper Input")
-		fmt.Println(input)
 
 		jsonBytes, err := json.Marshal(input)
 		if err != nil {
-			return util.GenerateError(err, "Failed to marshal input")
+			return util.TraceError(err)
 		}
 		jsonBytes = append(jsonBytes, '\n')
 
 		audioClip, err := piper.Generate(voice.Model, jsonBytes)
 		if err != nil {
-			return err
+			return util.TraceError(err)
 		}
 
 		if play {
-			if err := playRawAudioBytes(audioClip); err != nil {
-				return err
-			}
+			playRawAudioBytes(audioClip)
 		}
 	}
 
@@ -254,19 +239,19 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 	piper.initOnce.Do(func() {
 		err := piper.Prepare()
 		if err != nil {
-			return
+			response.Error(response.Data{
+				Summary: "Failed to prepare piper",
+				Detail:  err.Error(),
+			})
 		}
 	})
 
 	if utf8.Valid(jsonBytes) == false {
-		return nil, errors.New("input JSON is not valid UTF-8")
+		return nil, util.TraceError(fmt.Errorf("input JSON is not valid UTF-8"))
 	}
 
-	fmt.Println("About to send to engine's stdin")
-	//fmt.Println(model)
-	//fmt.Println(piper.models[model])
 	if _, err := piper.models[model].stdin.Write(jsonBytes); err != nil {
-		return nil, err
+		return nil, util.TraceError(err)
 	}
 
 	endSignal := make(chan bool)
@@ -287,14 +272,16 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 	audioBytes := piper.models[model].audioData.buffer.Bytes()
 	audioClip := make([]byte, len(audioBytes))
 	copy(audioClip, audioBytes)
+
 	piper.models[model].audioData.Reset()
+
 	return audioClip, nil
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	modelData, exists := piper.models[model]
 	if !exists {
-		return nil, fmt.Errorf("model %s does not exist", model)
+		return nil, util.TraceError(fmt.Errorf("model %s does not exist", model))
 	}
 	return modelData.Voices, nil
 }
@@ -303,35 +290,29 @@ func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 
 func (piper *Piper) InitializeModel(modelName string) error {
 	var err error
-	modelPath := piper.modelPath
-	fmt.Println("Should start initializing")
 
-	if runtime.GOOS == "darwin" {
-		err, modelPath = util.ExpandPath(modelPath)
-		if err != nil {
-			return err
-		}
-	}
-
-	metadataPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
+	metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
 	data, err := os.ReadFile(metadataPath)
 	if err != nil {
-		return fmt.Errorf("failed to read voice metadata: %v", err)
+		return util.TraceError(err)
 	}
-
-	fmt.Println("Continuing initialization")
 
 	var voices []engine.Voice
 	fmt.Println(string(data))
 	if err := json.Unmarshal(data, &voices); err != nil {
-		return fmt.Errorf("failed to parse voice metadata: %v", err)
+		return util.TraceError(err)
 	}
 
-	onnxPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
+	onnxPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
 
 	cmdArgs := []string{"--model", onnxPath, "--json-input", "--output-raw"}
 	command := exec.Command(piper.piperPath, cmdArgs...)
-	fmt.Println("Preparing command: %s %s\n", command.Path, strings.Join(command.Args[1:], " "))
+	response.Debug(response.Data{
+		Summary: fmt.Sprintf("Preparing command: %s %s",
+			command.Path,
+			strings.Join(command.Args[1:], " "),
+		),
+	})
 
 	instance := VoiceSynthesizer{
 		command:   command,
@@ -341,17 +322,17 @@ func (piper *Piper) InitializeModel(modelName string) error {
 
 	instance.stdin, err = instance.command.StdinPipe()
 	if err != nil {
-		return err
+		return util.TraceError(err)
 	}
 
 	instance.stderr, err = instance.command.StderrPipe()
 	if err != nil {
-		return err
+		return util.TraceError(err)
 	}
 
 	instance.stdout, err = instance.command.StdoutPipe()
 	if err != nil {
-		return err
+		return util.TraceError(err)
 	}
 
 	piper.models[modelName] = instance
@@ -362,48 +343,38 @@ func (piper *Piper) StartAudioCapture(instance VoiceSynthesizer) {
 	go func() {
 		_, err := io.Copy(instance.audioData, instance.stdout)
 		if err != nil {
-			panic("Error during audio capture: " + err.Error())
+			response.Error(response.Data{
+				Summary: "Failed to start capturing audio",
+				Detail:  instance.command.String() + "\n" + err.Error(),
+			})
 		}
 	}()
 }
 
-func playRawAudioBytes(audioClip []byte) error {
+func playRawAudioBytes(audioClip []byte) {
 	done := make(chan struct{})
 	audioDataReader := bytes.NewReader(audioClip)
 
 	streamer := beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
 		for i := range samples {
 			if audioDataReader.Len() < 2 { // 2 bytes needed for one sample
-				close(done) // Signal that streaming is done
+				close(done)
 				return i, false
 			}
 			var sample int16
-			// Correctly handle little endian for the sample
+
 			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
 			if err != nil {
-				close(done) // In case of read error, signal to stop
+				close(done)
 				return i, false
 			}
 			flSample := float64(sample) / (1 << 15)
-			samples[i][0] = flSample // Mono to left channel
-			samples[i][1] = flSample // Mono to right channel
+			samples[i][0] = flSample
+			samples[i][1] = flSample
 		}
 		return len(samples), true
 	})
 
 	speaker.Play(streamer)
-
-	// Wait for the audio to finish playing
 	<-done
-
-	// Optionally, ensure that all audio has been played out
-	time.Sleep(100 * time.Millisecond)
-	return nil
 }
-
-//func (ss *VoiceSynthesizer) Stop() error {
-//	if err := ss.stdin.Close(); err != nil {
-//		return err
-//	}
-//	return ss.command.Wait()
-//}

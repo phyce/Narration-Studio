@@ -13,19 +13,19 @@ import { useToast } from "primevue/usetoast";
 const toast = useToast();
 
 interface OutputType {
-	id: number;
+	value: number;
 	name: string;
 	label: string;
 }
 
 const outputTypes: OutputType[] = [
 	{
-		id: 0,
+		value: 0,
 		name: 'Combined File',
 		label: 'Combined File'
 	},
 	{
-		id: 1,
+		value: 1,
 		name: 'Split Files',
 		label: 'Split Files'
 	}
@@ -34,21 +34,11 @@ const outputTypes: OutputType[] = [
 const settings = ref<UserSettings>({} as UserSettings);
 
 function handleSaveSettings() {
-	const settingsString = JSON.stringify(settings.value);
-	console.log(settings.value);
-	console.log(settingsString);
-	SaveSettings(settingsString).then(() => {
-		toast.add({ severity: 'success', summary: 'Success', detail: 'Settings have been saved', life: 3000 });
-	});
+	SaveSettings(JSON.stringify(settings.value));
 }
 
 onMounted(async () => {
-	try {
-		const settingsString = await GetSettings();
-		settings.value = JSON.parse(settingsString) as UserSettings;
-	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Failed to load settings', detail: error, life: 5000});
-	}
+	settings.value = JSON.parse(await GetSettings()) as UserSettings;
 });
 </script>
 
@@ -88,7 +78,6 @@ onMounted(async () => {
 			<InputGroup class="mb-2 flex">
 				<InputGroupAddon class="w-1/6">Output Type</InputGroupAddon>
 				<Dropdown
-					:value="settings.outputType"
 					v-model="settings.outputType"
 					:options="outputTypes"
 					inputId="outputType"

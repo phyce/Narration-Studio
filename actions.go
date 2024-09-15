@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"nstudio/app/common/eventManager"
+	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts"
 	ttsUtil "nstudio/app/tts/util"
@@ -20,12 +20,10 @@ import (
 
 // <editor-fold desc="Sandbox">
 /* TODO: combine with ProcessScript as they're mostly identical */
-func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) string {
+func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) {
 	clearConsole()
 	lines := strings.Split(script, "\n")
 	var messages []ttsUtil.CharacterMessage
-
-	fmt.Println(script)
 
 	regex := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
@@ -45,14 +43,25 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 		}
 	}
 
-	return tts.GenerateSpeech(messages, false)
+	err := tts.GenerateSpeech(messages, false)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to play script",
+			Detail:  err.Error(),
+		})
+	} else {
+		response.Success(response.Data{
+			Summary: "Success",
+			Detail:  "Generation completed",
+		})
+	}
 }
 
 //</editor-fold>
 
 // <editor-fold desc="Script Editor">
 
-func (app *App) ProcessScript(script string) string {
+func (app *App) ProcessScript(script string) {
 	// TODO: combine with Play as they're mostly identical
 	clearConsole()
 	lines := strings.Split(script, "\n")
@@ -61,14 +70,9 @@ func (app *App) ProcessScript(script string) string {
 	regex := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
 		if ttsLine := regex.FindStringSubmatch(line); ttsLine != nil {
-			// Extract and sanitize the character and text
 			character := strings.TrimSpace(ttsLine[1])
 			text := strings.TrimSpace(ttsLine[2])
 
-			fmt.Println("Character:", character)
-			fmt.Println("Text:", text)
-
-			// Append sanitized message to messages slice
 			messages = append(messages, ttsUtil.CharacterMessage{
 				Character: character,
 				Text:      text,
@@ -79,35 +83,57 @@ func (app *App) ProcessScript(script string) string {
 
 	//TODO HERE
 	//Need to sanitise input
-	return tts.GenerateSpeech(messages, true)
+	err := tts.GenerateSpeech(messages, true)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to process script",
+			Detail:  err.Error(),
+		})
+	}
 }
 
 //</editor-fold>
 
 // <editor-fold desc="Character Voices">
-func (app *App) GetCharacterVoices() (string, error) {
+func (app *App) GetCharacterVoices() string {
 	voices := voiceManager.GetInstance().CharacterVoices
 
 	voicesJSON, err := json.Marshal(voices)
 	if err != nil {
-		return "", err
+		response.Error(response.Data{
+			Summary: "Failed to get character voices",
+			Detail:  err.Error(),
+		})
 	}
 
-	return string(voicesJSON), nil
+	return string(voicesJSON)
 }
 
 func (app *App) SaveCharacterVoices(voices string) {
-	voiceManager.GetInstance().UpdateCharacterVoices(voices)
+	err := voiceManager.GetInstance().UpdateCharacterVoices(voices)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to save character voices",
+			Detail:  err.Error(),
+		})
+	} else {
+		response.Success(response.Data{
+			Summary: "Successfully saved character voices",
+		})
+	}
 }
 
-func (app *App) GetAvailableModels() (string, error) {
+func (app *App) GetAvailableModels() string {
 	models := voiceManager.GetInstance().GetAllModels()
 
 	modelsJSON, err := json.Marshal(models)
 	if err != nil {
-		return "", err
+		response.Error(response.Data{
+			Summary: "Failed to get available models",
+			Detail:  err.Error(),
+		})
 	}
-	return string(modelsJSON), nil
+	return string(modelsJSON)
 }
 
 //</editor-fold>
@@ -127,12 +153,18 @@ func (app *App) GetEngines() string {
 func (app *App) GetVoices(engine string, model string) string {
 	voices, err := voiceManager.GetInstance().GetVoices(engine, model)
 	if err != nil {
-		return "Failed to get voices: " + err.Error()
+		response.Error(response.Data{
+			Summary: "Failed to get voices",
+			Detail:  err.Error(),
+		})
 	}
 
 	jsonData, err := json.Marshal(voices)
 	if err != nil {
-		return "Failed to marshal voices: " + err.Error()
+		response.Error(response.Data{
+			Summary: "Failed to get voices",
+			Detail:  err.Error(),
+		})
 	}
 
 	return string(jsonData)
@@ -153,18 +185,25 @@ func (a *App) EventTrigger(eventName string, data interface{}) {
 
 // <editor-fold desc="Settings">
 func (app *App) GetSettings() string {
-	result, error := config.GetInstance().Export()
-	if error != nil {
-		panic(error)
+	result, err := config.GetInstance().Export()
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to get settings",
+			Detail:  err.Error(),
+		})
 	}
+
 	return result
 }
 
 func (app *App) GetSetting(name string) string {
 	result := config.GetInstance().GetSetting(name)
-	data, error := json.Marshal(result)
-	if error != nil {
-		panic(error)
+	data, err := json.Marshal(result)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to get setting",
+			Detail:  err.Error(),
+		})
 	}
 	return string(data)
 }
@@ -172,32 +211,41 @@ func (app *App) GetSetting(name string) string {
 func (app *App) SaveSettings(settings string) {
 	err := config.GetInstance().Import(settings)
 	if err != nil {
-		panic(err)
+		response.Error(response.Data{
+			Summary: "Failed to save settings",
+			Detail:  err.Error(),
+		})
+	} else {
+		response.Success(response.Data{
+			Summary: "Success",
+			Detail:  "Settings have been saved",
+		})
 	}
 }
 
 func (app *App) SaveSetting(name string, newValue string) {
 	var value config.Value
 
-	fmt.Println("name")
-	fmt.Println(name)
-	fmt.Println("newValue")
-	fmt.Println(newValue)
-
 	err := json.Unmarshal([]byte(newValue), &value)
 	if err != nil {
-		panic(err)
+		response.Error(response.Data{
+			Summary: "Failed to unmarshal new value",
+			Detail:  err.Error(),
+		})
 	}
 
 	err = config.GetInstance().SetSetting(name, value)
 	if err != nil {
-		panic(err)
+		response.Error(response.Data{
+			Summary: "Failed to set new value",
+			Detail:  err.Error(),
+		})
 	}
 }
 
-func (app *App) SelectDirectory(defaultDirectory string) (string, error) {
+func (app *App) SelectDirectory(defaultDirectory string) string {
 	directory, err := wailsRuntime.OpenDirectoryDialog(
-		app.ctx,
+		app.context,
 		wailsRuntime.OpenDialogOptions{
 			DefaultDirectory: defaultDirectory,
 			Title:            "Select Directory",
@@ -205,10 +253,17 @@ func (app *App) SelectDirectory(defaultDirectory string) (string, error) {
 	)
 
 	if err != nil {
-		return "", err
+		response.Error(response.Data{
+			Summary: "Failed to select directory",
+			Detail:  err.Error(),
+		})
+	} else {
+		response.Success(response.Data{
+			Summary: "Directory changed",
+		})
 	}
 
-	return directory, nil
+	return directory
 }
 
 //</editor-fold>

@@ -51,7 +51,8 @@ function showNotification(data: any) {
 	const detail = data.detail || '';
 	const life = data.life || 5000;
 
-	toast.add({ severity, summary, detail, life });
+	if (life) toast.add({ severity, summary, detail, life });
+	else toast.add({ severity, summary, detail });
 }
 
 </script>

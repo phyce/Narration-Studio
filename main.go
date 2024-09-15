@@ -19,14 +19,12 @@ func main() {
 	app := NewApp()
 	err := config.GetInstance().Initialize()
 
-	fmt.Println("Tried to initialize config")
 	if err != nil {
+		// TODO error popup or separate window before closing application
 		fmt.Println("Failed to init config")
 		fmt.Println(err)
 		panic(err)
 	}
-
-	fmt.Println("Initialized config")
 
 	//TODO: Load Models from file
 	piperEngine := engine.Engine{
@@ -56,9 +54,6 @@ func main() {
 			},
 		},
 	}
-
-	fmt.Println("about to register engine")
-
 	voiceManager.GetInstance().RegisterEngine(piperEngine)
 
 	err = wails.Run(&options.App{
@@ -81,6 +76,7 @@ func main() {
 	})
 
 	if err != nil {
+		// TODO error popup or separate window before closing application
 		println("Error:", err.Error())
 	}
 }

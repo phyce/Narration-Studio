@@ -42,3 +42,15 @@ type ConfigManager struct {
 	filePath string     `json:"filePath"`
 	lock     sync.Mutex `json:"lock"`
 }
+
+type ConfigValueInt struct {
+	Value uint   `json:"value"`
+	Name  string `json:"name"`
+	Label string `json:"label"`
+}
+
+type ConfigValueString struct {
+	Value string `json:"value"`
+	Name  string `json:"name"`
+	Label string `json:"label"`
+}

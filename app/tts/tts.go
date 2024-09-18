@@ -14,6 +14,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 		if err != nil {
 			return util.TraceError(err)
 		}
+
 		engine, ok := voiceManager.GetEngine(voice.Engine)
 		if !ok {
 			return util.TraceError(

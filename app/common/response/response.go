@@ -23,7 +23,7 @@ func Debug(data Data) {
 
 func Info(data Data) error {
 	data.Severity = "info"
-	data.Life = 3000
+	data.Life = 10000
 	emitEvent("notification", data)
 	return nil
 }
@@ -44,6 +44,7 @@ func Warning(data Data) error {
 
 func Error(data Data) error {
 	data.Severity = "error"
+	data.Life = 25000
 	emitEvent("notification", data)
 	return errors.New(data.Summary)
 }

@@ -2,18 +2,24 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"github.com/go-audio/audio"
+	"github.com/go-audio/wav"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts"
-	ttsUtil "nstudio/app/tts/util"
+	util "nstudio/app/tts/util"
 	"nstudio/app/tts/voiceManager"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
+	"time"
 )
 
 //This is the entry point for all actions coming from the frontend
@@ -23,7 +29,7 @@ import (
 func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) {
 	clearConsole()
 	lines := strings.Split(script, "\n")
-	var messages []ttsUtil.CharacterMessage
+	var messages []util.CharacterMessage
 
 	regex := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
@@ -35,7 +41,7 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 				character = ttsLine[1]
 			}
 			text := ttsLine[2]
-			messages = append(messages, ttsUtil.CharacterMessage{
+			messages = append(messages, util.CharacterMessage{
 				Character: character,
 				Text:      text,
 				Save:      saveNewCharacters,
@@ -65,7 +71,7 @@ func (app *App) ProcessScript(script string) {
 	// TODO: combine with Play as they're mostly identical
 	clearConsole()
 	lines := strings.Split(script, "\n")
-	var messages []ttsUtil.CharacterMessage
+	var messages []util.CharacterMessage
 
 	regex := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
 	for _, line := range lines {
@@ -73,7 +79,7 @@ func (app *App) ProcessScript(script string) {
 			character := strings.TrimSpace(ttsLine[1])
 			text := strings.TrimSpace(ttsLine[2])
 
-			messages = append(messages, ttsUtil.CharacterMessage{
+			messages = append(messages, util.CharacterMessage{
 				Character: character,
 				Text:      text,
 				Save:      true,
@@ -81,13 +87,58 @@ func (app *App) ProcessScript(script string) {
 		}
 	}
 
-	//TODO HERE
-	//Need to sanitise input
+	response.Debug(response.Data{
+		Summary: "About to generate speech",
+	})
+	//TODO: Need to sanitise input
 	err := tts.GenerateSpeech(messages, true)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to process script",
 			Detail:  err.Error(),
+		})
+	} else {
+		outputTypeRaw := []byte(config.GetInstance().GetSetting("outputType").Raw)
+		var outputType config.ConfigValueInt
+
+		err = json.Unmarshal(outputTypeRaw, &outputType)
+		if err != nil {
+			response.Error(response.Data{
+				Summary: "Failed to process config",
+				Detail:  err.Error(),
+			})
+		}
+
+		if outputType.Value == 0 {
+			//combined file
+
+			now := time.Now()
+			dateString := now.Format("2006-01-02")
+
+			err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+			if err != nil {
+				response.Error(response.Data{
+					Summary: "Failed to expand path",
+					Detail:  err.Error(),
+				})
+			}
+
+			outputPath := filepath.Join(expandedPath, dateString)
+
+			timeString := now.Format("15-04-05.wav")
+
+			err = CombineWavFilesWithPause(outputPath, timeString, time.Second, 22050)
+			if err != nil {
+				response.Error(response.Data{
+					Summary: "Failed to combine wav files",
+					Detail:  err.Error(),
+				})
+			}
+		}
+
+		response.Success(response.Data{
+			Summary: "Success",
+			Detail:  "Script processed successfully",
 		})
 	}
 }
@@ -277,4 +328,111 @@ func clearConsole() error {
 	}
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
+}
+
+func CombineWavFilesWithPause(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate int) error {
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	var wavFiles []string
+	for _, file := range files {
+		if !file.IsDir() && filepath.Ext(file.Name()) == ".wav" {
+			wavFiles = append(wavFiles, filepath.Join(dirPath, file.Name()))
+		}
+	}
+
+	if len(wavFiles) == 0 {
+		return util.TraceError(errors.New("No WAV files found in directory"))
+	}
+
+	sort.Strings(wavFiles)
+
+	var combinedBuffer *audio.IntBuffer
+	var numChannels int
+	var bitDepth int
+
+	silenceSamples := int(float64(pauseDuration.Seconds()) * float64(sampleRate))
+	silenceBuffer := &audio.IntBuffer{
+		Data: make([]int, silenceSamples*2), // Assuming stereo (2 channels)
+		Format: &audio.Format{
+			NumChannels: 1,
+			SampleRate:  sampleRate,
+		},
+	}
+
+	for idx, wavPath := range wavFiles {
+		file, err := os.Open(wavPath)
+		if err != nil {
+			return util.TraceError(err)
+		}
+
+		decoder := wav.NewDecoder(file)
+		if !decoder.IsValidFile() {
+			file.Close()
+			return util.TraceError(errors.New("Invalid WAV file:" + wavPath))
+		}
+
+		buf, err := decoder.FullPCMBuffer()
+		if err != nil {
+			file.Close()
+			return util.TraceError(err)
+		}
+
+		file.Close()
+
+		if idx == 0 {
+			combinedBuffer = &audio.IntBuffer{
+				Data:           []int{},
+				Format:         buf.Format,
+				SourceBitDepth: buf.SourceBitDepth,
+			}
+			numChannels = buf.Format.NumChannels
+			bitDepth = buf.SourceBitDepth
+
+			if buf.Format.SampleRate != sampleRate {
+				return util.TraceError(errors.New("Sample rate mismatch:" + wavPath))
+			}
+		} else {
+			if buf.Format.SampleRate != sampleRate ||
+				buf.Format.NumChannels != numChannels ||
+				buf.SourceBitDepth != bitDepth {
+				return util.TraceError(errors.New("Audio format mismatch:" + wavPath))
+			}
+		}
+
+		combinedBuffer.Data = append(combinedBuffer.Data, buf.Data...)
+
+		if idx < len(wavFiles)-1 {
+			combinedBuffer.Data = append(combinedBuffer.Data, silenceBuffer.Data...)
+		}
+	}
+
+	outputPath := filepath.Join(dirPath, outputFilename)
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return util.TraceError(err)
+	}
+	defer outFile.Close()
+
+	encoder := wav.NewEncoder(outFile, sampleRate, bitDepth, numChannels, 1)
+	err = encoder.Write(combinedBuffer)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	err = encoder.Close()
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	for _, wavPath := range wavFiles {
+		err := os.Remove(wavPath)
+		if err != nil {
+			return util.TraceError(err)
+		}
+	}
+
+	return nil
 }

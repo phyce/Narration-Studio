@@ -197,6 +197,14 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 }
 
 func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
+	response.Debug(response.Data{
+		Summary: "Piper saving messages",
+	})
+
+	err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+	if err != nil {
+		return util.TraceError(err)
+	}
 
 	for index, message := range messages {
 		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
@@ -212,7 +220,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 			OutputFile: util.GenerateFilename(
 				message,
 				index,
-				*config.GetInstance().GetSetting("scriptOutputPath").String,
+				expandedPath,
 			),
 		}
 

@@ -2,6 +2,8 @@ package util
 
 import (
 	"fmt"
+	"nstudio/app/common/response"
+	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
@@ -51,7 +53,17 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 
 	filename := fmt.Sprintf("%d) %s-%s.wav", index, message.Character, text)
 
-	fullPath := filepath.Join(outputPath, datePath, filename)
+	outputPath = filepath.Join(outputPath, datePath)
+	fullPath := filepath.Join(outputPath, filename)
+
+	err := PrepareDirectory(outputPath)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to prepare directory: " + outputPath,
+			Detail:  err.Error(),
+		})
+	}
+
 	return fullPath
 }
 
@@ -64,6 +76,14 @@ func ExpandPath(path string) (error, string) {
 		path = filepath.Join(usr.HomeDir, path[1:])
 	}
 	return nil, path
+}
+
+func PrepareDirectory(filePath string) error {
+	err := os.MkdirAll(filePath, 0755)
+	if err != nil {
+		return TraceError(err)
+	}
+	return nil
 }
 
 func shortFileName(fullPath string) string {

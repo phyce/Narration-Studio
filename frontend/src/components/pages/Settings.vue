@@ -39,6 +39,7 @@ function handleSaveSettings() {
 
 onMounted(async () => {
 	settings.value = JSON.parse(await GetSettings()) as UserSettings;
+	settings.value.outputType = JSON.parse(settings.value.outputType as string);
 });
 </script>
 

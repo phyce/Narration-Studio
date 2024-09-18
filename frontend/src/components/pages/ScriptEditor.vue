@@ -29,12 +29,8 @@ const processScript = async () => {
 }
 
 onMounted(async () => {
-	try {
-		const settingsString = await GetSettings();
-		settings.value = JSON.parse(settingsString) as UserSettings;
-	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Failed to read settings', detail: error, life: 5000});
-	}
+	const settingsString = await GetSettings();
+	settings.value = JSON.parse(settingsString) as UserSettings;
 });
 </script>
 

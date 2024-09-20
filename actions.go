@@ -355,7 +355,7 @@ func CombineWavFilesWithPause(dirPath, outputFilename string, pauseDuration time
 
 	silenceSamples := int(float64(pauseDuration.Seconds()) * float64(sampleRate))
 	silenceBuffer := &audio.IntBuffer{
-		Data: make([]int, silenceSamples*2), // Assuming stereo (2 channels)
+		Data: make([]int, silenceSamples*2),
 		Format: &audio.Format{
 			NumChannels: 1,
 			SampleRate:  sampleRate,

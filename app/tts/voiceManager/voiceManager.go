@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"nstudio/app/common/response"
 	tts "nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"os"
@@ -207,9 +208,35 @@ func (manager *VoiceManager) SaveVoice(name string, voice CharacterVoice) error 
 }
 
 func (manager *VoiceManager) calculateEngine(name string) string {
-	//return manager.CharacterVoices[name].Engine
-	//randomly pick an engine from the available ones
-	return "piper" //TODO add proper engine selection
+	response.Debug(response.Data{
+		Summary: "Getting engine for: " + name,
+	})
+
+	voice, exists := manager.CharacterVoices[name]
+	if exists {
+		return voice.Engine
+	}
+
+	seed := int64(0)
+	for _, r := range name {
+		seed = seed*31 + int64(r)
+	}
+	rand.Seed(seed)
+
+	engines := make([]string, 0, len(manager.Engines))
+	for engine := range manager.Engines {
+		engines = append(engines, engine)
+	}
+
+	if len(engines) == 0 {
+		util.TraceError(fmt.Errorf("No engines found"))
+		return ""
+	} else if len(engines) == 1 {
+		return engines[0]
+	} else {
+		selectedEngine := engines[rand.Intn(len(engines)-1)]
+		return selectedEngine
+	}
 }
 
 func (manager *VoiceManager) calculateVoice(engineID string, value string) (string, string, error) {

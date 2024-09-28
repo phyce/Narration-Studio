@@ -138,8 +138,6 @@ func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, e
 	manager.Lock()
 	defer manager.Unlock()
 
-	fmt.Println("GET VOICE")
-
 	if strings.HasPrefix(name, "::") {
 		parts := strings.Split(name, ":")
 		if len(parts) == 5 {
@@ -162,8 +160,6 @@ func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, e
 		modelToggles := config.GetInstance().GetModelToggles()
 
 		if modelToggles[voice.Engine][voice.Model] {
-
-			fmt.Println("GET PREEXISTING VOICE")
 
 			return voice, nil
 		}
@@ -188,8 +184,6 @@ func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, e
 			return CharacterVoice{}, util.TraceError(err)
 		}
 	}
-
-	fmt.Println("CALCULATE NEW VOICE")
 
 	return characterVoice, nil
 }
@@ -229,12 +223,9 @@ func (manager *VoiceManager) calculateEngine(name string) string {
 	if exists {
 		enabled, exists := config.GetInstance().GetModelToggles()[voice.Engine][voice.Model]
 		if exists && enabled {
-			fmt.Println("Exists & enabled:" + voice.Model)
 			return voice.Engine
 		}
 	}
-
-	fmt.Println("PICKING RANDOM ENGINE FOR: ", name)
 
 	seed := int64(0)
 	for _, r := range name {
@@ -259,11 +250,6 @@ func (manager *VoiceManager) calculateEngine(name string) string {
 }
 
 func (manager *VoiceManager) calculateVoice(engineID string, name string) (string, string, error) {
-	fmt.Println("ENGINE")
-	fmt.Println(engineID)
-	fmt.Println("NAME")
-	fmt.Println(name)
-
 	if strings.Contains(name, ":") {
 		segments := strings.Split(name, ":")
 
@@ -282,8 +268,6 @@ func (manager *VoiceManager) calculateVoice(engineID string, name string) (strin
 		rand.Seed(seed)
 
 		modelToggles := config.GetInstance().GetModelToggles()
-		fmt.Println("MODEL TOGGLES")
-		fmt.Println(modelToggles)
 
 		models := make([]string, 0, len(selectedEngine.Models))
 		for modelID, _ := range selectedEngine.Models {
@@ -291,9 +275,6 @@ func (manager *VoiceManager) calculateVoice(engineID string, name string) (strin
 				models = append(models, modelID)
 			}
 		}
-
-		fmt.Println("selectedEngine.Models")
-		fmt.Println(selectedEngine.Models)
 
 		var selectedModel string
 
@@ -330,12 +311,10 @@ func (manager *VoiceManager) RegisterEngine(newEngine tts.Engine) error {
 	}
 
 	for _, model := range newEngine.Models {
-		fmt.Println(model.ID, model.Engine, "MODELLL")
-		fmt.Println(model)
 		manager.RegisterModel(model)
 	}
 
-	manager.RefreshModels()
+	//manager.RefreshModels()
 
 	return nil
 }
@@ -352,26 +331,22 @@ func (manager *VoiceManager) RegisterModel(model tts.Model) {
 		fmt.Println("Already existing model: ", model.Engine, model.Name)
 	}
 
-	//if engine.Models == nil {
-	//	engine.Models = make(map[string]tts.Model)
-	//}
-
-	fmt.Println("engine.Models")
-	fmt.Println(engine.Models)
 	engine.Models[model.ID] = model
 
-	//if model.Enabled {
-	//	fmt.Println("model is Enabled, starting:", model.ID)
-	//	err := engine.Engine.Start(model.ID)
-	//	if err != nil {
-	//		response.Error(response.Data{
-	//			Summary: "Failed to prepare piper",
-	//			Detail:  err.Error(),
-	//		})
-	//	}
-	//}
+	modelToggles := config.GetInstance().GetModelToggles()
 
-	fmt.Println("Done registering model")
+	if modelToggles[model.Engine][model.ID] {
+		fmt.Println("STARTING MODEL: " + model.ID)
+		err := engine.Engine.Start(model.ID)
+		if err != nil {
+			response.Error(response.Data{
+				Summary: "Failed to prepare piper model:" + model.ID,
+				Detail:  err.Error(),
+			})
+		}
+	} else {
+		fmt.Println("NOT STARTING MODEL: " + model.ID)
+	}
 }
 
 func (manager *VoiceManager) GetEngine(ID string) (tts.Engine, bool) {
@@ -410,22 +385,15 @@ func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.V
 }
 
 func (manager *VoiceManager) RefreshModels() {
-	fmt.Println("Refreshing models")
 	toggles := config.GetInstance().GetModelToggles()
-	fmt.Println("Got model toggles")
-	fmt.Println(toggles)
+
 	for engine, models := range toggles {
-		fmt.Println("looping through engine: " + engine)
 		for model, enabled := range models {
-			fmt.Println("model: ", model)
 			if enabled {
-				fmt.Println("Starting: ", engine, model)
 				manager.Engines[engine].Engine.Start(model)
 			} else {
-				fmt.Println("Stopping: ", engine, model)
 				manager.Engines[engine].Engine.Stop(model)
 			}
-
 		}
 	}
 }

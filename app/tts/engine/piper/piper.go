@@ -138,7 +138,6 @@ func (piper *Piper) Start(modelName string) error {
 	}
 
 	var voices []engine.Voice
-	fmt.Println(string(data))
 	if err := json.Unmarshal(data, &voices); err != nil {
 		return util.TraceError(err)
 	}
@@ -176,13 +175,10 @@ func (piper *Piper) Start(modelName string) error {
 		return util.TraceError(err)
 	}
 
-	fmt.Println("About to run the command")
 	err = instance.command.Start()
 	if err != nil {
 		return util.TraceError(err)
 	}
-
-	fmt.Println("Ran the command")
 
 	piper.StartAudioCapture(instance)
 
@@ -303,9 +299,6 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 		return util.TraceError(err)
 	}
 
-	fmt.Println("GOT VOICE")
-	fmt.Println(voice.Voice, voice.Engine, voice.Model)
-
 	speakerID, _ := strconv.Atoi(voice.Voice)
 
 	input := PiperInputLite{
@@ -387,8 +380,6 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 			util.TraceError(fmt.Errorf("Failed to start model %s: %v", model, err))
 		}
 	}
-	fmt.Println("in Generate")
-	fmt.Println("Process ID: ", piper.GetProcessID(model))
 
 	if utf8.Valid(jsonBytes) == false {
 		return nil, util.TraceError(fmt.Errorf("input JSON is not valid UTF-8"))
@@ -404,8 +395,6 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 			text := scanner.Text()
 
 			if strings.HasSuffix(text, " sec)") {
-				fmt.Println("RECEIVED END SIGNAL")
-				fmt.Println(text)
 				endSignal <- true
 				return
 			}
@@ -416,11 +405,6 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 	audioBytes := piper.models[model].audioData.buffer.Bytes()
 	audioClip := make([]byte, len(audioBytes))
 	copy(audioClip, audioBytes)
-	fmt.Println("audioClip len")
-	fmt.Println(len(audioClip))
-
-	fmt.Println("audioBytes len")
-	fmt.Println(len(audioBytes))
 
 	piper.models[model].audioData.Reset()
 

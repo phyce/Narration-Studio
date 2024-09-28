@@ -21,7 +21,7 @@ export function Play(arg1:string,arg2:boolean,arg3:string):Promise<void>;
 
 export function ProcessScript(arg1:string):Promise<void>;
 
-export function ReloadEngines():Promise<void>;
+export function RefreshModels():Promise<void>;
 
 export function SaveCharacterVoices(arg1:string):Promise<void>;
 

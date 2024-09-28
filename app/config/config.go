@@ -145,14 +145,17 @@ func (manager *ConfigManager) SetConfigInt(name string, value int) error {
 
 // TODO this might need to go elsewhere
 func (manager *ConfigManager) GetModelToggles() map[string]map[string]bool {
-	engineTogglesRaw := *manager.GetSetting("modelToggles").String
+	//Seems like for random reason sometimes modelToggles comes out as String?
+	//Not sure what the hell is going on
+	engineTogglesRaw := manager.GetSetting("modelToggles").Raw
+
+	//engineTogglesString := *manager.GetSetting("modelToggles").String
+	//fmt.Println("engineTogglesString:", engineTogglesString)
 
 	engineToggles2D := make(map[string]map[string]bool)
 
 	var togglesMap map[string]bool
 	err := json.Unmarshal([]byte(engineTogglesRaw), &togglesMap)
-	fmt.Println("engineTogglesRaw")
-	fmt.Println(engineTogglesRaw)
 	if err != nil {
 		fmt.Println("Error unmarshaling JSON:", err)
 		return engineToggles2D

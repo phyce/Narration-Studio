@@ -334,8 +334,12 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 	return directory
 }
 
-func (app *App) ReloadEngines() {
-
+func (app *App) RefreshModels() {
+	clearConsole()
+	voiceManager.GetInstance().RefreshModels()
+	response.Success(response.Data{
+		Summary: "Models refreshed",
+	})
 }
 
 //</editor-fold>

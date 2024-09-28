@@ -42,8 +42,8 @@ export function ProcessScript(arg1) {
   return window['go']['main']['App']['ProcessScript'](arg1);
 }
 
-export function ReloadEngines() {
-  return window['go']['main']['App']['ReloadEngines']();
+export function RefreshModels() {
+  return window['go']['main']['App']['RefreshModels']();
 }
 
 export function SaveCharacterVoices(arg1) {

@@ -41,7 +41,6 @@ func TraceError(err error) error {
 	traceLine := fmt.Sprintf("%s:%d", shortFile, line)
 
 	result := fmt.Errorf("%v\n%s", err, traceLine)
-	fmt.Println(result)
 
 	return result
 }

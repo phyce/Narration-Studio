@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"nstudio/app/common/response"
 	"nstudio/app/tts/util"
 	"os"
 	"path/filepath"
@@ -129,9 +130,6 @@ func (manager *ConfigManager) SetSetting(name string, value Value) error {
 		return err
 	}
 
-	//fmt.Println("manager.filePath")
-	//fmt.Println(manager.filePath)
-
 	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 }
 
@@ -149,15 +147,20 @@ func (manager *ConfigManager) GetModelToggles() map[string]map[string]bool {
 	//Not sure what the hell is going on
 	engineTogglesRaw := manager.GetSetting("modelToggles").Raw
 
-	//engineTogglesString := *manager.GetSetting("modelToggles").String
-	//fmt.Println("engineTogglesString:", engineTogglesString)
+	if engineTogglesRaw == "" {
+		engineTogglesRaw = *manager.GetSetting("modelToggles").String
+	}
 
 	engineToggles2D := make(map[string]map[string]bool)
 
 	var togglesMap map[string]bool
 	err := json.Unmarshal([]byte(engineTogglesRaw), &togglesMap)
+
 	if err != nil {
-		fmt.Println("Error unmarshaling JSON:", err)
+		response.Error(response.Data{
+			Summary: "Failed unmarshaling json",
+			Detail:  err.Error(),
+		})
 		return engineToggles2D
 	}
 
@@ -173,6 +176,9 @@ func (manager *ConfigManager) GetModelToggles() map[string]map[string]bool {
 
 		engineToggles2D[parts[0]][parts[1]] = value
 	}
+
+	fmt.Println("modelToggles HERE")
+	fmt.Println(engineToggles2D)
 
 	return engineToggles2D
 }

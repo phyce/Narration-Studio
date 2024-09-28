@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -277,7 +276,6 @@ func (app *App) SaveSettings(settings string) {
 
 func (app *App) SaveSetting(name string, newValue string) {
 	var value config.Value
-	fmt.Println()
 
 	err := json.Unmarshal([]byte(newValue), &value)
 	if err != nil {

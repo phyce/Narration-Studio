@@ -29,7 +29,6 @@ type Model struct {
 	Name     string        `json:"name"`
 	Engine   string        `json:"engine"`
 	Download ModelDownload `json:"modelDownload"`
-	Enabled  bool
 }
 
 type ModelDownload struct {

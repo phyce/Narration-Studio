@@ -13,6 +13,7 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
+	process "nstudio/app/tts/util/process"
 	"nstudio/app/tts/voiceManager"
 	"os"
 	"os/exec"
@@ -21,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -124,8 +126,9 @@ func (piper *Piper) Initialize() error {
 
 func (piper *Piper) Start(modelName string) error {
 	var err error
-	if piper.GetProcessID(modelName) > 0 {
-		return util.TraceError(fmt.Errorf("Piper:Start:modelName[%s] already exists", modelName))
+	modelProcessID := piper.GetProcessID(modelName)
+	if modelProcessID > 0 {
+		return util.TraceError(fmt.Errorf("Piper:Start:modelName[%s] already exists. PID: ", modelName, modelProcessID))
 	}
 
 	metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
@@ -189,6 +192,8 @@ func (piper *Piper) Start(modelName string) error {
 }
 
 func (piper *Piper) Stop(modelName string) error {
+	defer delete(piper.models, modelName)
+
 	instance, exists := piper.models[modelName]
 	if !exists {
 		response.Debug(response.Data{
@@ -197,16 +202,41 @@ func (piper *Piper) Stop(modelName string) error {
 		return nil
 	}
 
+	// Send interrupt signal to the process
 	if err := instance.command.Process.Signal(os.Interrupt); err != nil {
+		// If sending interrupt fails, attempt to kill the process
 		if killErr := instance.command.Process.Kill(); killErr != nil {
 			return util.TraceError(fmt.Errorf("failed to kill process for model %s: %v, original error: %v", modelName, killErr, err))
 		}
 	}
 
-	if err := instance.command.Wait(); err != nil {
-		return util.TraceError(fmt.Errorf("process for model %s exited with error: %v", modelName, err))
+	// Wait for the process to exit
+	err := instance.command.Wait()
+
+	// Handle the error returned by Wait()
+	if err != nil {
+		// Check if the error is an ExitError
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			// Check if the process was terminated by a signal
+			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+				if status.Signaled() && status.Signal() == os.Interrupt {
+					// Process exited due to os.Interrupt, which is expected
+					// Do not treat as an error
+				} else {
+					// Process was terminated by a different signal or exited with a non-zero status
+					return util.TraceError(fmt.Errorf("process for model %s exited with signal: %v", modelName, status.Signal()))
+				}
+			} else {
+				// Unable to determine the exit status
+				return util.TraceError(fmt.Errorf("process for model %s exited with error: %v", modelName, err))
+			}
+		} else {
+			// Some other error occurred
+			return util.TraceError(fmt.Errorf("process for model %s exited with error: %v", modelName, err))
+		}
 	}
 
+	// Close stdin, stdout, and stderr
 	if instance.stdin != nil {
 		if err := instance.stdin.Close(); err != nil {
 			return util.TraceError(fmt.Errorf("failed to close stdin for model %s: %v", modelName, err))
@@ -222,8 +252,6 @@ func (piper *Piper) Stop(modelName string) error {
 			return util.TraceError(fmt.Errorf("failed to close stderr for model %s: %v", modelName, err))
 		}
 	}
-
-	delete(piper.models, modelName)
 
 	response.Debug(response.Data{
 		Summary: fmt.Sprintf("Stopped model: %s", modelName),
@@ -270,14 +298,13 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 		Detail:  message.Text,
 	})
 
-	if strings.HasPrefix(message.Character, "::") {
-
-	}
-
 	voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
 	if err != nil {
 		return util.TraceError(err)
 	}
+
+	fmt.Println("GOT VOICE")
+	fmt.Println(voice.Voice, voice.Engine, voice.Model)
 
 	speakerID, _ := strconv.Atoi(voice.Voice)
 
@@ -433,6 +460,10 @@ func (piper *Piper) GetProcessID(modelName string) int {
 	}
 
 	if instance.command.ProcessState != nil && instance.command.ProcessState.Exited() {
+		return 0
+	}
+
+	if !process.IsRunning(instance.command.Process) {
 		return 0
 	}
 

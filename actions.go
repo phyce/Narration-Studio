@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -276,6 +277,7 @@ func (app *App) SaveSettings(settings string) {
 
 func (app *App) SaveSetting(name string, newValue string) {
 	var value config.Value
+	fmt.Println()
 
 	err := json.Unmarshal([]byte(newValue), &value)
 	if err != nil {
@@ -295,10 +297,25 @@ func (app *App) SaveSetting(name string, newValue string) {
 }
 
 func (app *App) SelectDirectory(defaultDirectory string) string {
+	err, fullPath := util.ExpandPath(defaultDirectory)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to expand provided directory",
+		})
+
+		fullPath, err = os.UserHomeDir()
+		if err != nil {
+			response.Error(response.Data{
+				Summary: "Failed to retrieve user's home directory.",
+			})
+			return ""
+		}
+	}
+
 	directory, err := wailsRuntime.OpenDirectoryDialog(
 		app.context,
 		wailsRuntime.OpenDialogOptions{
-			DefaultDirectory: defaultDirectory,
+			DefaultDirectory: fullPath,
 			Title:            "Select Directory",
 		},
 	)
@@ -315,6 +332,10 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 	}
 
 	return directory
+}
+
+func (app *App) ReloadEngines() {
+
 }
 
 //</editor-fold>

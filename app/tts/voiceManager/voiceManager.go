@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"nstudio/app/common/response"
+	"nstudio/app/config"
 	tts "nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"os"
@@ -49,7 +50,6 @@ func (characterVoice CharacterVoice) MarshalJSON() ([]byte, error) {
 type VoiceManager struct {
 	sync.Mutex
 	Engines         map[string]tts.Engine
-	Models          map[string]tts.Model
 	CharacterVoices map[string]CharacterVoice
 }
 
@@ -62,7 +62,6 @@ func GetInstance() *VoiceManager {
 	once.Do(func() {
 		instance = &VoiceManager{
 			Engines:         make(map[string]tts.Engine),
-			Models:          make(map[string]tts.Model),
 			CharacterVoices: make(map[string]CharacterVoice),
 		}
 
@@ -214,7 +213,10 @@ func (manager *VoiceManager) calculateEngine(name string) string {
 
 	voice, exists := manager.CharacterVoices[name]
 	if exists {
-		return voice.Engine
+		enabled, exists := config.GetInstance().GetModelToggles()[voice.Engine][voice.Model]
+		if exists && enabled {
+			return voice.Engine
+		}
 	}
 
 	seed := int64(0)
@@ -239,12 +241,12 @@ func (manager *VoiceManager) calculateEngine(name string) string {
 	}
 }
 
-func (manager *VoiceManager) calculateVoice(engineID string, value string) (string, string, error) {
-	if strings.Contains(value, ":") {
-		segments := strings.Split(value, ":")
+func (manager *VoiceManager) calculateVoice(engineID string, name string) (string, string, error) {
+	if strings.Contains(name, ":") {
+		segments := strings.Split(name, ":")
 
 		if len(segments) < 2 {
-			return "", "", util.TraceError(fmt.Errorf("Failed to parse voice name:" + value))
+			return "", "", util.TraceError(fmt.Errorf("Failed to parse voice name:" + name))
 		}
 
 		return segments[0], segments[1], nil
@@ -252,19 +254,24 @@ func (manager *VoiceManager) calculateVoice(engineID string, value string) (stri
 		selectedEngine, _ := manager.GetEngine(engineID)
 
 		seed := int64(0)
-		for _, r := range value {
+		for _, r := range name {
 			seed = seed*31 + int64(r)
 		}
 		rand.Seed(seed)
 
 		models := make([]string, 0, len(selectedEngine.Models))
-		for model := range selectedEngine.Models {
-			models = append(models, model)
+		for modelName, model := range selectedEngine.Models {
+			if model.Enabled {
+				models = append(models, modelName)
+			}
 		}
+
+		fmt.Println("selectedEngine.Models")
+		fmt.Println(selectedEngine.Models)
 
 		if len(models) == 0 {
 			return "", "", util.TraceError(
-				fmt.Errorf("No models found for engine %s", selectedEngine),
+				fmt.Errorf("No enabled models found for engine %s", selectedEngine),
 			)
 		}
 		selectedModel := models[rand.Intn(len(models)-1)]
@@ -282,36 +289,65 @@ func (manager *VoiceManager) calculateVoice(engineID string, value string) (stri
 }
 
 func (manager *VoiceManager) RegisterEngine(newEngine tts.Engine) error {
-	models := util.GetKeys(newEngine.Models)
-	err := newEngine.Engine.Initialize(models)
-	if err != nil {
-		return util.TraceError(err)
-	}
 	manager.Lock()
 	defer manager.Unlock()
 
+	manager.Engines[newEngine.ID] = newEngine
+	err := manager.Engines[newEngine.ID].Engine.Initialize()
+	if err != nil {
+		return util.TraceError(err)
+	}
+
 	for _, model := range newEngine.Models {
+		fmt.Println(model.ID, model.Engine, "MODELLL")
+		fmt.Println(model)
 		manager.RegisterModel(model)
 	}
 
-	manager.Engines[newEngine.ID] = newEngine
+	manager.RefreshModels()
+
 	return nil
 }
 
 func (manager *VoiceManager) RegisterModel(model tts.Model) {
-	manager.Models[model.ID] = model
+	toggles := config.GetInstance().GetModelToggles()
+
+	engine := manager.Engines[model.Engine]
+
+	enabled, exists := toggles[model.Engine][model.ID]
+	if !exists {
+		fmt.Println("New Model: ", model.Engine, model.ID)
+		model.Enabled = true
+	} else {
+		fmt.Println("Setting enabled status for model to: ", model.Engine, model.Name, model.Enabled)
+		model.Enabled = enabled
+	}
+
+	//if engine.Models == nil {
+	//	engine.Models = make(map[string]tts.Model)
+	//}
+
+	fmt.Println("engine.Models")
+	fmt.Println(engine.Models)
+	engine.Models[model.ID] = model
+
+	if model.Enabled {
+		fmt.Println("model is Enabled, starting:", model.ID)
+		err := engine.Engine.Start(model.ID)
+		if err != nil {
+			response.Error(response.Data{
+				Summary: "Failed to prepare piper",
+				Detail:  err.Error(),
+			})
+		}
+	}
+
+	fmt.Println("Done registering model")
 }
 
 func (manager *VoiceManager) GetEngine(ID string) (tts.Engine, bool) {
 	selectedEngine, ok := manager.Engines[ID]
 	return selectedEngine, ok
-}
-
-func (manager *VoiceManager) UnregisterEngine(name string) {
-	manager.Lock()
-	defer manager.Unlock()
-
-	delete(manager.Engines, name)
 }
 
 func (manager *VoiceManager) GetEngines() []tts.Engine {
@@ -323,7 +359,15 @@ func (manager *VoiceManager) GetEngines() []tts.Engine {
 }
 
 func (manager *VoiceManager) GetAllModels() map[string]tts.Model {
-	return manager.Models
+	var result map[string]tts.Model
+
+	for _, engine := range manager.Engines {
+		for _, model := range engine.Models {
+			result[model.ID] = model
+		}
+	}
+
+	return result
 }
 
 func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.Voice, error) {
@@ -334,4 +378,20 @@ func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.V
 	}
 
 	return voiceEngine.Engine.GetVoices(model)
+}
+
+func (manager *VoiceManager) RefreshModels() {
+	toggles := config.GetInstance().GetModelToggles()
+	for engine, models := range toggles {
+		for model, enabled := range models {
+			if enabled {
+				fmt.Println("Starting: ", engine, model)
+				manager.Engines[engine].Engine.Start(model)
+			} else {
+				fmt.Println("Stopping: ", engine, model)
+				manager.Engines[engine].Engine.Stop(model)
+			}
+
+		}
+	}
 }

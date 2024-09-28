@@ -40,7 +40,10 @@ func TraceError(err error) error {
 	shortFile := shortFileName(file)
 	traceLine := fmt.Sprintf("%s:%d", shortFile, line)
 
-	return fmt.Errorf("%v\n%s", err, traceLine)
+	result := fmt.Errorf("%v\n%s", err, traceLine)
+	fmt.Println(result)
+
+	return result
 }
 
 func GenerateFilename(message CharacterMessage, index int, outputPath string) string {

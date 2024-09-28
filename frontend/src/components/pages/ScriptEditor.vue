@@ -19,7 +19,10 @@ const regexes = [
 ];
 
 const handleBrowseClick = async () => {
-	settings.value.scriptOutputPath = await SelectDirectory(settings.value.scriptOutputPath as string);
+	const result = await SelectDirectory(settings.value.scriptOutputPath as string);
+	if (result.length > 0) {
+		settings.value.scriptOutputPath =  result;
+	}
 
 	await SaveSettings(JSON.stringify(settings.value));
 }

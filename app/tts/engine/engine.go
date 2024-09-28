@@ -7,8 +7,9 @@ import (
 )
 
 type Base interface {
-	Initialize([]string) error
-	Prepare() error
+	Initialize() error
+	Start(modelName string) error
+	Stop(modelName string) error
 	Play(message util.CharacterMessage) error
 	Save(messages []util.CharacterMessage, play bool) error
 	Generate(model string, jsonBytes []byte) ([]byte, error)
@@ -28,6 +29,7 @@ type Model struct {
 	Name     string        `json:"name"`
 	Engine   string        `json:"engine"`
 	Download ModelDownload `json:"modelDownload"`
+	Enabled  bool
 }
 
 type ModelDownload struct {

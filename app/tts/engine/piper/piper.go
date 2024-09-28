@@ -9,7 +9,6 @@ import (
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/speaker"
 	"io"
-	"io/ioutil"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
@@ -88,7 +87,7 @@ type Piper struct {
 }
 
 // <editor-fold desc="Engine Interface">
-func (piper *Piper) Initialize(models []string) error {
+func (piper *Piper) Initialize() error {
 	var err error
 
 	piperPathValue := config.GetInstance().GetSetting("piperPath")
@@ -106,29 +105,134 @@ func (piper *Piper) Initialize(models []string) error {
 		return util.TraceError(fmt.Errorf("Piper:Initialize:modelPathValue: is nil"))
 	}
 
-	err, piper.modelPath = util.ExpandPath(*modelPathValue.String)
-	if err != nil {
-		return util.TraceError(err)
-	}
-
 	if runtime.GOOS == "darwin" {
-		err, piper.modelPath = util.ExpandPath(piper.modelPath)
+		err, piper.modelPath = util.ExpandPath(*modelPathValue.String)
 		if err != nil {
 			return util.TraceError(err)
 		}
 	}
 
 	piper.models = make(map[string]VoiceSynthesizer)
-	for _, model := range models {
-		err := piper.InitializeModel(model)
-		if err != nil {
-			return util.TraceError(err)
-		}
+
+	format := Format
+	if err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
+		return util.TraceError(err)
 	}
 
 	return err
 }
 
+func (piper *Piper) Start(modelName string) error {
+	var err error
+	if piper.GetProcessID(modelName) > 0 {
+		return util.TraceError(fmt.Errorf("Piper:Start:modelName[%s] already exists", modelName))
+	}
+
+	metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	var voices []engine.Voice
+	fmt.Println(string(data))
+	if err := json.Unmarshal(data, &voices); err != nil {
+		return util.TraceError(err)
+	}
+
+	onnxPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
+
+	cmdArgs := []string{"--model", onnxPath, "--json-input", "--output-raw"}
+
+	command := exec.Command(piper.piperPath, cmdArgs...)
+	response.Debug(response.Data{
+		Summary: fmt.Sprintf("Preparing command: %s %s",
+			command.Path,
+			strings.Join(command.Args[1:], " "),
+		),
+	})
+
+	instance := VoiceSynthesizer{
+		command:   command,
+		audioData: &AudioBuffer{},
+		Voices:    voices,
+	}
+
+	instance.stdin, err = instance.command.StdinPipe()
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	instance.stderr, err = instance.command.StderrPipe()
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	instance.stdout, err = instance.command.StdoutPipe()
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	fmt.Println("About to run the command")
+	err = instance.command.Start()
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	fmt.Println("Ran the command")
+
+	piper.StartAudioCapture(instance)
+
+	piper.models[modelName] = instance
+
+	return nil
+}
+
+func (piper *Piper) Stop(modelName string) error {
+	instance, exists := piper.models[modelName]
+	if !exists {
+		response.Debug(response.Data{
+			Summary: fmt.Sprintf("Instance for %s is not running", modelName),
+		})
+		return nil
+	}
+
+	if err := instance.command.Process.Signal(os.Interrupt); err != nil {
+		if killErr := instance.command.Process.Kill(); killErr != nil {
+			return util.TraceError(fmt.Errorf("failed to kill process for model %s: %v, original error: %v", modelName, killErr, err))
+		}
+	}
+
+	if err := instance.command.Wait(); err != nil {
+		return util.TraceError(fmt.Errorf("process for model %s exited with error: %v", modelName, err))
+	}
+
+	if instance.stdin != nil {
+		if err := instance.stdin.Close(); err != nil {
+			return util.TraceError(fmt.Errorf("failed to close stdin for model %s: %v", modelName, err))
+		}
+	}
+	if instance.stdout != nil {
+		if err := instance.stdout.Close(); err != nil {
+			return util.TraceError(fmt.Errorf("failed to close stdout for model %s: %v", modelName, err))
+		}
+	}
+	if instance.stderr != nil {
+		if err := instance.stderr.Close(); err != nil {
+			return util.TraceError(fmt.Errorf("failed to close stderr for model %s: %v", modelName, err))
+		}
+	}
+
+	delete(piper.models, modelName)
+
+	response.Debug(response.Data{
+		Summary: fmt.Sprintf("Stopped model: %s", modelName),
+	})
+
+	return nil
+}
+
+/*
 func (piper *Piper) Prepare() error {
 	for modelName, model := range piper.models {
 		metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
@@ -158,6 +262,7 @@ func (piper *Piper) Prepare() error {
 
 	return nil
 }
+*/
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
 	response.Debug(response.Data{
@@ -244,20 +349,23 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 }
 
 func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
-	piper.initOnce.Do(func() {
-		err := piper.Prepare()
-		if err != nil {
-			response.Error(response.Data{
-				Summary: "Failed to prepare piper",
-				Detail:  err.Error(),
-			})
+	if piper.GetProcessID(model) == 0 {
+		if !config.GetInstance().GetModelToggles()["piper"][model] {
+			return make([]byte, 0), util.TraceError(fmt.Errorf("Model is not running and not enabled:" + model))
 		}
-	})
+		util.TraceError(fmt.Errorf("Model is not running:" + model))
+
+		err := piper.Start(model)
+		if err != nil {
+			util.TraceError(fmt.Errorf("Failed to start model %s: %v", model, err))
+		}
+	}
+	fmt.Println("in Generate")
+	fmt.Println("Process ID: ", piper.GetProcessID(model))
 
 	if utf8.Valid(jsonBytes) == false {
 		return nil, util.TraceError(fmt.Errorf("input JSON is not valid UTF-8"))
 	}
-
 	if _, err := piper.models[model].stdin.Write(jsonBytes); err != nil {
 		return nil, util.TraceError(err)
 	}
@@ -267,9 +375,10 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 		scanner := bufio.NewScanner(piper.models[model].stderr)
 		for scanner.Scan() {
 			text := scanner.Text()
-			fmt.Println(text)
 
 			if strings.HasSuffix(text, " sec)") {
+				fmt.Println("RECEIVED END SIGNAL")
+				fmt.Println(text)
 				endSignal <- true
 				return
 			}
@@ -280,6 +389,11 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 	audioBytes := piper.models[model].audioData.buffer.Bytes()
 	audioClip := make([]byte, len(audioBytes))
 	copy(audioClip, audioBytes)
+	fmt.Println("audioClip len")
+	fmt.Println(len(audioClip))
+
+	fmt.Println("audioBytes len")
+	fmt.Println(len(audioBytes))
 
 	piper.models[model].audioData.Reset()
 
@@ -289,63 +403,12 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	modelData, exists := piper.models[model]
 	if !exists {
-		return nil, util.TraceError(fmt.Errorf("model %s does not exist", model))
+		return nil, util.TraceError(fmt.Errorf("model %s is not initialized", model))
 	}
 	return modelData.Voices, nil
 }
 
 //</editor-fold>
-
-func (piper *Piper) InitializeModel(modelName string) error {
-	var err error
-
-	metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
-	data, err := os.ReadFile(metadataPath)
-	if err != nil {
-		return util.TraceError(err)
-	}
-
-	var voices []engine.Voice
-	fmt.Println(string(data))
-	if err := json.Unmarshal(data, &voices); err != nil {
-		return util.TraceError(err)
-	}
-
-	onnxPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
-
-	cmdArgs := []string{"--model", onnxPath, "--json-input", "--output-raw"}
-	command := exec.Command(piper.piperPath, cmdArgs...)
-	response.Debug(response.Data{
-		Summary: fmt.Sprintf("Preparing command: %s %s",
-			command.Path,
-			strings.Join(command.Args[1:], " "),
-		),
-	})
-
-	instance := VoiceSynthesizer{
-		command:   command,
-		audioData: &AudioBuffer{},
-		Voices:    voices,
-	}
-
-	instance.stdin, err = instance.command.StdinPipe()
-	if err != nil {
-		return util.TraceError(err)
-	}
-
-	instance.stderr, err = instance.command.StderrPipe()
-	if err != nil {
-		return util.TraceError(err)
-	}
-
-	instance.stdout, err = instance.command.StdoutPipe()
-	if err != nil {
-		return util.TraceError(err)
-	}
-
-	piper.models[modelName] = instance
-	return nil
-}
 
 func (piper *Piper) StartAudioCapture(instance VoiceSynthesizer) {
 	go func() {
@@ -357,6 +420,23 @@ func (piper *Piper) StartAudioCapture(instance VoiceSynthesizer) {
 			})
 		}
 	}()
+}
+
+func (piper *Piper) GetProcessID(modelName string) int {
+	instance, exists := piper.models[modelName]
+	if !exists {
+		return 0
+	}
+
+	if instance.command.Process == nil {
+		return 0
+	}
+
+	if instance.command.ProcessState != nil && instance.command.ProcessState.Exited() {
+		return 0
+	}
+
+	return instance.command.Process.Pid
 }
 
 func playRawAudioBytes(audioClip []byte) {

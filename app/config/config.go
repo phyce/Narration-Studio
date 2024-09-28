@@ -2,11 +2,13 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"nstudio/app/tts/util"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -127,6 +129,9 @@ func (manager *ConfigManager) SetSetting(name string, value Value) error {
 		return err
 	}
 
+	//fmt.Println("manager.filePath")
+	//fmt.Println(manager.filePath)
+
 	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 }
 
@@ -136,4 +141,35 @@ func (manager *ConfigManager) SetConfigString(name string, value string) error {
 
 func (manager *ConfigManager) SetConfigInt(name string, value int) error {
 	return manager.SetSetting(name, Value{Int: &value})
+}
+
+// TODO this might need to go elsewhere
+func (manager *ConfigManager) GetModelToggles() map[string]map[string]bool {
+	engineTogglesRaw := *manager.GetSetting("modelToggles").String
+
+	engineToggles2D := make(map[string]map[string]bool)
+
+	var togglesMap map[string]bool
+	err := json.Unmarshal([]byte(engineTogglesRaw), &togglesMap)
+	fmt.Println("engineTogglesRaw")
+	fmt.Println(engineTogglesRaw)
+	if err != nil {
+		fmt.Println("Error unmarshaling JSON:", err)
+		return engineToggles2D
+	}
+
+	for key, value := range togglesMap {
+		parts := strings.Split(key, ":")
+		if len(parts) != 2 {
+			continue
+		}
+
+		if _, exists := engineToggles2D[parts[0]]; !exists {
+			engineToggles2D[parts[0]] = make(map[string]bool)
+		}
+
+		engineToggles2D[parts[0]][parts[1]] = value
+	}
+
+	return engineToggles2D
 }

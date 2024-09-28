@@ -107,16 +107,13 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 }
 
 func (manager *VoiceManager) UpdateCharacterVoices(data string) error {
-	var newVoices []CharacterVoice
+	var newVoices map[string]CharacterVoice
 	err := json.Unmarshal([]byte(data), &newVoices)
 	if err != nil {
 		return util.TraceError(err)
 	}
 
-	manager.CharacterVoices = make(map[string]CharacterVoice)
-	for _, voice := range newVoices {
-		manager.CharacterVoices[voice.Name] = voice
-	}
+	manager.CharacterVoices = newVoices
 
 	executablePath, err := os.Executable()
 	if err != nil {

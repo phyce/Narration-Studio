@@ -75,6 +75,8 @@ async function getCharacterVoices() {
 			voiceOptionsMap.value[name] = voiceOptions.value[engine + ":" + model];
 		}
 
+		addEmptyCharacterVoice();
+
 	} catch (error) {
 		toast.add({
 			severity: 'error',
@@ -83,6 +85,97 @@ async function getCharacterVoices() {
 			life: 5000
 		});
 	}
+}
+
+function onModelSelect(nodeKey: TreeNode, characterKey: string) {
+	const [engineId, modelId] = nodeKey.key?.split(':') ?? '';
+	const character = characterVoices.value[characterKey];
+	character.engine = engineId;
+	character.model = modelId;
+
+	voiceOptionsMap.value[characterKey] = voiceOptions.value[`${engineId}:${modelId}`] || [];
+}
+
+function onVoiceSelect(event: DropdownChangeEvent) {
+	console.log(selectedVoices);
+	console.log(event);
+}
+
+const saveCharacterVoices = () => {
+  const dataToSave = Object.entries(characterVoices.value)
+    .filter(([key, voice]) => {
+      // Skip entries where the name is empty or selectedModels[key] is empty
+      const hasName = voice.name && voice.name.trim() !== '';
+      const hasSelection = selectedModels[key] && Object.keys(selectedModels[key]).length > 0;
+      return hasName && hasSelection;
+    })
+    .reduce((accumulator, [key, voice]) => {
+      const modelKeys = Object.keys(selectedModels[key]);
+      const modelKey = modelKeys[0];
+      const [engine, model] = modelKey.split(':');
+      const voiceOption = selectedVoices[key];
+      const voiceID = voiceOption ? voiceOption.voiceID : '';
+
+      // Replace keys starting with '_' with the character's name
+      const newKey = key.startsWith('_') ? voice.name : key;
+
+      accumulator[newKey] = {
+        key: modelKey,
+        name: voice.name,
+        engine: engine,
+        model: model,
+        voice: voiceID
+      };
+
+      return accumulator;
+    }, {});
+
+  const dataString = JSON.stringify(dataToSave);
+  console.log("Data to save:", dataToSave);
+
+  SaveCharacterVoices(dataString);
+};
+
+async function previewVoice(voice: CharacterVoice) {
+	console.log("should be playing")
+	await Play(voice.name + ": " + voice.name, false, voice.model + voice.voice);
+}
+
+async function removeVoice(key: string, voice: CharacterVoice) {
+	if(key in characterVoices.value) delete characterVoices.value[key];
+}
+
+// Method to handle input in the name field
+function onNameInput(voice: any, key: string) {
+	const keys = Object.keys(characterVoices.value);
+	const lastKey = keys[keys.length - 1];
+	console.log(keys);
+	console.log(key, lastKey, keys.length);
+
+	console.log("should be adding a voice now");
+	if (key === lastKey) {
+        if (voice.name && voice.name.trim() !== '') {
+			addEmptyCharacterVoice();
+        }
+	}
+}
+
+function addEmptyCharacterVoice() {
+	console.log("appending to characterVoices");
+	const key = "_" + Object.keys(characterVoices.value).length;
+	characterVoices.value[key] = {
+		key: "",
+		name: "",
+		engine: "",
+		model: "",
+		voice: ""
+	};
+
+	selectedModels[key] = {};
+
+  	selectedVoices[key] = null;
+
+  	voiceOptionsMap.value[key] = [];
 }
 
 onMounted(async () => {
@@ -101,47 +194,12 @@ onMounted(async () => {
 		}))
 	}));
 });
+/*
 
-function onModelSelect(nodeKey: TreeNode, characterKey: string) {
-	const [engineId, modelId] = nodeKey.key?.split(':') ?? '';
-	const character = characterVoices.value[characterKey];
-	character.engine = engineId;
-	character.model = modelId;
+Need to make an empty row show up, and when anything is entered another one gets added underneath. this way we can always enter a new character name.
+and save should update everything accordingly, including deletions
 
-	voiceOptionsMap.value[characterKey] = voiceOptions.value[`${engineId}:${modelId}`] || [];
-}
-
-function onVoiceSelect(event: DropdownChangeEvent) {
-	console.log(selectedVoices);
-	console.log(event);
-}
-
-const saveCharacterVoices = () => {
-	const dataToSave = Object.entries(characterVoices.value).map(([key, voice]) => {
-		const modelKey = Object.keys(selectedModels[key])[0];
-		const [engine, model] = modelKey.split(':');
-		const voiceID = selectedVoices[key].voiceID;
-
-		return {
-			key: modelKey,
-			name: voice.name,
-			engine: engine,
-			model: model,
-			voice: voiceID
-		};
-	});
-	const dataString = JSON.stringify(dataToSave);
-
-	SaveCharacterVoices(dataString);
-}
-
-async function previewVoice(voice: CharacterVoice) {
-	await Play(voice.name + ": " + voice.name, false, voice.model + voice.voice);
-}
-
-async function removeVoice(key: string, voice: CharacterVoice) {
-	if(key in characterVoices.value) delete characterVoices.value[key];
-}
+ */
 
 </script>
 <template>
@@ -151,7 +209,12 @@ async function removeVoice(key: string, voice: CharacterVoice) {
 		</div>
 		<div v-for="(voice, key) in characterVoices" :key="key" class="flex mx-2">
 			<div class="flex-grow p-1">
-				<InputText v-model="voice.name" class="w-full" type="text" placeholder="Character name" />
+				<InputText class="w-full"
+						   v-model="voice.name"
+						   type="text"
+						   placeholder="Character name"
+						   @input="onNameInput(voice, key)"
+				/>
 			</div>
 			<div class="flex-initial p-1 w-1/4 flex items-center">
 				<TreeSelect

@@ -1,12 +1,10 @@
 <script setup lang="ts">
+import '../../css/pages/voice-packs.css';
 import Card from 'primevue/card';
 import InputSwitch from 'primevue/inputswitch';
 import {onMounted, reactive, ref} from "vue";
 import {Model} from '../interfaces/engine';
 import { GetAvailableModels, GetSetting, SaveSetting, RefreshModels } from '../../../wailsjs/go/main/App'
-import Toast from 'primevue/toast';
-import { useToast } from "primevue/usetoast";
-const toast = useToast();
 
 const models = ref<Record<string, Model>>({});
 const modelToggles = reactive<Record<string, boolean>>({});
@@ -35,19 +33,19 @@ const handleCheckboxToggle = async () => {
 </script>
 
 <template>
-	<div class="flex flex-wrap mt-2 mb-2 mr-2">
-		<Toast position="bottom-center" />
-		<div v-for="model in models" :key="model.engine + ':' + model.id" class="w-full md:w-1/3 pl-2 mb-2">
-			<Card class="text-left">
+	<div class="voice-packs">
+		<div  class="voice-packs__container"
+			  :key="model.engine + ':' + model.id"
+			  v-for="model in models"
+		>
+			<Card class="voice-pack">
 				<template #title>{{ model.name }} {{model.key}}</template>
 				<template #content>
-					<div class="flex justify-between items-center">
-						<div class="flex-grow">
-
-							{{ model.engine }}
+					<div class="voice-pack__container">
+						<div class="voice-pack__container__info">
 							{{ model.engine + ':' + model.id }}
 						</div>
-						<div class="flex-initial">
+						<div class="voice-pack__container__toggle">
 							<InputSwitch v-model="modelToggles[model.engine + ':' + model.id]" @update:modelValue="handleCheckboxToggle" />
 						</div>
 					</div>

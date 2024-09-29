@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+.link {
+    @apply
+        text-orange-600 hover:text-orange-500
+    ;
+}
+
+
+
+
+
+
+
+
 :root {
     --primary-50: 255 247 237;
     --primary-100: 255 237 213;
@@ -77,29 +90,6 @@
 
 .background-secondary {
     background-color: #1e1e1e;
-}
-
-.button-start {
-    background-color: #3A9E8B;
-    border-color: #3A9E8B;
-
-    /*background-color: #6AA84F;*/
-    /*border-color: #6AA84F;*/
-}
-
-.button-start:hover {
-    background-color: #276a5c !important;
-    border-color: #276a5c !important;
-}
-
-.button-stop {
-    background-color: #B03A2E;
-    border-color: #B03A2E;
-}
-
-.button-stop:hover {
-    background-color: #8a2d24 !important;
-    border-color: #8a2d24 !important;
 }
 
 html {

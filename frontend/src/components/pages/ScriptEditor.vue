@@ -1,15 +1,13 @@
 <script setup lang="ts">
+import '../../css/pages/script-editor.css';
 import Button from 'primevue/button'
 import InputGroup from 'primevue/inputgroup'
 import InputText from 'primevue/inputtext'
 import Editor from "../common/Editor.vue";
-import {Play, SelectDirectory, GetSettings, SaveSettings, ProcessScript} from '../../../wailsjs/go/main/App'
-import {useLocalStorage} from "@vueuse/core";
-import {UserSettings} from "../interfaces/settings";
-import {onMounted, ref} from "vue";
-import Toast from 'primevue/toast';
-import { useToast } from "primevue/usetoast";
-const toast = useToast();
+import { SelectDirectory, GetSettings, SaveSettings, ProcessScript } from '../../../wailsjs/go/main/App'
+import { useLocalStorage } from "@vueuse/core";
+import { UserSettings } from "../interfaces/settings";
+import { onMounted, ref } from "vue";
 
 const text = useLocalStorage<string>('scriptText', 'user: hello world');
 const settings = ref<UserSettings>({} as UserSettings);
@@ -39,32 +37,31 @@ onMounted(async () => {
 </script>
 
 <template>
-	<div class="flex w-full h-full">
-		<Toast position="bottom-center" />
-		<div class="w-1/5 p-2">
-			<InputGroup class="" :title="settings.scriptOutputPath">
-				<InputText
-					:value="settings.scriptOutputPath"
-					placeholder="Output Path"
-					class="disabled:bg-neutral-800"
-					disabled
+	<div class="script">
+		<div class="script__panel">
+			<InputGroup :title="settings.scriptOutputPath">
+				<InputText class="script__panel__input"
+						   :value="settings.scriptOutputPath"
+						   placeholder="Output Path"
+						   disabled
 				/>
-				<Button
-					@click="handleBrowseClick"
-					icon="pi pi-folder-open"
-					title="Browse"
-					aria-label="Browse"
-				/>
+				<Button class="script__panel__browse"
+						@click="handleBrowseClick"
+						title="Browse"
+						aria-label="Browse"
+				>
+					<i class="pi pi-folder-open"/>
+				</Button>
 			</InputGroup>
-			<Button
-				@click="processScript"
-				class="w-full mt-2"
-				icon="pi pi-upload"
-				title="Generate"
-				aria-label="Generate"
-			/>
+			<Button class="script__panel__generate"
+					@click="processScript"
+					title="Generate"
+					aria-label="Generate"
+			>
+				<i class="pi pi-upload"/>
+			</Button>
 		</div>
-		<div class="w-4/5">
+		<div class="script__editor">
 			<Editor v-model:text="text" :regexes="regexes" model-value=""/>
 		</div>
 	</div>

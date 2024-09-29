@@ -6,9 +6,10 @@ import {computed, nextTick, onMounted, reactive, ref, watch} from "vue";
 import {GetVoices, GetEngines, Play, GetCharacterVoices, SaveCharacterVoices} from '../../../wailsjs/go/main/App'
 import {CharacterVoice, Engine, Model, Voice} from '../interfaces/engine';
 import {formatToTreeSelectData} from "../../util/util";
-import {useToast} from "primevue/usetoast";
 import TreeSelect from "primevue/treeselect";
 import {TreeNode} from "primevue/treenode";
+import Toast from 'primevue/toast';
+import { useToast } from "primevue/usetoast";
 const toast = useToast();
 
 const engineModelNodes = ref<any[]>([]);
@@ -21,7 +22,6 @@ const voiceOptionsMap = ref<Record<string, Voice[]>>({});
 // const characterVoices = ref<{ [key: string]: CharacterVoice }>({});
 
 const characterVoices = ref<Record<string, CharacterVoice>>({});
-
 
 const selectedModels: Record<string, any> = reactive({});
 const selectedVoices: Record<string, any> = reactive({});
@@ -63,7 +63,7 @@ async function getVoices(engine: string, model: string) {
 async function getCharacterVoices() {
 	try {
 		const result = await GetCharacterVoices();
-		const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
+			const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
 		characterVoices.value = characterVoiceData;
 
 		for (const name in characterVoiceData) {
@@ -128,7 +128,7 @@ const saveCharacterVoices = () => {
       };
 
       return accumulator;
-    }, {});
+    }, {} as Record<string, CharacterVoice>);
 
   const dataString = JSON.stringify(dataToSave);
   console.log("Data to save:", dataToSave);
@@ -145,7 +145,6 @@ async function removeVoice(key: string, voice: CharacterVoice) {
 	if(key in characterVoices.value) delete characterVoices.value[key];
 }
 
-// Method to handle input in the name field
 function onNameInput(voice: any, key: string) {
 	const keys = Object.keys(characterVoices.value);
 	const lastKey = keys[keys.length - 1];
@@ -194,16 +193,11 @@ onMounted(async () => {
 		}))
 	}));
 });
-/*
-
-Need to make an empty row show up, and when anything is entered another one gets added underneath. this way we can always enter a new character name.
-and save should update everything accordingly, including deletions
-
- */
 
 </script>
 <template>
 	<div class="flex flex-col w-full h-full">
+		<Toast position="bottom-center" />
 		<div class="w-full px-2 mb-3 flex">
 			<Button class="mt-2 mr-2" icon="pi pi-save" title="Save All" label="Save All" aria-label="Save All" @click="saveCharacterVoices()" />
 		</div>

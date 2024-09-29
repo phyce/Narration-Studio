@@ -6,8 +6,9 @@ import Editor from "../common/Editor.vue";
 import {Play, SelectDirectory, GetSettings, SaveSettings, ProcessScript} from '../../../wailsjs/go/main/App'
 import {useLocalStorage} from "@vueuse/core";
 import {UserSettings} from "../interfaces/settings";
-import {useToast} from "primevue/usetoast";
 import {onMounted, ref} from "vue";
+import Toast from 'primevue/toast';
+import { useToast } from "primevue/usetoast";
 const toast = useToast();
 
 const text = useLocalStorage<string>('scriptText', 'user: hello world');
@@ -39,6 +40,7 @@ onMounted(async () => {
 
 <template>
 	<div class="flex w-full h-full">
+		<Toast position="bottom-center" />
 		<div class="w-1/5 p-2">
 			<InputGroup class="" :title="settings.scriptOutputPath">
 				<InputText

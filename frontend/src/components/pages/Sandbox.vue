@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import '../../css/pages/sandbox.css';
 import Editor from '../common/Editor.vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox';
-import {computed, onMounted, ref} from "vue"
-import {Engine, Model, Voice } from '../interfaces/engine';
+import { computed, onMounted, ref } from "vue"
+import { Engine, Model, Voice } from '../interfaces/engine';
 import { useLocalStorage } from '@vueuse/core';
 import { GetVoices, GetEngines, Play } from '../../../wailsjs/go/main/App'
 import { formatToTreeSelectData } from "../../util/util";
@@ -25,6 +26,10 @@ const regexes = [
 	{ regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character' }
 ];
 
+const isDisabled = computed(() => {
+	return (overrideVoices.value && selectedVoice.value === undefined);
+});
+
 async function generateSpeech() {
 	let voiceID = "";
 	if(overrideVoices.value) {
@@ -36,8 +41,7 @@ async function generateSpeech() {
 	await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
 }
 
-
-//TODO: Move this and the copy in CharacterVoices into util.ts (need to have toast in here)
+//TODO: Move this and the copy in CharacterVoices into util.ts
 async function getEngines() {
 	const result = await GetEngines();
 	const engines: Engine[] = JSON.parse(result);
@@ -72,36 +76,58 @@ onMounted(async () => {
 
 	treeNodes.value = formatToTreeSelectData(engines.value);
 });
-
-const isDisabled = computed(() => {
-	return (overrideVoices.value && selectedVoice.value === undefined);
-});
 </script>
 
 <template>
-	<div class="flex w-full h-full">
-		<div class="w-1/5 p-2">
-			<Button
-				@click="generateSpeech"
-				class="w-full"
-				icon="pi pi-play"
-				title="Play All"
-				aria-label="Play"
-				:disabled="isDisabled"
+	<div class="sandbox">
+		<div class="sandbox__panel">
+			<Button class="sandbox__panel__generate"
+					@click="generateSpeech"
+					title="Play All"
+					aria-label="Play"
+					:disabled="isDisabled"
+			>
+				<i class="pi pi-play"/>
+			</Button>
+			<TreeSelect class="sandbox__panel__model-tree"
+						:options="treeNodes"
+						v-model="selectedModel"
+						@node-select="onModelSelect"
+						placeholder="Select a model"
 			/>
-			<TreeSelect :options="treeNodes" v-model="selectedModel" @node-select="onModelSelect" placeholder="Select a model" class="w-full mt-2" />
-			<Dropdown v-model="selectedVoice" :options="voices" filter optionLabel="name" placeholder="Select a voice" class="w-full mt-2 text-left" />
-			<div class="flex items-center justify-start w-full pt-1">
-				<Checkbox v-model="overrideVoices" inputId="overrideVoices" name="overrideVoices" value="1" />
-				<label for="overrideVoices" class="ml-2 cursor-pointer select-none"> Override Voices </label>
+			<Dropdown class="sandbox__panel__voice-dropdown"
+					  v-model="selectedVoice"
+					  :options="voices"
+					  filter
+					  optionLabel="name"
+					  placeholder="Select a voice"
+			/>
+
+			<div class="sandbox__panel__checkbox">
+				<Checkbox class="checkbox"
+						  v-model="overrideVoices"
+						  inputId="overrideVoices"
+						  name="overrideVoices"
+						  value="1"
+				/>
+				<label class="checkbox-label" for="overrideVoices">
+					Override Voices
+				</label>
 			</div>
-			<div class="flex items-center justify-start w-full pt-1">
-				<Checkbox v-model="saveNewCharacters" inputId="saveNewCharacters" name="saveNewCharacters" value="1" />
-				<label for="saveNewCharacters" class="ml-2 cursor-pointer select-none"> Save new characters </label>
+			<div class="sandbox__panel__checkbox">
+				<Checkbox class="checkbox"
+						  v-model="saveNewCharacters"
+						  inputId="saveNewCharacters"
+						  name="saveNewCharacters"
+						  value="1"
+				/>
+				<label class="checkbox-label" for="saveNewCharacters">
+					Save new characters
+				</label>
 			</div>
 		</div>
-		<div class="w-4/5">
-			<Editor v-model:text="text" :regexes="regexes" model-value=""/>
+		<div class="sandbox__editor">
+			<Editor v-model:text="text" :regexes="regexes"/>
 		</div>
 	</div>
 </template>

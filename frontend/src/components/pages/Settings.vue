@@ -1,5 +1,5 @@
 <script setup lang="ts">
-
+import '../../css/pages/settings.css';
 import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
 import InputGroupAddon from "primevue/inputgroupaddon";
@@ -8,9 +8,6 @@ import Dropdown from "primevue/dropdown";
 import {onMounted, ref} from "vue";
 import { GetSettings, SaveSettings } from "../../../wailsjs/go/main/App"
 import { UserSettings } from "../interfaces/settings"
-import Toast from 'primevue/toast';
-import { useToast } from "primevue/usetoast";
-const toast = useToast();
 
 interface OutputType {
 	value: number;
@@ -44,53 +41,50 @@ onMounted(async () => {
 </script>
 
 <template>
-	<div class="flex flex-col w-full h-full">
-		<Toast position="bottom-center" />
-		<div class="w-full px-2 mb-2 flex">
-			<Button
-				@click="handleSaveSettings()"
-				class="mt-2 mr-2"
-				icon="pi pi-save"
-				title="Save Settings"
-				label="Save Settings"
-				aria-label="Save Settings"
-			/>
+	<div class="settings">
+		<div class="settings__actions">
+			<Button class="settings__actions__save"
+					@click="handleSaveSettings()"
+					title="Save Settings"
+					aria-label="Save Settings"
+			>
+				<i class="pi pi-save"/>&nbsp;
+				Save Settings
+			</Button>
 		</div>
-		<div class="flex-grow background-secondary flex flex-col p-2">
-			<InputGroup class="mb-2 flex">
-				<InputGroupAddon class="w-1/6">Piper path</InputGroupAddon>
-				<InputText
-					:value="settings.piperPath"
-					placeholder="Select a directory"
-					class="flex-grow disabled:bg-neutral-800"
-					disabled
+		<div class="settings__container">
+			<InputGroup class="input-group">
+				<InputGroupAddon class="input-group__addon">Piper path</InputGroupAddon>
+				<InputText class="input-group__input"
+						   :value="settings.piperPath"
+						   placeholder="Select a directory"
+						   disabled
 				/>
-				<Button icon="pi pi-folder-open w-1/6" title="Browse" aria-label="Browse" />
+				<Button class="input-group__button" title="Browse" aria-label="Browse" >
+					<i class="pi pi-folder-open"/>
+				</Button>
 			</InputGroup>
-			<InputGroup class="mb-2 flex">
-				<InputGroupAddon class="w-1/6">Models directory</InputGroupAddon>
-				<InputText
-					:value="settings.piperModelsDirectory"
-					placeholder="Output Path"
-					class="flex-grow disabled:bg-neutral-800"
-					disabled />
-				<Button icon="pi pi-folder-open w-1/6" title="Browse" aria-label="Generate" />
+			<InputGroup class="input-group">
+				<InputGroupAddon class="input-group__addon">Models directory</InputGroupAddon>
+				<InputText class="input-group__input"
+						   :value="settings.piperModelsDirectory"
+						   placeholder="Output Path"
+						   disabled
+				/>
+				<Button class="input-group__button" title="Browse" aria-label="Browse">
+					<i class="pi pi-folder-open"/>
+				</Button>
 			</InputGroup>
-			<InputGroup class="mb-2 flex">
-				<InputGroupAddon class="w-1/6">Output Type</InputGroupAddon>
-				<Dropdown
-					v-model="settings.outputType"
-					:options="outputTypes"
-					inputId="outputType"
-					optionLabel="label"
-					placeholder="select type"
-					class="flex-grow"
+			<InputGroup class="input-group">
+				<InputGroupAddon class="input-group__addon">Output Type</InputGroupAddon>
+				<Dropdown class="input-group__dropdown"
+						  v-model="settings.outputType"
+						  :options="outputTypes"
+						  inputId="outputType"
+						  optionLabel="label"
+						  placeholder="select type"
 				/>
 			</InputGroup>
 		</div>
 	</div>
 </template>
-
-<style scoped>
-
-</style>

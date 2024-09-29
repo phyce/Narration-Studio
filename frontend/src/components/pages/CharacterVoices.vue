@@ -1,26 +1,18 @@
 <script setup lang="ts">
+import '../../css/pages/character-voices.css';
 import InputText from 'primevue/inputtext';
 import Button from "primevue/button";
 import Dropdown, {DropdownChangeEvent} from "primevue/dropdown";
-import {computed, nextTick, onMounted, reactive, ref, watch} from "vue";
+import {nextTick, onMounted, reactive, ref} from "vue";
 import {GetVoices, GetEngines, Play, GetCharacterVoices, SaveCharacterVoices} from '../../../wailsjs/go/main/App'
-import {CharacterVoice, Engine, Model, Voice} from '../interfaces/engine';
-import {formatToTreeSelectData} from "../../util/util";
+import {CharacterVoice, Engine, Voice} from '../interfaces/engine';
 import TreeSelect from "primevue/treeselect";
 import {TreeNode} from "primevue/treenode";
-import Toast from 'primevue/toast';
-import { useToast } from "primevue/usetoast";
-const toast = useToast();
 
 const engineModelNodes = ref<any[]>([]);
-// const engineTreeNodes = ref<any[]>([]);
-// const voices = ref<{ [key: string]: Voice[] }>({});
 const engines = ref<{ [key: string]: Engine }>({});
-
 const voiceOptions = ref<Record<string, Voice[]>>({});
 const voiceOptionsMap = ref<Record<string, Voice[]>>({});
-// const characterVoices = ref<{ [key: string]: CharacterVoice }>({});
-
 const characterVoices = ref<Record<string, CharacterVoice>>({});
 
 const selectedModels: Record<string, any> = reactive({});
@@ -196,63 +188,64 @@ onMounted(async () => {
 
 </script>
 <template>
-	<div class="flex flex-col w-full h-full">
-		<Toast position="bottom-center" />
-		<div class="w-full px-2 mb-3 flex">
-			<Button class="mt-2 mr-2" icon="pi pi-save" title="Save All" label="Save All" aria-label="Save All" @click="saveCharacterVoices()" />
+	<div class="voices">
+		<div class="voices__actions">
+			<Button class="voices__actions__save"
+					title="Save All"
+					aria-label="Save All"
+					@click="saveCharacterVoices()"
+			>
+				<i class="pi pi-save"/>&nbsp;
+				Save All
+			</Button>
 		</div>
-		<div v-for="(voice, key) in characterVoices" :key="key" class="flex mx-2">
-			<div class="flex-grow p-1">
-				<InputText class="w-full"
+		<div class="voices__entry"
+			 :key="key"
+			 v-for="(voice, key) in characterVoices"
+		>
+			<div class="voices__entry__name">
+				<InputText class="voices__entry__name__input"
 						   v-model="voice.name"
 						   type="text"
 						   placeholder="Character name"
 						   @input="onNameInput(voice, key)"
 				/>
 			</div>
-			<div class="flex-initial p-1 w-1/4 flex items-center">
-				<TreeSelect
-					v-if="engineModelNodes && engineModelNodes.length > 0"
-					:options="engineModelNodes"
-					v-model="selectedModels[key]"
-					@node-select="node => onModelSelect(node, key)"
-					placeholder="Select a model"
-					class="w-full pt-0"
+			<div class="voices__entry__model">
+				<TreeSelect class="voices__entry__model__tree"
+							v-if="engineModelNodes && engineModelNodes.length > 0"
+							:options="engineModelNodes"
+							v-model="selectedModels[key]"
+							@node-select="node => onModelSelect(node, key)"
+							placeholder="Select a model"
 				/>
 			</div>
-			<div class="flex-initial p-1 w-1/4 flex items-center">
-				 <Dropdown
-					 @change="onVoiceSelect"
-					 v-model="selectedVoices[key]"
-					 :options="voiceOptionsMap[key]"
-					 filter
-					 optionLabel="name"
-					 placeholder="Select a voice"
-					 class="w-full"
+			<div class="voices__entry__voice">
+				 <Dropdown class="voices__entry__voice__dropdown"
+						   @change="onVoiceSelect"
+						   v-model="selectedVoices[key]"
+						   :options="voiceOptionsMap[key]"
+						   filter
+						   optionLabel="name"
+						   placeholder="Select a voice"
 				 />
 			</div>
-			<div class="flex-none pl-2 flex flex-col items-start">
-				<div class="flex justify-end w-full">
-					<Button
-						@click="previewVoice(voice)"
-						class="mt-1 mr-2 inline-block button-start"
-						icon="pi pi-volume-up"
-						title="Preview"
-						aria-label="Preview"
+			<div class="voices__entry__actions">
+				<div class="voices__entry__actions__container">
+					<Button class="button-start"
+							@click="previewVoice(voice)"
+							icon="pi pi-volume-up"
+							title="Preview"
+							aria-label="Preview"
 					/>
-					<Button
-						@click="removeVoice(key, voice)"
-						class="mt-1 inline-block button-stop"
-						icon="pi pi-trash"
-						title="Remove"
-						aria-label="Remove"
+					<Button class="button-stop"
+							@click="removeVoice(key, voice)"
+							icon="pi pi-trash"
+							title="Remove"
+							aria-label="Remove"
 					/>
 				</div>
 			</div>
 		</div>
 	</div>
 </template>
-
-<style scoped>
-
-</style>

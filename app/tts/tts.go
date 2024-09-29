@@ -2,11 +2,13 @@ package tts
 
 import (
 	"fmt"
+	"nstudio/app/common/status"
 	"nstudio/app/tts/util"
 	VoiceManger "nstudio/app/tts/voiceManager"
 )
 
 func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
+	status.Set(status.Generating, "")
 	voiceManager := VoiceManger.GetInstance()
 
 	for _, message := range messages {
@@ -28,6 +30,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 				return util.TraceError(err)
 			}
 		} else {
+			status.Set(status.Playing, "")
 			err := engine.Engine.Play(message)
 			if err != nil {
 				return util.TraceError(err)

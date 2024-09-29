@@ -33,9 +33,10 @@ const currentStatus = computed(() => StatusDisplayNames[status.value as Status])
 </script>
 
 <template>
-	<footer class="bg-neutral-800 py-1 text-xs text-gray-200" :title="title">
-		{{ currentStatus }}
-	</footer>
+	<footer class="bg-neutral-800 py-1 text-xs text-gray-200"
+			:title="title"
+			v-html="currentStatus"
+	/>
 </template>
 
 <style scoped>

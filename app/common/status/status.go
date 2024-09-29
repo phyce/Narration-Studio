@@ -12,6 +12,7 @@ const (
 	Ready
 	Streaming
 	Generating
+	Playing
 	Error
 )
 

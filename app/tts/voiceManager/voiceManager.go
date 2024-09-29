@@ -93,18 +93,17 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 		}
 	}
 
-	var voices map[string]CharacterVoice
+	//var voices map[string]CharacterVoice
+	var voices []CharacterVoice
 	err = json.Unmarshal(file, &voices)
-	fmt.Println("file")
-	fmt.Println(string(file))
 	if err != nil {
 		panic("Failed to unmarshal voice config: " + err.Error())
 	}
 
-	manager.CharacterVoices = voices
-	//for _, voice := range voices {
-	//	manager.CharacterVoices[voice.Name] = voice
-	//}
+	//manager.CharacterVoices = voices
+	for _, voice := range voices {
+		manager.CharacterVoices[voice.Name] = voice
+	}
 }
 
 func (manager *VoiceManager) UpdateCharacterVoices(data string) error {
@@ -333,8 +332,6 @@ func (manager *VoiceManager) RegisterModel(model tts.Model) {
 
 	modelToggles := config.GetInstance().GetModelToggles()
 
-	enabledModels := 0
-
 	if modelToggles[model.Engine][model.ID] {
 		err := engine.Engine.Start(model.ID)
 		if err != nil {
@@ -342,8 +339,6 @@ func (manager *VoiceManager) RegisterModel(model tts.Model) {
 				Summary: "Failed to prepare piper model:" + model.ID,
 				Detail:  err.Error(),
 			})
-		} else {
-			enabledModels++
 		}
 	}
 }

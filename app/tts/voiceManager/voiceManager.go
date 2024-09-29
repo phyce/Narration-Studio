@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"nstudio/app/common/response"
+	"nstudio/app/common/status"
 	"nstudio/app/config"
 	tts "nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
@@ -311,7 +312,7 @@ func (manager *VoiceManager) RegisterEngine(newEngine tts.Engine) error {
 		manager.RegisterModel(model)
 	}
 
-	//manager.RefreshModels()
+	manager.RefreshModels()
 
 	return nil
 }
@@ -332,17 +333,18 @@ func (manager *VoiceManager) RegisterModel(model tts.Model) {
 
 	modelToggles := config.GetInstance().GetModelToggles()
 
+	enabledModels := 0
+
 	if modelToggles[model.Engine][model.ID] {
-		fmt.Println("STARTING MODEL: " + model.ID)
 		err := engine.Engine.Start(model.ID)
 		if err != nil {
 			response.Error(response.Data{
 				Summary: "Failed to prepare piper model:" + model.ID,
 				Detail:  err.Error(),
 			})
+		} else {
+			enabledModels++
 		}
-	} else {
-		fmt.Println("NOT STARTING MODEL: " + model.ID)
 	}
 }
 
@@ -384,13 +386,21 @@ func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.V
 func (manager *VoiceManager) RefreshModels() {
 	toggles := config.GetInstance().GetModelToggles()
 
+	enabledModels := 0
 	for engine, models := range toggles {
 		for model, enabled := range models {
 			if enabled {
 				manager.Engines[engine].Engine.Start(model)
+				enabledModels++
 			} else {
 				manager.Engines[engine].Engine.Stop(model)
 			}
 		}
+	}
+
+	if enabledModels > 0 {
+		status.Set(status.Ready, "")
+	} else {
+		status.Set(status.Error, "No models enabled")
 	}
 }

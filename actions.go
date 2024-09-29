@@ -9,6 +9,7 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/response"
+	"nstudio/app/common/status"
 	"nstudio/app/config"
 	"nstudio/app/tts"
 	util "nstudio/app/tts/util"
@@ -218,6 +219,17 @@ func (app *App) GetVoices(engine string, model string) string {
 			Summary: "Failed to get voices",
 			Detail:  err.Error(),
 		})
+	}
+
+	return string(jsonData)
+}
+
+func (app *App) GetStatus() string {
+	status := status.Get()
+
+	jsonData, err := json.Marshal(status)
+	if err != nil {
+		panic(err)
 	}
 
 	return string(jsonData)

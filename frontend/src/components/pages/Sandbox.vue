@@ -9,9 +9,6 @@ import { GetVoices, GetEngines, Play } from '../../../wailsjs/go/main/App'
 import { formatToTreeSelectData } from "../../util/util";
 import TreeSelect from "primevue/treeselect";
 import Dropdown from "primevue/dropdown";
-import Toast from 'primevue/toast';
-import { useToast } from "primevue/usetoast";
-const toast = useToast();
 
 const nodes = ref<any[]>([]);
 const treeNodes = ref<any[]>([]);
@@ -43,31 +40,16 @@ async function generateSpeech() {
 //TODO: Move this and the copy in CharacterVoices into util.ts (need to have toast in here)
 async function getEngines() {
 	const result = await GetEngines();
-	try {
-		const engines: Engine[] = JSON.parse(result);
+	const engines: Engine[] = JSON.parse(result);
 
-		return engines;
-	} catch (error) {
-		toast.add({
-			severity: 'error',
-			summary: 'Error getting engines:',
-			detail: error,
-			life: 5000
-		});
-	}
+	return engines;
 }
 
 async function getVoices(engine: string, model: string) {
-	console.log([engine, model]);
 	const result = await GetVoices(engine, model);
-	console.log(result);
-	try {
-		const voices: Voice[] = JSON.parse(result);
+	const voices: Voice[] = JSON.parse(result);
 
-		return voices;
-	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Error getting Voices:', detail: error, life: 5000});
-	}
+	return voices;
 }
 
 async function onModelSelect(node: any) {
@@ -99,7 +81,6 @@ const isDisabled = computed(() => {
 <template>
 	<div class="flex w-full h-full">
 		<div class="w-1/5 p-2">
-			<Toast position="bottom-center" />
 			<Button
 				@click="generateSpeech"
 				class="w-full"

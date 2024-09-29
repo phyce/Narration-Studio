@@ -8,14 +8,12 @@ import CharacterVoices from './components/pages/CharacterVoices.vue';
 import VoicePacks from './components/pages/VoicePacks.vue';
 import Settings from './components/pages/Settings.vue';
 import Start from './components/pages/Start.vue';
-import {Status} from "./components/enums/status";
 import {useToast} from "primevue/usetoast";
 import {eventManager} from "./util/eventManager";
 
 const toast = useToast();
 
 const activePage = ref<string>('start');
-const status = ref<number>(Status.Ready);
 
 function handleUpdateActivePage(newPage: string) {
 	activePage.value = newPage;
@@ -38,7 +36,8 @@ const pageComponents: pageComponent = {
 let unsubscribeNotification: () => void;
 
 onMounted(() => {
-  unsubscribeNotification = eventManager.subscribe('notification', showNotification);
+	unsubscribeNotification = eventManager.subscribe('notification', showNotification);
+
 });
 
 onUnmounted(() => {
@@ -64,7 +63,7 @@ function showNotification(data: any) {
 		<main class="flex-grow bg-neutral-700 overflow-y-auto">
 			<component :is="pageComponents[activePage]" />
 		</main>
-		<Footer :status="status" />
+		<Footer />
 	</div>
 </template>
 

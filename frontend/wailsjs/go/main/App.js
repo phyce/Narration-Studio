@@ -30,6 +30,10 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
+export function GetStatus() {
+  return window['go']['main']['App']['GetStatus']();
+}
+
 export function GetVoices(arg1, arg2) {
   return window['go']['main']['App']['GetVoices'](arg1, arg2);
 }

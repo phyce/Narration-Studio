@@ -45,8 +45,8 @@ onMounted(async () => {
 
 <template>
 	<div class="flex flex-col w-full h-full">
+		<Toast position="bottom-center" />
 		<div class="w-full px-2 mb-2 flex">
-			<Toast position="bottom-center" />
 			<Button
 				@click="handleSaveSettings()"
 				class="mt-2 mr-2"

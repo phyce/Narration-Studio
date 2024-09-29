@@ -22,7 +22,6 @@ type CharacterVoice struct {
 }
 
 func (characterVoice *CharacterVoice) UnmarshalJSON(data []byte) error {
-	// Define a temporary structure to decode your JSON data
 	type Alias CharacterVoice
 	unmarshalTarget := &struct {
 		*Alias
@@ -32,7 +31,6 @@ func (characterVoice *CharacterVoice) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &unmarshalTarget); err != nil {
 		return err
 	}
-	// Here you could add additional handling if necessary
 	return nil
 }
 
@@ -79,31 +77,33 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 
 	voiceConfigPath := filepath.Join(filepath.Dir(executablePath), "voiceConfig.json")
 
+	fmt.Println("voiceConfigPath")
+	fmt.Println(voiceConfigPath)
 	file, err := os.ReadFile(voiceConfigPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// If the file does not exist, create it with an empty JSON array
 			err = os.WriteFile(voiceConfigPath, []byte("[]"), 0644)
 			if err != nil {
 				panic("Failed to create voice config file: " + err.Error())
 			}
-			file = []byte("[]") // Set file to empty JSON array to prevent json.Unmarshal error
+			file = []byte("[]")
 		} else {
 			panic("Failed to open voice  config file: " + err.Error())
 		}
 	}
 
-	// Unmarshal JSON data into a slice of CharacterVoice
-	var voices []CharacterVoice
+	var voices map[string]CharacterVoice
 	err = json.Unmarshal(file, &voices)
+	fmt.Println("file")
+	fmt.Println(string(file))
 	if err != nil {
 		panic("Failed to unmarshal voice config: " + err.Error())
 	}
 
-	manager.CharacterVoices = make(map[string]CharacterVoice)
-	for _, voice := range voices {
-		manager.CharacterVoices[voice.Name] = voice
-	}
+	manager.CharacterVoices = voices
+	//for _, voice := range voices {
+	//	manager.CharacterVoices[voice.Name] = voice
+	//}
 }
 
 func (manager *VoiceManager) UpdateCharacterVoices(data string) error {

@@ -4,6 +4,9 @@ import InputSwitch from 'primevue/inputswitch';
 import {onMounted, reactive, ref} from "vue";
 import {Model} from '../interfaces/engine';
 import { GetAvailableModels, GetSetting, SaveSetting, RefreshModels } from '../../../wailsjs/go/main/App'
+import Toast from 'primevue/toast';
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
 
 const models = ref<Record<string, Model>>({});
 const modelToggles = reactive<Record<string, boolean>>({});
@@ -33,6 +36,7 @@ const handleCheckboxToggle = async () => {
 
 <template>
 	<div class="flex flex-wrap mt-2 mb-2 mr-2">
+		<Toast position="bottom-center" />
 		<div v-for="model in models" :key="model.engine + ':' + model.id" class="w-full md:w-1/3 pl-2 mb-2">
 			<Card class="text-left">
 				<template #title>{{ model.name }} {{model.key}}</template>

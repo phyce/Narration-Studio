@@ -1,20 +1,21 @@
 <script lang="ts" setup>
+import './css/app.css';
 import Header from './components/Header.vue'
 import Footer from './components/Footer.vue'
-import {ComponentOptionsMixin, DefineComponent, onMounted, onUnmounted, ref} from "vue";
+import {onMounted, onUnmounted, ref} from "vue";
 import Sandbox from './components/pages/Sandbox.vue';
 import ScriptEditor from './components/pages/ScriptEditor.vue';
 import CharacterVoices from './components/pages/CharacterVoices.vue';
 import VoicePacks from './components/pages/VoicePacks.vue';
 import Settings from './components/pages/Settings.vue';
 import Start from './components/pages/Start.vue';
-import {useToast} from "primevue/usetoast";
 import {eventManager} from "./util/eventManager";
+import Toast, {ToastMessageOptions} from 'primevue/toast';
+import {useToast} from "primevue/usetoast";
 
 const toast = useToast();
 
 const activePage = ref<string>('start');
-
 function handleUpdateActivePage(newPage: string) {
 	activePage.value = newPage;
 }
@@ -22,8 +23,6 @@ function handleUpdateActivePage(newPage: string) {
 interface pageComponent {
 	[key: string]: any;
 }
-
-
 const pageComponents: pageComponent = {
 	'start': Start,
 	'sandbox': Sandbox,
@@ -33,18 +32,7 @@ const pageComponents: pageComponent = {
 	'settings': Settings
 };
 
-let unsubscribeNotification: () => void;
-
-onMounted(() => {
-	unsubscribeNotification = eventManager.subscribe('notification', showNotification);
-
-});
-
-onUnmounted(() => {
-	unsubscribeNotification();
-});
-
-function showNotification(data: any) {
+function showNotification(data: ToastMessageOptions) {
 	const severity = data.severity || 'info';
 	const summary = data.summary || '';
 	const detail = data.detail || '';
@@ -54,16 +42,27 @@ function showNotification(data: any) {
 	else toast.add({ severity, summary, detail });
 }
 
+let unsubscribeNotification: () => void;
+onMounted(() => {
+	unsubscribeNotification = eventManager.subscribe('notification', showNotification);
+});
+onUnmounted(() => {
+	unsubscribeNotification();
+});
 </script>
 
 
 <template>
-	<div class="flex flex-col h-full">
-		<Header :activePage="activePage" @updateActivePage="handleUpdateActivePage"/>
-		<main class="flex-grow bg-neutral-700 overflow-y-auto">
+	<div class="app">
+		<Header class="app__header"
+				:activePage="activePage"
+				@updateActivePage="handleUpdateActivePage"
+		/>
+		<main class="app__main">
 			<component :is="pageComponents[activePage]" />
 		</main>
-		<Footer />
+		<Footer class="app__footer" />
+		<Toast position="bottom-center" />
 	</div>
 </template>
 

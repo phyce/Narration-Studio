@@ -208,7 +208,11 @@ func (app *App) GetEngines() string {
 
 	jsonData, err := json.Marshal(engines)
 	if err != nil {
-		panic(err)
+		response.Error(response.Data{
+			Summary: "Failed to get engines",
+			Detail:  err.Error(),
+		})
+		return ""
 	}
 
 	return string(jsonData)

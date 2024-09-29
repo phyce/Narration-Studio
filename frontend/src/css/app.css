@@ -1,0 +1,15 @@
+.app {
+    @apply flex flex-col h-full;
+}
+
+.app__header {
+    @apply bg-neutral-800;
+}
+
+.app__main {
+    @apply flex-grow bg-neutral-700 overflow-y-auto;
+}
+
+.app__footer {
+
+}

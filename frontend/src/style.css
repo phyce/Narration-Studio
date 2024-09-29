@@ -149,3 +149,69 @@ body {
     background-color: #c2410c; /* Fallback background color */
     font-weight: bold; /* Just to make it more noticeable */
 }
+
+.icon {
+    position: relative;
+    display: inline-block;
+    width: 1em; /* Adjust as needed */
+    height: 1em; /* Adjust as needed */
+}
+
+.icon::before,
+.icon::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    font-size: 1em;
+    transform: translate(-50%, -50%);
+    display: inline-block;
+}
+
+.icon::before {
+    content: "⌛️";
+    animation: start-icon-animation 4s infinite;
+    transform-origin: center center;
+}
+
+.icon::after {
+    content: "⏳";
+    opacity: 0;
+    animation: end-icon-animation 4s infinite;
+    transition: none;
+}
+
+@keyframes start-icon-animation {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    55% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(180deg);
+    }
+    56% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+}
+
+@keyframes end-icon-animation {
+    0% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 0;
+    }
+    51% {
+        opacity: 1;
+    }
+    95% {
+        opacity: 1;
+    }
+    96% {
+        opacity: 0;
+    }
+}

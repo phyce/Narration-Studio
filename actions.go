@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -30,6 +29,7 @@ import (
 /* TODO: combine with ProcessScript as they're mostly identical */
 func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) {
 	clearConsole()
+	status.Set(status.Loading, "Playing")
 	lines := strings.Split(script, "\n")
 	var messages []util.CharacterMessage
 
@@ -63,6 +63,8 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 			Detail:  "Generation completed",
 		})
 	}
+
+	status.Set(status.Ready, "")
 }
 
 //</editor-fold>
@@ -72,6 +74,7 @@ func (app *App) Play(script string, saveNewCharacters bool, overrideVoices strin
 func (app *App) ProcessScript(script string) {
 	// TODO: combine with Play as they're mostly identical
 	clearConsole()
+	status.Set(status.Loading, "Processing Script")
 	lines := strings.Split(script, "\n")
 	var messages []util.CharacterMessage
 
@@ -93,6 +96,7 @@ func (app *App) ProcessScript(script string) {
 		Summary: "About to generate speech",
 	})
 	//TODO: Need to sanitise input
+	status.Set(status.Generating, "")
 	err := tts.GenerateSpeech(messages, true)
 	if err != nil {
 		response.Error(response.Data{
@@ -142,6 +146,7 @@ func (app *App) ProcessScript(script string) {
 			Summary: "Success",
 			Detail:  "Script processed successfully",
 		})
+		status.Set(status.Ready, "")
 	}
 }
 
@@ -149,6 +154,7 @@ func (app *App) ProcessScript(script string) {
 
 // <editor-fold desc="Character Voices">
 func (app *App) GetCharacterVoices() string {
+	status.Set(status.Loading, "Getting character voices")
 	voices := voiceManager.GetInstance().CharacterVoices
 
 	voicesJSON, err := json.Marshal(voices)
@@ -159,11 +165,12 @@ func (app *App) GetCharacterVoices() string {
 		})
 	}
 
+	status.Set(status.Ready, "")
 	return string(voicesJSON)
 }
 
 func (app *App) SaveCharacterVoices(voices string) {
-	fmt.Println(voices)
+	status.Set(status.Loading, "Saving character voices")
 	err := voiceManager.GetInstance().UpdateCharacterVoices(voices)
 	if err != nil {
 		response.Error(response.Data{
@@ -175,9 +182,11 @@ func (app *App) SaveCharacterVoices(voices string) {
 			Summary: "Successfully saved character voices",
 		})
 	}
+	status.Set(status.Ready, "")
 }
 
 func (app *App) GetAvailableModels() string {
+	status.Set(status.Loading, "Getting available models")
 	models := voiceManager.GetInstance().GetAllModels()
 
 	modelsJSON, err := json.Marshal(models)
@@ -187,6 +196,7 @@ func (app *App) GetAvailableModels() string {
 			Detail:  err.Error(),
 		})
 	}
+	status.Set(status.Ready, "")
 	return string(modelsJSON)
 }
 
@@ -274,6 +284,7 @@ func (app *App) GetSetting(name string) string {
 }
 
 func (app *App) SaveSettings(settings string) {
+	status.Set(status.Loading, "Saving settings")
 	err := config.GetInstance().Import(settings)
 	if err != nil {
 		response.Error(response.Data{
@@ -286,6 +297,7 @@ func (app *App) SaveSettings(settings string) {
 			Detail:  "Settings have been saved",
 		})
 	}
+	status.Set(status.Ready, "")
 }
 
 func (app *App) SaveSetting(name string, newValue string) {
@@ -309,6 +321,7 @@ func (app *App) SaveSetting(name string, newValue string) {
 }
 
 func (app *App) SelectDirectory(defaultDirectory string) string {
+	status.Set(status.Loading, "Selecting directory")
 	err, fullPath := util.ExpandPath(defaultDirectory)
 	if err != nil {
 		response.Error(response.Data{
@@ -342,16 +355,18 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 			Summary: "Directory changed",
 		})
 	}
-
+	status.Set(status.Ready, "")
 	return directory
 }
 
 func (app *App) RefreshModels() {
 	clearConsole()
+	status.Set(status.Loading, "Refreshing models")
 	voiceManager.GetInstance().RefreshModels()
 	response.Success(response.Data{
 		Summary: "Models refreshed",
 	})
+	status.Set(status.Ready, "")
 }
 
 //</editor-fold>

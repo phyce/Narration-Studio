@@ -20,63 +20,46 @@ const selectedVoices: Record<string, any> = reactive({});
 
 async function getEngines() {
 	const result = await GetEngines();
-	try {
-		// const engines: Engine[] = JSON.parse(result);
-		const engineList: Engine[] = JSON.parse(result);
+	// const engines: Engine[] = JSON.parse(result);
+	const engineList: Engine[] = JSON.parse(result);
 
-		for (const engine of engineList) {
-			engines.value[engine.id] = engine;
+	for (const engine of engineList) {
+		engines.value[engine.id] = engine;
 
-			for(const index in engine.models) {
-				if (engine.models.hasOwnProperty(index)) {
-					const model = engine.models[index];
-					await getVoices(engine.id, model.id);
-				}
+		for(const index in engine.models) {
+			if (engine.models.hasOwnProperty(index)) {
+				const model = engine.models[index];
+				await getVoices(engine.id, model.id);
 			}
 		}
-
-		return engines;
-	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Error getting engines:', detail: error, life: 5000});
 	}
+
+	return engines;
 }
 
 async function getVoices(engine: string, model: string) {
-	try {
-		const result = await GetVoices(engine, model);
-		const voicesList: Voice[] = JSON.parse(result);
-		const key = `${engine}:${model}`;
-		voiceOptions.value[key] = voicesList;
-	} catch (error) {
-		toast.add({ severity: 'error', summary: 'Error getting voices:', detail: String(error), life: 5000 });
-	}
+	const result = await GetVoices(engine, model);
+	const voicesList: Voice[] = JSON.parse(result);
+	const key = `${engine}:${model}`;
+	voiceOptions.value[key] = voicesList;
 }
 
 async function getCharacterVoices() {
-	try {
-		const result = await GetCharacterVoices();
-			const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
-		characterVoices.value = characterVoiceData;
+	const result = await GetCharacterVoices();
+		const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
+	characterVoices.value = characterVoiceData;
 
-		for (const name in characterVoiceData) {
-			const { engine, model, voice } = characterVoiceData[name];
-			selectedModels[name] = {
-				[characterVoiceData[name].key]: true
-			};
-			selectedVoices[name] = voiceOptions.value[characterVoiceData[name].key][parseInt(voice)];
-			voiceOptionsMap.value[name] = voiceOptions.value[engine + ":" + model];
-		}
-
-		addEmptyCharacterVoice();
-
-	} catch (error) {
-		toast.add({
-			severity: 'error',
-			summary: 'Error getting character voices:',
-			detail: String(error),
-			life: 5000
-		});
+	for (const name in characterVoiceData) {
+		const { engine, model, voice } = characterVoiceData[name];
+		selectedModels[name] = {
+			[characterVoiceData[name].key]: true
+		};
+		selectedVoices[name] = voiceOptions.value[characterVoiceData[name].key][parseInt(voice)];
+		voiceOptionsMap.value[name] = voiceOptions.value[engine + ":" + model];
 	}
+
+	addEmptyCharacterVoice();
+
 }
 
 function onModelSelect(nodeKey: TreeNode, characterKey: string) {

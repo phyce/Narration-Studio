@@ -56,7 +56,6 @@ watch(props.regexes, () => {
 
 watch(() => props.text, (newValue) => {
 	internalText.value = newValue;
-	console.log(internalText.value);
 	if (editorRef.value && editorRef.value.getValue() !== newValue) {
 		editorRef.value.setValue(newValue);
 	}

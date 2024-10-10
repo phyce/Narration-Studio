@@ -6,6 +6,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/piper"
@@ -18,6 +19,7 @@ var assets embed.FS
 func main() {
 	app := NewApp()
 	err := config.GetInstance().Initialize()
+	response.Initialize()
 
 	if err != nil {
 		// TODO error popup or separate window before closing application

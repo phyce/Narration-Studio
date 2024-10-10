@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import '../../css/pages/character-voices.css';
+
 import InputText from 'primevue/inputtext';
 import Button from "primevue/button";
 import Dropdown, {DropdownChangeEvent} from "primevue/dropdown";
-import {nextTick, onMounted, reactive, ref} from "vue";
-import {GetVoices, GetEngines, Play, GetCharacterVoices, SaveCharacterVoices} from '../../../wailsjs/go/main/App'
+import {nextTick, onMounted, onUnmounted, reactive, ref} from "vue";
+import {
+	GetVoices,
+	GetEngines,
+	Play,
+	GetCharacterVoices,
+	SaveCharacterVoices,
+	EventTrigger
+} from '../../../wailsjs/go/main/App';
 import {CharacterVoice, Engine, Voice} from '../interfaces/engine';
 import TreeSelect from "primevue/treeselect";
 import {TreeNode} from "primevue/treenode";
@@ -20,7 +28,6 @@ const selectedVoices: Record<string, any> = reactive({});
 
 async function getEngines() {
 	const result = await GetEngines();
-	// const engines: Engine[] = JSON.parse(result);
 	const engineList: Engine[] = JSON.parse(result);
 
 	for (const engine of engineList) {
@@ -59,7 +66,6 @@ async function getCharacterVoices() {
 	}
 
 	addEmptyCharacterVoice();
-
 }
 
 function onModelSelect(nodeKey: TreeNode, characterKey: string) {
@@ -71,62 +77,62 @@ function onModelSelect(nodeKey: TreeNode, characterKey: string) {
 	voiceOptionsMap.value[characterKey] = voiceOptions.value[`${engineId}:${modelId}`] || [];
 }
 
-function onVoiceSelect(event: DropdownChangeEvent) {
-	console.log(selectedVoices);
-	console.log(event);
+async function onVoiceSelect(key: string ,event: DropdownChangeEvent) {
+	await previewVoice(key);
 }
 
 const saveCharacterVoices = () => {
-  const dataToSave = Object.entries(characterVoices.value)
-    .filter(([key, voice]) => {
-      // Skip entries where the name is empty or selectedModels[key] is empty
-      const hasName = voice.name && voice.name.trim() !== '';
-      const hasSelection = selectedModels[key] && Object.keys(selectedModels[key]).length > 0;
-      return hasName && hasSelection;
-    })
-    .reduce((accumulator, [key, voice]) => {
-      const modelKeys = Object.keys(selectedModels[key]);
-      const modelKey = modelKeys[0];
-      const [engine, model] = modelKey.split(':');
-      const voiceOption = selectedVoices[key];
-      const voiceID = voiceOption ? voiceOption.voiceID : '';
+	const dataToSave = Object.entries(characterVoices.value)
+		.filter(([key, voice]) => {
+			const hasName = voice.name && voice.name.trim() !== '';
+			const hasSelection = selectedModels[key] && Object.keys(selectedModels[key]).length > 0;
 
-      // Replace keys starting with '_' with the character's name
-      const newKey = key.startsWith('_') ? voice.name : key;
+			return hasName && hasSelection;
+		})
+		.reduce((accumulator, [key, voice]) => {
+			const modelKeys = Object.keys(selectedModels[key]);
+			const modelKey = modelKeys[0];
+			const [engine, model] = modelKey.split(':');
+			const voiceOption = selectedVoices[key];
+			const voiceID = voiceOption ? voiceOption.voiceID : '';
 
-      accumulator[newKey] = {
-        key: modelKey,
-        name: voice.name,
-        engine: engine,
-        model: model,
-        voice: voiceID
-      };
+			const newKey = key.startsWith('_') ? voice.name : key;
 
-      return accumulator;
-    }, {} as Record<string, CharacterVoice>);
+			accumulator[newKey] = {
+				key: modelKey,
+				name: voice.name,
+				engine: engine,
+				model: model,
+				voice: voiceID,
+			};
 
-  const dataString = JSON.stringify(dataToSave);
-  console.log("Data to save:", dataToSave);
+			return accumulator;
+		}, {} as Record<string, CharacterVoice>);
 
-  SaveCharacterVoices(dataString);
+	const dataString = JSON.stringify(dataToSave);
+
+	SaveCharacterVoices(dataString);
 };
 
-async function previewVoice(voice: CharacterVoice) {
-	console.log("should be playing")
-	await Play(voice.name + ": " + voice.name, false, voice.model + voice.voice);
+async function previewVoice(key: string) {
+	const voice = characterVoices.value[key];
+
+	const modelVoiceID = "::" + Object.keys(selectedModels[key])[0] + ":" + selectedVoices[key].voiceID;
+
+	await EventTrigger('notification_enabled', false);
+	await Play(voice.name + ": " + voice.name, false, modelVoiceID);
+	await EventTrigger('notification_enabled', true);
 }
 
-async function removeVoice(key: string, voice: CharacterVoice) {
+async function removeVoice(key: string) {
+	if(key == "_" + (Object.keys(characterVoices.value).length - 1))return;
+
 	if(key in characterVoices.value) delete characterVoices.value[key];
 }
 
 function onNameInput(voice: any, key: string) {
 	const keys = Object.keys(characterVoices.value);
 	const lastKey = keys[keys.length - 1];
-	console.log(keys);
-	console.log(key, lastKey, keys.length);
-
-	console.log("should be adding a voice now");
 	if (key === lastKey) {
         if (voice.name && voice.name.trim() !== '') {
 			addEmptyCharacterVoice();
@@ -135,7 +141,6 @@ function onNameInput(voice: any, key: string) {
 }
 
 function addEmptyCharacterVoice() {
-	console.log("appending to characterVoices");
 	const key = "_" + Object.keys(characterVoices.value).length;
 	characterVoices.value[key] = {
 		key: "",
@@ -169,6 +174,10 @@ onMounted(async () => {
 	}));
 });
 
+onUnmounted( () => {
+	EventTrigger('notification_enabled', true);
+})
+
 </script>
 <template>
 	<div class="voices">
@@ -186,7 +195,7 @@ onMounted(async () => {
 			 :key="key"
 			 v-for="(voice, key) in characterVoices"
 		>
-			<div class="voices__entry__name">
+			<div class="voices__entry__name" :data-key="key">
 				<InputText class="voices__entry__name__input"
 						   v-model="voice.name"
 						   type="text"
@@ -205,7 +214,7 @@ onMounted(async () => {
 			</div>
 			<div class="voices__entry__voice">
 				 <Dropdown class="voices__entry__voice__dropdown"
-						   @change="onVoiceSelect"
+						   @change="(event) => onVoiceSelect(key, event)"
 						   v-model="selectedVoices[key]"
 						   :options="voiceOptionsMap[key]"
 						   filter
@@ -216,13 +225,13 @@ onMounted(async () => {
 			<div class="voices__entry__actions">
 				<div class="voices__entry__actions__container">
 					<Button class="button-start"
-							@click="previewVoice(voice)"
+							@click="previewVoice(key)"
 							icon="pi pi-volume-up"
 							title="Preview"
 							aria-label="Preview"
 					/>
 					<Button class="button-stop"
-							@click="removeVoice(key, voice)"
+							@click="removeVoice(key)"
 							icon="pi pi-trash"
 							title="Remove"
 							aria-label="Remove"

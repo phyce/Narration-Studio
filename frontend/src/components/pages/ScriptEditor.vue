@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import '../../css/pages/script-editor.css';
-import Button from 'primevue/button'
-import InputGroup from 'primevue/inputgroup'
-import InputText from 'primevue/inputtext'
+
+import Button from 'primevue/button';
+import InputGroup from 'primevue/inputgroup';
+import InputText from 'primevue/inputtext';
 import Editor from "../common/Editor.vue";
-import { SelectDirectory, GetSettings, SaveSettings, ProcessScript } from '../../../wailsjs/go/main/App'
+import { SelectDirectory, GetSettings, SaveSettings, ProcessScript } from '../../../wailsjs/go/main/App';
 import { useLocalStorage } from "@vueuse/core";
 import { UserSettings } from "../interfaces/settings";
 import { onMounted, ref } from "vue";
 
 const text = useLocalStorage<string>('scriptText', 'user: hello world');
 const settings = ref<UserSettings>({} as UserSettings);
-
 const regexes = [
 	{ regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence' },
 	{ regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character' },
@@ -26,8 +26,8 @@ const handleBrowseClick = async () => {
 	await SaveSettings(JSON.stringify(settings.value));
 }
 
-const processScript = async () => {
-	const result = await ProcessScript(text.value)
+const processScript = () => {
+	ProcessScript(text.value)
 }
 
 onMounted(async () => {

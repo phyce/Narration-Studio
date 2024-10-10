@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import '../../css/pages/voice-packs.css';
+
 import Card from 'primevue/card';
 import InputSwitch from 'primevue/inputswitch';
 import {onMounted, reactive, ref} from "vue";
 import {Model} from '../interfaces/engine';
-import { GetAvailableModels, GetSetting, SaveSetting, RefreshModels } from '../../../wailsjs/go/main/App'
+import {
+	GetAvailableModels,
+	GetSetting,
+	SaveSetting,
+	RefreshModels
+} from '../../../wailsjs/go/main/App';
 
 const models = ref<Record<string, Model>>({});
 const modelToggles = reactive<Record<string, boolean>>({});
@@ -23,11 +29,9 @@ onMounted(async () => {
 });
 
 const handleCheckboxToggle = async () => {
-	console.log("toggling models");
-	console.log(modelToggles);
 	const stringModelToggles = JSON.stringify(modelToggles);
-	await SaveSetting("modelToggles", stringModelToggles).then(async () => {
-		await RefreshModels();
+	await SaveSetting("modelToggles", stringModelToggles).then(() => {
+		RefreshModels();
 	});
 }
 </script>

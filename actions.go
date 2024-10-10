@@ -27,7 +27,11 @@ import (
 
 // <editor-fold desc="Sandbox">
 /* TODO: combine with ProcessScript as they're mostly identical */
-func (app *App) Play(script string, saveNewCharacters bool, overrideVoices string) {
+func (app *App) Play(
+	script string,
+	saveNewCharacters bool,
+	overrideVoices string,
+) {
 	clearConsole()
 	status.Set(status.Loading, "Playing")
 	lines := strings.Split(script, "\n")

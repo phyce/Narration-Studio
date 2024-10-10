@@ -13,6 +13,20 @@ type Data struct {
 	Life     uint   `json:"life"`
 }
 
+var notificationEnabled = true
+
+func Initialize() {
+	eventManager.GetInstance().SubscribeToEvent("notification_enabled", func(data interface{}) {
+		if enabled, ok := data.(bool); ok {
+			notificationEnabled = enabled
+		} else {
+			Error(Data{
+				Summary: fmt.Sprint(data) + " is not a valid value for notification_enabled",
+			})
+		}
+	})
+}
+
 // TODO enable/disable logging
 func Debug(data Data) {
 	data.Severity = "info"
@@ -51,5 +65,7 @@ func Error(data Data) error {
 
 func emitEvent(name string, data Data, log bool) {
 	fmt.Println(data.Severity+": ", data.Summary, data.Detail)
-	eventManager.GetInstance().EmitEvent(name, data)
+	if notificationEnabled {
+		eventManager.GetInstance().EmitEvent(name, data)
+	}
 }

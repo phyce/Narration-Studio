@@ -3,15 +3,15 @@
 }
 
 .voices__actions {
-    @apply w-full px-2 mb-3 flex;
+    @apply w-full px-2 mb-1 flex;
 }
 
-.voice__actions__save {
+.voices__actions__save {
     @apply mt-2 mr-2;
 }
 
 .voices__entry {
-    @apply flex mx-2;
+    @apply flex ml-1 mr-2;
 }
 
 .voices__entry__name {

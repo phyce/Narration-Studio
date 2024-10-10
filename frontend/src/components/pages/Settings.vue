@@ -1,32 +1,15 @@
 <script setup lang="ts">
 import '../../css/pages/settings.css';
+
 import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
 import InputGroupAddon from "primevue/inputgroupaddon";
 import Button from "primevue/button";
 import Dropdown from "primevue/dropdown";
 import {onMounted, ref} from "vue";
-import { GetSettings, SaveSettings } from "../../../wailsjs/go/main/App"
-import { UserSettings } from "../interfaces/settings"
-
-interface OutputType {
-	value: number;
-	name: string;
-	label: string;
-}
-
-const outputTypes: OutputType[] = [
-	{
-		value: 0,
-		name: 'Combined File',
-		label: 'Combined File'
-	},
-	{
-		value: 1,
-		name: 'Split Files',
-		label: 'Split Files'
-	}
-];
+import { GetSettings, SaveSettings } from "../../../wailsjs/go/main/App";
+import { UserSettings } from "../interfaces/settings";
+import { OutputTypeOptions } from "../enums/outputType";
 
 const settings = ref<UserSettings>({} as UserSettings);
 
@@ -79,7 +62,7 @@ onMounted(async () => {
 				<InputGroupAddon class="input-group__addon">Output Type</InputGroupAddon>
 				<Dropdown class="input-group__dropdown"
 						  v-model="settings.outputType"
-						  :options="outputTypes"
+						  :options="OutputTypeOptions"
 						  inputId="outputType"
 						  optionLabel="label"
 						  placeholder="select type"

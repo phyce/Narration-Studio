@@ -6,6 +6,12 @@ import (
 	"sync"
 )
 
+/* Events
+notification - send a notification to the user
+notification_enabled - enable/disable notifications
+status - current progress
+*/
+
 type EventManager struct {
 	mutex     sync.RWMutex
 	callbacks map[string]func(data interface{})

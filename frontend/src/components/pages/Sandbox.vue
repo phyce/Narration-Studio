@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import '../../css/pages/sandbox.css';
-import Editor from '../common/Editor.vue'
-import Button from 'primevue/button'
+
+import Editor from '../common/Editor.vue';
+import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import { computed, onMounted, ref } from "vue"
 import { Engine, Model, Voice } from '../interfaces/engine';
 import { useLocalStorage } from '@vueuse/core';
-import { GetVoices, GetEngines, Play } from '../../../wailsjs/go/main/App'
+import { GetVoices, GetEngines, Play } from '../../../wailsjs/go/main/App';
 import { formatToTreeSelectData } from "../../util/util";
 import TreeSelect from "primevue/treeselect";
 import Dropdown from "primevue/dropdown";
 
-const nodes = ref<any[]>([]);
-const treeNodes = ref<any[]>([]);
+const modelVoiceTree = ref<any[]>([]);
 const engines = ref<Engine[]>([]);
 const voices = ref<Voice[]>([]);
 const selectedModel = ref<Model>();
@@ -41,7 +41,6 @@ async function generateSpeech() {
 	await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
 }
 
-//TODO: Move this and the copy in CharacterVoices into util.ts
 async function getEngines() {
 	const result = await GetEngines();
 	const engines: Engine[] = JSON.parse(result);
@@ -62,19 +61,8 @@ async function onModelSelect(node: any) {
 
 onMounted(async () => {
 	engines.value = await getEngines() ?? [];
-	nodes.value = engines.value.map(engine => ({
-		key: engine.id,
-		label: engine.name,
-		selectable: false,
-		children: Object.entries(engine.models ?? {}).map(([modelId, modelData]) => ({
-			selectable: true,
-			key: modelId,
-			label: modelData.name,
-			data: modelData
-		}))
-	}));
 
-	treeNodes.value = formatToTreeSelectData(engines.value);
+	modelVoiceTree.value = formatToTreeSelectData(engines.value);
 });
 </script>
 
@@ -90,7 +78,7 @@ onMounted(async () => {
 				<i class="pi pi-play"/>
 			</Button>
 			<TreeSelect class="sandbox__panel__model-tree"
-						:options="treeNodes"
+						:options="modelVoiceTree"
 						v-model="selectedModel"
 						@node-select="onModelSelect"
 						placeholder="Select a model"

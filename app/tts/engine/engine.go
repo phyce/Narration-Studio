@@ -13,7 +13,7 @@ type Base interface {
 	Play(message util.CharacterMessage) error
 	Save(messages []util.CharacterMessage, play bool) error
 	Generate(model string, jsonBytes []byte) ([]byte, error)
-	GetVoices(string) ([]Voice, error)
+	GetVoices(model string) ([]Voice, error)
 	//GetModels() []Model
 }
 
@@ -37,14 +37,14 @@ type ModelDownload struct {
 	Phonemes string `json:"phonemes"`
 }
 
-func (m *Model) MarshalJSON() ([]byte, error) {
+func (model *Model) MarshalJSON() ([]byte, error) {
 	type Alias Model
 	return json.Marshal(&struct {
 		*Alias
 		Key string `json:"key"`
 	}{
-		Alias: (*Alias)(m),
-		Key:   fmt.Sprintf("%s:%s", m.Engine, m.Name),
+		Alias: (*Alias)(model),
+		Key:   fmt.Sprintf("%s:%s", model.Engine, model.Name),
 	})
 }
 

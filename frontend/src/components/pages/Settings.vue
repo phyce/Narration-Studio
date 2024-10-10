@@ -68,6 +68,10 @@ onMounted(async () => {
 						  placeholder="select type"
 				/>
 			</InputGroup>
+			<InputGroup class="input-group">
+				<InputGroupAddon class="input-group__addon">OpenAI API Key</InputGroupAddon>
+				<InputText class="input-group__input" v-model="settings.openAiApiKey" />
+			</InputGroup>
 		</div>
 	</div>
 </template>

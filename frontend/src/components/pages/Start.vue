@@ -2,7 +2,7 @@
 
 <template>
 	<div class="start">
-		<h1 class="start__header">Narrator Studio v0.9.0</h1>
+		<h1 class="start__header">Narrator Studio v0.10.0</h1>
 		<img class="start__logo" id="logo" alt="Wails logo" src="../../assets/images/logo.png"/>
 		Made by <a class="link" href="https://phyce.dev" target="_blank">Phyce</a>
 	</div>

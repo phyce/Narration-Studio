@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 	"unicode/utf8"
 )
 
@@ -62,12 +61,6 @@ type VoiceSynthesizer struct {
 	stdout    io.ReadCloser
 	audioData *AudioBuffer
 	Voices    []engine.Voice
-}
-
-var Format = beep.Format{
-	SampleRate:  beep.SampleRate(22050),
-	NumChannels: 1,
-	Precision:   2,
 }
 
 type PiperInput struct {
@@ -115,11 +108,6 @@ func (piper *Piper) Initialize() error {
 	}
 
 	piper.models = make(map[string]VoiceSynthesizer)
-
-	format := Format
-	if err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
-		return util.TraceError(err)
-	}
 
 	return err
 }

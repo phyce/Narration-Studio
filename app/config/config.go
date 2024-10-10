@@ -52,6 +52,10 @@ func (manager *ConfigManager) Initialize() error {
 		return err
 	}
 
+	fmt.Println("string(configFile)")
+	fmt.Println(manager.filePath)
+	fmt.Println(string(configFile))
+
 	err = json.Unmarshal(configFile, &manager.settings)
 	if err != nil {
 		return util.TraceError(err)

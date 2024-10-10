@@ -9,6 +9,7 @@ import (
 	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
+	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/voiceManager"
 )
@@ -58,8 +59,27 @@ func main() {
 	}
 	voiceManager.GetInstance().RegisterEngine(piperEngine)
 
+	openAIEngine := engine.Engine{
+		ID:     "openai",
+		Name:   "OpenAI",
+		Engine: &openai.OpenAI{},
+		Models: map[string]engine.Model{
+			"tts-1": {
+				ID:     "tts-1",
+				Name:   "TTS-1",
+				Engine: "openai",
+			},
+			"tts-1-hd": {
+				ID:     "tts-1-hd",
+				Name:   "TTS-1 HD",
+				Engine: "openai",
+			},
+		},
+	}
+	voiceManager.GetInstance().RegisterEngine(openAIEngine)
+
 	err = wails.Run(&options.App{
-		Title:            "Narrator Studio v0.9.0",
+		Title:            "Narrator Studio v0.10.0",
 		Width:            1024,
 		Height:           768,
 		WindowStartState: options.Minimised,

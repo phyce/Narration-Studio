@@ -3,6 +3,8 @@ package voiceManager
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gopxl/beep"
+	"github.com/gopxl/beep/speaker"
 	"math/rand"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
@@ -13,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 type CharacterVoice struct {
@@ -65,6 +68,19 @@ func GetInstance() *VoiceManager {
 		}
 
 		instance.LoadCharacterVoices()
+
+		format := beep.Format{
+			SampleRate:  48000,
+			NumChannels: 1,
+			Precision:   2,
+		}
+
+		if err := speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
+			response.Error(response.Data{
+				Summary: "failed to initialize speaker",
+				Detail:  err.Error(),
+			})
+		}
 
 	})
 	return instance
@@ -388,7 +404,9 @@ func (manager *VoiceManager) RefreshModels() {
 				manager.Engines[engine].Engine.Start(model)
 				enabledModels++
 			} else {
-				manager.Engines[engine].Engine.Stop(model)
+				if _, exists := manager.Engines[engine]; exists {
+					manager.Engines[engine].Engine.Stop(model)
+				}
 			}
 		}
 	}

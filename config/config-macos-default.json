@@ -4,5 +4,7 @@
 	"piperModelsDirectory" : "~/piper/models",
 	"piperPath" : "~/piper/piper",
 	"scriptOutputPath" : "~/Desktop/Narrator Studio/output",
-	"debugMode" : 0
+	"debugMode" : 0,
+	"openAiApiKey" : "",
+	"openAiOutputType": "flac"
 }

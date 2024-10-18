@@ -14,7 +14,6 @@ import (
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"nstudio/app/tts/voiceManager"
-	"time"
 )
 
 type Model struct {
@@ -37,8 +36,6 @@ var voices = []engine.Voice{
 }
 
 func (openAI *OpenAI) Initialize() error {
-	fmt.Println("API KEY?")
-	fmt.Println(*config.GetInstance().GetSetting("openAiApiKey"))
 	openAI.apiKey = *config.GetInstance().GetSetting("openAiApiKey").String
 	//openAI.outputType = *config.GetInstance().GetSetting("openAiOutputType").String
 	openAI.outputType = "flac"
@@ -150,40 +147,34 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 	return responseData, nil
 }
 
-func bytesToReadCloser(b []byte) io.ReadCloser {
-	return io.NopCloser(bytes.NewReader(b))
-}
-
 func playFLACAudioBytes(audioClip []byte) error {
-	// Step 1: Create an io.ReadCloser from the FLAC bytes
-	audioReader := bytesToReadCloser(audioClip)
+	audioReader := io.NopCloser(bytes.NewReader(audioClip))
 
-	// Step 2: Decode the FLAC data
 	streamer, format, err := flac.Decode(audioReader)
 	if err != nil {
 		return err
 	}
 	defer streamer.Close()
 
-	// Now you have a streamer and the audio format
-	// For your audioClip, format.SampleRate should be 24000 Hz
-
-	// Step 3: Initialize the speaker at 48,000 Hz (Option 4)
 	sampleRate := beep.SampleRate(48000)
 
-	// Initialize the speaker only once in your application
-	speaker.Init(sampleRate, sampleRate.N(time.Second/10))
+	//skipping, speaker already initialized, with:
+	/*
+		format := beep.Format{
+			SampleRate:  48000,
+			NumChannels: 1,
+			Precision:   2,
+		}
+	*/
+	//speaker.Init(sampleRate, sampleRate.N(time.Second/10))
 
-	// Step 4: Resample the streamer from 24,000 Hz to 48,000 Hz
 	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
 
-	// Step 5: Play the resampled streamer
 	done := make(chan bool)
 	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
 		done <- true
 	})))
 
-	// Wait until playback is finished
 	<-done
 
 	return nil

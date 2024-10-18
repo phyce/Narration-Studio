@@ -72,6 +72,10 @@ onMounted(async () => {
 				<InputGroupAddon class="input-group__addon">OpenAI API Key</InputGroupAddon>
 				<InputText class="input-group__input" v-model="settings.openAiApiKey" />
 			</InputGroup>
+			<InputGroup class="input-group">
+				<InputGroupAddon class="input-group__addon">Elevenlabs API Key</InputGroupAddon>
+				<InputText class="input-group__input" v-model="settings.elevenlabsApiKey" />
+			</InputGroup>
 		</div>
 	</div>
 </template>

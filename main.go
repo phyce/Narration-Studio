@@ -9,6 +9,7 @@ import (
 	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
+	"nstudio/app/tts/engine/elevenlabs"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/voiceManager"
@@ -20,6 +21,7 @@ var assets embed.FS
 func main() {
 	app := NewApp()
 	err := config.GetInstance().Initialize()
+	fmt.Println()
 	response.Initialize()
 
 	if err != nil {
@@ -30,7 +32,7 @@ func main() {
 	}
 
 	//TODO: Load Models from file
-	piperEngine := engine.Engine{
+	piper := engine.Engine{
 		ID:     "piper",
 		Name:   "Piper",
 		Engine: &piper.Piper{},
@@ -57,9 +59,9 @@ func main() {
 			},
 		},
 	}
-	voiceManager.GetInstance().RegisterEngine(piperEngine)
+	voiceManager.GetInstance().RegisterEngine(piper)
 
-	openAIEngine := engine.Engine{
+	openAI := engine.Engine{
 		ID:     "openai",
 		Name:   "OpenAI",
 		Engine: &openai.OpenAI{},
@@ -76,7 +78,24 @@ func main() {
 			},
 		},
 	}
-	voiceManager.GetInstance().RegisterEngine(openAIEngine)
+	voiceManager.GetInstance().RegisterEngine(openAI)
+
+	models, err := elevenlabs.FetchModels()
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to fetch elevenlabs models",
+			Detail:  err.Error(),
+		})
+		models = make(map[string]engine.Model)
+	}
+
+	elevenLabs := engine.Engine{
+		ID:     "elevenlabs",
+		Name:   "ElevenLabs",
+		Engine: &elevenlabs.ElevenLabs{},
+		Models: models,
+	}
+	voiceManager.GetInstance().RegisterEngine(elevenLabs)
 
 	err = wails.Run(&options.App{
 		Title:            "Narrator Studio v0.10.0",

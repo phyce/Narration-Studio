@@ -46,7 +46,7 @@ const handleCheckboxToggle = async () => {
 				<template #title>{{ model.name }} {{model.key}}</template>
 				<template #content>
 					<div class="voice-pack__container">
-						<div class="voice-pack__container__info">
+						<div class="voice-pack__container__info" :title="model.engine + ':' + model.id">
 							{{ model.engine + ':' + model.id }}
 						</div>
 						<div class="voice-pack__container__toggle">

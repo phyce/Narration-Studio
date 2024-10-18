@@ -87,15 +87,8 @@ func GetInstance() *VoiceManager {
 }
 
 func (manager *VoiceManager) LoadCharacterVoices() {
-	executablePath, err := os.Executable()
-	if err != nil {
-		panic("Failed to get executable path: " + err.Error())
-	}
+	voiceConfigPath := filepath.Join(config.GetInstance().GetConfigPath(), "voiceConfig.json")
 
-	voiceConfigPath := filepath.Join(filepath.Dir(executablePath), "voiceConfig.json")
-
-	fmt.Println("voiceConfigPath")
-	fmt.Println(voiceConfigPath)
 	file, err := os.ReadFile(voiceConfigPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -131,12 +124,7 @@ func (manager *VoiceManager) UpdateCharacterVoices(data string) error {
 
 	manager.CharacterVoices = newVoices
 
-	executablePath, err := os.Executable()
-	if err != nil {
-		return util.TraceError(err)
-	}
-
-	voiceConfigPath := filepath.Join(filepath.Dir(executablePath), "voiceConfig.json")
+	voiceConfigPath := filepath.Join(config.GetInstance().GetConfigPath(), "voiceConfig.json")
 
 	byteData := []byte(data)
 
@@ -214,11 +202,7 @@ func (manager *VoiceManager) SaveVoice(name string, voice CharacterVoice) error 
 		return util.TraceError(err)
 	}
 
-	executablePath, err := os.Executable()
-	if err != nil {
-		return util.TraceError(err)
-	}
-	voiceConfigPath := filepath.Join(filepath.Dir(executablePath), "voiceConfig.json")
+	voiceConfigPath := filepath.Join(config.GetInstance().GetConfigPath(), "voiceConfig.json")
 
 	err = os.WriteFile(voiceConfigPath, data, 0644)
 	if err != nil {
@@ -400,11 +384,11 @@ func (manager *VoiceManager) RefreshModels() {
 	enabledModels := 0
 	for engine, models := range toggles {
 		for model, enabled := range models {
-			if enabled {
-				manager.Engines[engine].Engine.Start(model)
-				enabledModels++
-			} else {
-				if _, exists := manager.Engines[engine]; exists {
+			if _, exists := manager.Engines[engine]; exists {
+				if enabled {
+					manager.Engines[engine].Engine.Start(model)
+					enabledModels++
+				} else {
 					manager.Engines[engine].Engine.Stop(model)
 				}
 			}

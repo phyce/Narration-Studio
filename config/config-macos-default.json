@@ -6,5 +6,6 @@
 	"scriptOutputPath" : "~/Desktop/Narrator Studio/output",
 	"debugMode" : 0,
 	"openAiApiKey" : "",
-	"openAiOutputType": "flac"
+	"openAiOutputType": "flac",
+	"elevenlabsApiKey": ""
 }

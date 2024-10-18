@@ -25,12 +25,18 @@ func GetInstance() *ConfigManager {
 	return instance
 }
 
-func (manager *ConfigManager) Initialize() error {
-	executablePath, err := os.Executable()
+func (manager *ConfigManager) GetConfigPath() string {
+	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return util.TraceError(err)
+		util.TraceError(err)
+		panic(err)
 	}
-	manager.filePath = filepath.Join(filepath.Dir(executablePath), "narrator-studio-config.json")
+
+	return filepath.Join(configDir, "Narrator Studio")
+}
+
+func (manager *ConfigManager) Initialize() error {
+	manager.filePath = filepath.Join(manager.GetConfigPath(), "narrator-studio-config.json")
 
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
@@ -47,14 +53,16 @@ func (manager *ConfigManager) Initialize() error {
 				return util.TraceError(err)
 			}
 
-			err = ioutil.WriteFile(manager.filePath, configFile, 0644)
-		}
-		return err
-	}
+			configPath := filepath.Dir(manager.filePath)
+			if err := os.MkdirAll(configPath, 0755); err != nil {
+				return util.TraceError(err)
+			}
 
-	fmt.Println("string(configFile)")
-	fmt.Println(manager.filePath)
-	fmt.Println(string(configFile))
+			err = ioutil.WriteFile(manager.filePath, configFile, 0644)
+		} else {
+			return err
+		}
+	}
 
 	err = json.Unmarshal(configFile, &manager.settings)
 	if err != nil {
@@ -97,6 +105,8 @@ func (manager *ConfigManager) Import(jsonString string) error {
 	if err != nil {
 		return util.TraceError(err)
 	}
+
+	fmt.Println("Wrote new config to file: ", manager.filePath)
 
 	return nil
 }

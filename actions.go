@@ -358,9 +358,13 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 			Detail:  err.Error(),
 		})
 	} else {
-		response.Success(response.Data{
-			Summary: "Directory changed",
-		})
+		if directory != "" {
+			response.Success(response.Data{
+				Summary: "Directory changed",
+			})
+		} else {
+			directory = defaultDirectory
+		}
 	}
 	status.Set(status.Ready, "")
 	return directory

@@ -174,7 +174,6 @@ func (piper *Piper) Start(modelName string) error {
 
 	return nil
 }
-
 func (piper *Piper) Stop(modelName string) error {
 	defer delete(piper.models, modelName)
 
@@ -244,38 +243,6 @@ func (piper *Piper) Stop(modelName string) error {
 	return nil
 }
 
-/*
-func (piper *Piper) Prepare() error {
-	for modelName, model := range piper.models {
-		metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
-		data, err := ioutil.ReadFile(metadataPath)
-		if err != nil {
-			err = fmt.Errorf("failed to read voice metadata for model %s: %v", modelName, err)
-			return util.TraceError(err)
-		}
-
-		var voices []engine.Voice
-		if err := json.Unmarshal(data, &voices); err != nil {
-			err = fmt.Errorf("failed to parse voice metadata for model %s: %v", modelName, err)
-			return util.TraceError(err)
-		}
-
-		if err = model.command.Start(); err != nil {
-			return util.TraceError(err)
-		}
-
-		piper.StartAudioCapture(model)
-
-		format := Format
-		if err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
-			return util.TraceError(err)
-		}
-	}
-
-	return nil
-}
-*/
-
 func (piper *Piper) Play(message util.CharacterMessage) error {
 	response.Debug(response.Data{
 		Summary: "Piper playing:" + message.Character,
@@ -319,7 +286,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 		return util.TraceError(err)
 	}
 
-	for index, message := range messages {
+	for _, message := range messages {
 		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
 		if err != nil {
 			return util.TraceError(err)
@@ -332,7 +299,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 			SpeakerID: speakerID,
 			OutputFile: util.GenerateFilename(
 				message,
-				index,
+				util.FileIndexGet(),
 				expandedPath,
 			),
 		}
@@ -356,7 +323,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
-func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
+func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	if piper.GetProcessID(model) == 0 {
 		if !config.GetInstance().GetModelToggles()["piper"][model] {
 			return make([]byte, 0), util.TraceError(fmt.Errorf("Model is not running and not enabled:" + model))
@@ -369,10 +336,10 @@ func (piper *Piper) Generate(model string, jsonBytes []byte) ([]byte, error) {
 		}
 	}
 
-	if utf8.Valid(jsonBytes) == false {
+	if utf8.Valid(payload) == false {
 		return nil, util.TraceError(fmt.Errorf("input JSON is not valid UTF-8"))
 	}
-	if _, err := piper.models[model].stdin.Write(jsonBytes); err != nil {
+	if _, err := piper.models[model].stdin.Write(payload); err != nil {
 		return nil, util.TraceError(err)
 	}
 
@@ -407,8 +374,9 @@ func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	return modelData.Voices, nil
 }
 
-//</editor-fold>
+// </editor-fold>
 
+// <editor-fold desc="Other">
 func (piper *Piper) StartAudioCapture(instance VoiceSynthesizer) {
 	go func() {
 		_, err := io.Copy(instance.audioData, instance.stdout)
@@ -469,3 +437,5 @@ func playRawAudioBytes(audioClip []byte) {
 	speaker.Play(streamer)
 	<-done
 }
+
+// </editor-fold>

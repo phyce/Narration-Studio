@@ -24,6 +24,7 @@ type ElevenLabs struct {
 
 var voices = make([]engine.Voice, 0)
 
+// <editor-fold desc="Engine Interface">
 func (labs *ElevenLabs) Initialize() error {
 	var err error
 	voices, err = FetchVoices()
@@ -92,7 +93,7 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 	return nil
 }
 
-func (labs *ElevenLabs) Generate(model string, jsonBytes []byte) ([]byte, error) {
+func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
@@ -100,6 +101,9 @@ func (labs *ElevenLabs) GetVoices(model string) ([]engine.Voice, error) {
 	return voices, nil
 }
 
+// </editor-fold>
+
+// <editor-fold desc="Other">
 func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]byte, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -195,3 +199,5 @@ func playPCMAudioBytes(audioClip []byte) error {
 
 	return nil
 }
+
+// </editor-fold>

@@ -11,6 +11,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 	status.Set(status.Generating, "")
 	voiceManager := VoiceManger.GetInstance()
 
+	util.FileIndexReset()
 	for _, message := range messages {
 		voice, err := voiceManager.GetVoice(message.Character, message.Save)
 		if err != nil {

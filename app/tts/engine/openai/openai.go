@@ -2,23 +2,20 @@ package openai
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
+	"github.com/go-audio/audio"
+	"github.com/go-audio/wav"
 	"github.com/gopxl/beep"
-	"github.com/gopxl/beep/flac"
+	pxlFlac "github.com/gopxl/beep/flac"
 	"github.com/gopxl/beep/speaker"
+	"github.com/mewkiz/flac"
 	"io"
-	"net/http"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"nstudio/app/tts/voiceManager"
+	"os"
 )
-
-type Model struct {
-	Voices []engine.Voice `json:"voice"`
-}
 
 type OpenAI struct {
 	Models     map[string]Model
@@ -35,6 +32,7 @@ var voices = []engine.Voice{
 	engine.Voice{ID: "shimmer", Name: "Shimmer", Gender: ""},
 }
 
+// <editor-fold desc="Engine Interface">
 func (openAI *OpenAI) Initialize() error {
 	openAI.apiKey = *config.GetInstance().GetSetting("openAiApiKey").String
 	//openAI.outputType = *config.GetInstance().GetSetting("openAiOutputType").String
@@ -87,11 +85,109 @@ func (openAI *OpenAI) Play(message util.CharacterMessage) error {
 }
 
 func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
+	response.Debug(response.Data{
+		Summary: "Openai saving messages",
+	})
+
+	err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	for _, message := range messages {
+		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
+		if err != nil {
+			return util.TraceError(err)
+		}
+
+		input := OpenAIRequest{
+			Voice:          voice.Voice,
+			Input:          message.Text,
+			Model:          voice.Model,
+			ResponseFormat: openAI.outputType,
+			Speed:          1,
+		}
+
+		audioClip, err := openAI.sendRequest(input)
+		if err != nil {
+			return util.TraceError(err)
+		}
+
+		filename := util.GenerateFilename(
+			message,
+			util.FileIndexGet(),
+			expandedPath,
+		)
+
+		err = saveWavFile(audioClip, filename)
+		if err != nil {
+			return util.TraceError(err)
+		}
+
+		if play {
+			err = playFLACAudioBytes(audioClip)
+			if err != nil {
+				return util.TraceError(err)
+			}
+		}
+	}
+
 	return nil
 }
 
-// TODO mb remove this from interface?
-func (openAI *OpenAI) Generate(model string, jsonBytes []byte) ([]byte, error) {
+func saveWavFile(flacData []byte, filename string) error {
+	// Create a bytes.Reader from the FLAC data
+	reader := bytes.NewReader(flacData)
+
+	// Decode the FLAC data
+	stream, err := flac.New(reader)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	// Prepare an audio buffer
+	var buf audio.IntBuffer
+	buf.Format = &audio.Format{
+		NumChannels: int(stream.Info.NChannels),
+		SampleRate:  int(stream.Info.SampleRate),
+	}
+
+	for {
+		frame, err := stream.ParseNext()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return util.TraceError(err)
+		}
+		// Append the samples from each subframe to the buffer
+		for _, subframe := range frame.Subframes {
+			for _, sample := range subframe.Samples {
+				buf.Data = append(buf.Data, int(sample))
+			}
+		}
+	}
+
+	// Create the output WAV file
+	outFile, err := os.Create(filename)
+	if err != nil {
+		return util.TraceError(err)
+	}
+	defer outFile.Close()
+
+	// Encode the buffer as WAV
+	encoder := wav.NewEncoder(outFile, buf.Format.SampleRate, int(stream.Info.BitsPerSample), buf.Format.NumChannels, 1)
+	if err := encoder.Write(&buf); err != nil {
+		return util.TraceError(err)
+	}
+	if err := encoder.Close(); err != nil {
+		return util.TraceError(err)
+	}
+
+	return nil
+}
+
+func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
@@ -99,58 +195,13 @@ func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {
 	return voices, nil
 }
 
-type OpenAIRequest struct {
-	Voice          string  `json:"voice"`
-	Input          string  `json:"input"`
-	Model          string  `json:"model"`
-	ResponseFormat string  `json:"response_format"`
-	Speed          float64 `json:"speed"`
-}
+// </editor-fold>
 
-func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
-
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to marshal request body: %v", err))
-	}
-
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/audio/speech", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to create HTTP request: %v", err))
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", openAI.apiKey))
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to send HTTP request: %v", err))
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, util.TraceError(fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes)))
-	}
-
-	responseData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to read response body: %v", err))
-	}
-
-	response.Success(response.Data{
-		Summary: "Request succeeded?",
-		Detail:  "Response Status: " + resp.Status,
-	})
-
-	return responseData, nil
-}
-
+// <editor-fold desc="Other">
 func playFLACAudioBytes(audioClip []byte) error {
 	audioReader := io.NopCloser(bytes.NewReader(audioClip))
 
-	streamer, format, err := flac.Decode(audioReader)
+	streamer, format, err := pxlFlac.Decode(audioReader)
 	if err != nil {
 		return err
 	}
@@ -179,3 +230,5 @@ func playFLACAudioBytes(audioClip []byte) error {
 
 	return nil
 }
+
+// </editor-fold>

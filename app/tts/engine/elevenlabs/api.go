@@ -28,6 +28,8 @@ func FetchModels() (map[string]engine.Model, error) {
 	}
 
 	client := &http.Client{}
+	defer client.CloseIdleConnections()
+
 	request, err := http.NewRequest("GET", "https://api.elevenlabs.io/v1/models", nil)
 	if err != nil {
 		return nil, util.TraceError(err)
@@ -76,6 +78,7 @@ func FetchVoices() ([]engine.Voice, error) {
 	}
 
 	client := &http.Client{}
+	defer client.CloseIdleConnections()
 
 	request, err := http.NewRequest("GET", "https://api.elevenlabs.io/v1/voices", nil)
 	if err != nil {

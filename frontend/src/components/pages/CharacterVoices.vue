@@ -12,7 +12,7 @@ import {
 	GetCharacterVoices,
 	SaveCharacterVoices,
 	EventTrigger,
-	ReloadModels
+	ReloadVoicePacks
 } from '../../../wailsjs/go/main/App';
 import {CharacterVoice, Engine, Voice} from '../interfaces/engine';
 import TreeSelect from "primevue/treeselect";

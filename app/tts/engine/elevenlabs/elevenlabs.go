@@ -195,6 +195,8 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
+	defer client.CloseIdleConnections()
+	
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, util.TraceError(fmt.Errorf("failed to send HTTP request: %v", err))

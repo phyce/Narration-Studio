@@ -2,6 +2,7 @@
 import '../../css/pages/voice-packs.css';
 
 import Card from 'primevue/card';
+import Button from "primevue/button";
 import InputSwitch from 'primevue/inputswitch';
 import {onMounted, reactive, ref} from "vue";
 import {Model} from '../interfaces/engine';
@@ -9,7 +10,8 @@ import {
 	GetAvailableModels,
 	GetSetting,
 	SaveSetting,
-	RefreshModels
+	RefreshModels,
+	ReloadVoicePacks,
 } from '../../../wailsjs/go/main/App';
 
 const models = ref<Record<string, Model>>({});
@@ -34,10 +36,24 @@ const handleCheckboxToggle = async () => {
 		RefreshModels();
 	});
 }
+
+const reloadModels = () => {
+	ReloadVoicePacks();
+}
 </script>
 
 <template>
 	<div class="voice-packs">
+		<div class="voice-packs__header">
+			<Button class="voices-packs__header__save"
+					title="Reload voice packs & voices"
+					aria-label="Reload voice packs & voices"
+					@click="reloadModels()"
+			>
+				<i class="pi pi-refresh"/>&nbsp;
+				Reload Packs
+			</Button>
+		</div>
 		<div  class="voice-packs__container"
 			  :key="model.engine + ':' + model.id"
 			  v-for="model in models"

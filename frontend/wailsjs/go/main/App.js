@@ -50,6 +50,10 @@ export function RefreshModels() {
   return window['go']['main']['App']['RefreshModels']();
 }
 
+export function ReloadVoicePacks() {
+  return window['go']['main']['App']['ReloadVoicePacks']();
+}
+
 export function SaveCharacterVoices(arg1) {
   return window['go']['main']['App']['SaveCharacterVoices'](arg1);
 }

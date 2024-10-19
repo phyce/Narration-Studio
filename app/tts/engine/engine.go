@@ -14,7 +14,7 @@ type Base interface {
 	Save(messages []util.CharacterMessage, play bool) error
 	Generate(model string, payload []byte) ([]byte, error)
 	GetVoices(model string) ([]Voice, error)
-	//GetModels() []Model
+	FetchModels() map[string]Model
 }
 
 type Engine struct {

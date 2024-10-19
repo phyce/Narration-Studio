@@ -2,6 +2,14 @@
 	@apply flex flex-wrap mt-2 mb-2 mr-2
 }
 
+.voice-packs__header {
+	@apply w-full px-2 mb-2 flex;
+}
+
+.voice-packs__header__save {
+	@apply mt-2 mr-2;
+}
+
 .voice-packs__container {
 	@apply w-full md:w-1/3 pl-2 mb-2;
 }

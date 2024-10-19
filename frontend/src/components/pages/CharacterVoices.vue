@@ -11,7 +11,8 @@ import {
 	Play,
 	GetCharacterVoices,
 	SaveCharacterVoices,
-	EventTrigger
+	EventTrigger,
+	ReloadModels
 } from '../../../wailsjs/go/main/App';
 import {CharacterVoice, Engine, Voice} from '../interfaces/engine';
 import TreeSelect from "primevue/treeselect";
@@ -126,6 +127,8 @@ const saveCharacterVoices = () => {
 
 	SaveCharacterVoices(dataString);
 };
+
+
 
 async function previewVoice(key: string) {
 	const voice = characterVoices.value[key];

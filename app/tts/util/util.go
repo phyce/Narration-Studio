@@ -56,6 +56,7 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 	filename := fmt.Sprintf("%d) %s-%s.wav", index, message.Character, text)
 
 	outputPath = filepath.Join(outputPath, datePath)
+	outputPath = filepath.Join(outputPath, timestamp)
 	fullPath := filepath.Join(outputPath, filename)
 
 	err := PrepareDirectory(outputPath)

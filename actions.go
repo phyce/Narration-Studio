@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
@@ -110,6 +109,14 @@ func (app *App) ProcessScript(script string) {
 		})
 	} else {
 		outputTypeRaw := []byte(config.GetInstance().GetSetting("outputType").Raw)
+
+		if len(outputTypeRaw) == 0 {
+			outputTypeRaw = []byte(*config.GetInstance().GetSetting("outputType").String)
+		}
+
+		fmt.Println("string(outputTypeRaw)")
+		fmt.Println(string(outputTypeRaw))
+
 		var outputType config.ConfigValueInt
 
 		err = json.Unmarshal(outputTypeRaw, &outputType)
@@ -120,11 +127,11 @@ func (app *App) ProcessScript(script string) {
 			})
 		}
 
-		if outputType.Value == 0 {
-			//combined file
+		if outputType.Value == 0 || outputType.Value == 2 {
+			//combined file OR both
 
-			now := time.Now()
-			dateString := now.Format("2006-01-02")
+			now := time.Now().Format("2006-01-02")
+			dateString := now
 
 			err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
 			if err != nil {
@@ -134,16 +141,49 @@ func (app *App) ProcessScript(script string) {
 				})
 			}
 
-			outputPath := filepath.Join(expandedPath, dateString)
+			outputPath := filepath.Join(
+				expandedPath,
+				dateString,
+				util.FileTimestampGet(),
+			)
 
-			timeString := now.Format("15-04-05.wav")
-
-			err = CombineWavFilesWithPause(outputPath, timeString, time.Second, 22050)
+			err = CombineWavFilesWithPause(
+				outputPath,
+				"combined.wav",
+				time.Second,
+				22050,
+				1,
+				16,
+			)
 			if err != nil {
 				response.Error(response.Data{
 					Summary: "Failed to combine wav files",
 					Detail:  err.Error(),
 				})
+			}
+
+			if outputType.Value != 2 {
+				files, err := os.ReadDir(outputPath)
+				if err != nil {
+					response.Error(response.Data{
+						Summary: "Failed to read directory",
+						Detail:  err.Error(),
+					})
+					return // Make sure to return after handling the error
+				}
+
+				for _, file := range files {
+					if !file.IsDir() && file.Name() != "combined.wav" {
+						err = os.Remove(filepath.Join(outputPath, file.Name()))
+						if err != nil {
+							response.Error(response.Data{
+								Summary: "Failed to delete file",
+								Detail:  err.Error(),
+							})
+							return // Make sure to return after handling the error
+						}
+					}
+				}
 			}
 		}
 
@@ -409,10 +449,10 @@ func clearConsole() error {
 	return cmd.Run()
 }
 
-func CombineWavFilesWithPause(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate int) error {
+func CombineWavFilesWithPause(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate, numChannels, bitDepth int) error {
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
-		return util.TraceError(err)
+		return err
 	}
 
 	var wavFiles []string
@@ -423,61 +463,73 @@ func CombineWavFilesWithPause(dirPath, outputFilename string, pauseDuration time
 	}
 
 	if len(wavFiles) == 0 {
-		return util.TraceError(errors.New("No WAV files found in directory"))
+		return util.TraceError(fmt.Errorf("no WAV files found in directory"))
 	}
 
 	sort.Strings(wavFiles)
 
 	var combinedBuffer *audio.IntBuffer
-	var numChannels int
-	var bitDepth int
 
+	// Create silence buffer
 	silenceSamples := int(float64(pauseDuration.Seconds()) * float64(sampleRate))
+	silenceData := make([]int, silenceSamples*numChannels)
 	silenceBuffer := &audio.IntBuffer{
-		Data: make([]int, silenceSamples*2),
+		Data: silenceData,
 		Format: &audio.Format{
-			NumChannels: 1,
+			NumChannels: numChannels,
 			SampleRate:  sampleRate,
 		},
+		SourceBitDepth: bitDepth,
 	}
 
 	for idx, wavPath := range wavFiles {
 		file, err := os.Open(wavPath)
 		if err != nil {
-			return util.TraceError(err)
+			return err
 		}
 
 		decoder := wav.NewDecoder(file)
 		if !decoder.IsValidFile() {
 			file.Close()
-			return util.TraceError(errors.New("Invalid WAV file:" + wavPath))
+			return util.TraceError(fmt.Errorf("invalid WAV file: " + wavPath))
 		}
 
 		buf, err := decoder.FullPCMBuffer()
 		if err != nil {
 			file.Close()
-			return util.TraceError(err)
+			return err
+		}
+		file.Close()
+
+		// Resample if necessary
+		if buf.Format.SampleRate != sampleRate {
+			buf, err = ResampleBuffer(buf, sampleRate)
+			if err != nil {
+				return err
+			}
 		}
 
-		file.Close()
+		// Change number of channels if necessary
+		if buf.Format.NumChannels != numChannels {
+			buf, err = ChangeNumChannels(buf, numChannels)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Change bit depth if necessary
+		if buf.SourceBitDepth != bitDepth {
+			buf, err = ChangeBitDepth(buf, bitDepth)
+			if err != nil {
+				return err
+			}
+		}
 
 		if idx == 0 {
 			combinedBuffer = &audio.IntBuffer{
 				Data:           []int{},
 				Format:         buf.Format,
 				SourceBitDepth: buf.SourceBitDepth,
-			}
-			numChannels = buf.Format.NumChannels
-			bitDepth = buf.SourceBitDepth
-
-			if buf.Format.SampleRate != sampleRate {
-				return util.TraceError(errors.New("Sample rate mismatch:" + wavPath))
-			}
-		} else {
-			if buf.Format.SampleRate != sampleRate ||
-				buf.Format.NumChannels != numChannels ||
-				buf.SourceBitDepth != bitDepth {
-				return util.TraceError(errors.New("Audio format mismatch:" + wavPath))
 			}
 		}
 
@@ -491,27 +543,127 @@ func CombineWavFilesWithPause(dirPath, outputFilename string, pauseDuration time
 	outputPath := filepath.Join(dirPath, outputFilename)
 	outFile, err := os.Create(outputPath)
 	if err != nil {
-		return util.TraceError(err)
+		return err
 	}
 	defer outFile.Close()
 
 	encoder := wav.NewEncoder(outFile, sampleRate, bitDepth, numChannels, 1)
 	err = encoder.Write(combinedBuffer)
 	if err != nil {
-		return util.TraceError(err)
+		return err
 	}
 
 	err = encoder.Close()
 	if err != nil {
-		return util.TraceError(err)
+		return err
 	}
 
-	for _, wavPath := range wavFiles {
-		err := os.Remove(wavPath)
-		if err != nil {
-			return util.TraceError(err)
+	// Optionally remove original WAV files
+	/*
+		for _, wavPath := range wavFiles {
+			err := os.Remove(wavPath)
+			if err != nil {
+				return err
+			}
 		}
-	}
+	*/
 
 	return nil
+}
+
+func ResampleBuffer(buf *audio.IntBuffer, targetSampleRate int) (*audio.IntBuffer, error) {
+	srcSampleRate := buf.Format.SampleRate
+	if srcSampleRate == targetSampleRate {
+		return buf, nil
+	}
+
+	resampleRatio := float64(targetSampleRate) / float64(srcSampleRate)
+	srcData := buf.Data
+	srcLength := len(srcData)
+	dstLength := int(float64(srcLength) * resampleRatio)
+	dstData := make([]int, dstLength)
+
+	for i := 0; i < dstLength; i++ {
+		srcPos := float64(i) / resampleRatio
+		srcIndex := int(srcPos)
+		if srcIndex >= srcLength-1 {
+			srcIndex = srcLength - 2
+		}
+		frac := srcPos - float64(srcIndex)
+		sample := int(float64(srcData[srcIndex])*(1-frac) + float64(srcData[srcIndex+1])*frac)
+		dstData[i] = sample
+	}
+
+	resampledBuf := &audio.IntBuffer{
+		Data:           dstData,
+		Format:         &audio.Format{SampleRate: targetSampleRate, NumChannels: buf.Format.NumChannels},
+		SourceBitDepth: buf.SourceBitDepth,
+	}
+	return resampledBuf, nil
+}
+
+func ChangeNumChannels(buf *audio.IntBuffer, targetNumChannels int) (*audio.IntBuffer, error) {
+	srcNumChannels := buf.Format.NumChannels
+	if srcNumChannels == targetNumChannels {
+		return buf, nil
+	}
+	srcData := buf.Data
+	numSamples := len(srcData) / srcNumChannels
+	dstData := make([]int, numSamples*targetNumChannels)
+
+	if targetNumChannels == 1 && srcNumChannels > 1 {
+		// Convert from multi-channel to mono by averaging channels
+		for i := 0; i < numSamples; i++ {
+			sum := 0
+			for c := 0; c < srcNumChannels; c++ {
+				sum += srcData[i*srcNumChannels+c]
+			}
+			avg := sum / srcNumChannels
+			dstData[i] = avg
+		}
+	} else if targetNumChannels > 1 && srcNumChannels == 1 {
+		// Convert from mono to multi-channel by duplicating channels
+		for i := 0; i < numSamples; i++ {
+			sample := srcData[i]
+			for c := 0; c < targetNumChannels; c++ {
+				dstData[i*targetNumChannels+c] = sample
+			}
+		}
+	} else {
+
+		return nil, util.TraceError(fmt.Errorf("unsupported channel conversion"))
+	}
+
+	convertedBuf := &audio.IntBuffer{
+		Data:           dstData,
+		Format:         &audio.Format{SampleRate: buf.Format.SampleRate, NumChannels: targetNumChannels},
+		SourceBitDepth: buf.SourceBitDepth,
+	}
+	return convertedBuf, nil
+}
+
+func ChangeBitDepth(buf *audio.IntBuffer, targetBitDepth int) (*audio.IntBuffer, error) {
+	srcBitDepth := buf.SourceBitDepth
+	if srcBitDepth == targetBitDepth {
+		return buf, nil
+	}
+
+	srcData := buf.Data
+	dstData := make([]int, len(srcData))
+
+	maxSrcValue := 1 << (srcBitDepth - 1)
+	maxDstValue := 1 << (targetBitDepth - 1)
+
+	for i, sample := range srcData {
+		// Scale sample value to target bit depth
+		scaledSample := sample * maxDstValue / maxSrcValue
+		dstData[i] = scaledSample
+	}
+
+	convertedBuf := &audio.IntBuffer{
+		Data:           dstData,
+		Format:         buf.Format,
+		SourceBitDepth: targetBitDepth,
+	}
+	return convertedBuf, nil
 }

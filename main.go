@@ -66,7 +66,7 @@ func main() {
 	voiceManager.GetInstance().RegisterEngine(elevenLabs)
 
 	err = wails.Run(&options.App{
-		Title:            "Narrator Studio v0.10.0",
+		Title:            "Narrator Studio v0.11.0",
 		Width:            1024,
 		Height:           768,
 		WindowStartState: options.Minimised,

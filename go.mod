@@ -8,6 +8,7 @@ require (
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.1.0
 	github.com/gopxl/beep v1.4.1
+	github.com/mewkiz/flac v1.0.12
 	github.com/wailsapp/wails/v2 v2.9.1
 )
 
@@ -29,7 +30,6 @@ require (
 	github.com/leaanthony/u v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
-	github.com/mewkiz/flac v1.0.8 // indirect
 	github.com/mewkiz/pkg v0.0.0-20230226050401-4010bf0fec14 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

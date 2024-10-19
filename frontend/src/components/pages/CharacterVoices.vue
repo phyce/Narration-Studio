@@ -19,7 +19,7 @@ import {TreeNode} from "primevue/treenode";
 
 const engineModelNodes = ref<any[]>([]);
 const engines = ref<{ [key: string]: Engine }>({});
-const voiceOptions = ref<Record<string, Voice[]>>({});
+const voiceOptions = ref<Record<string, Record<string, Voice>>>({});
 const voiceOptionsMap = ref<Record<string, Voice[]>>({});
 const characterVoices = ref<Record<string, CharacterVoice>>({});
 
@@ -46,14 +46,24 @@ async function getEngines() {
 
 async function getVoices(engine: string, model: string) {
 	const result = await GetVoices(engine, model);
+
 	const voicesList: Voice[] = JSON.parse(result);
 	const key = `${engine}:${model}`;
-	voiceOptions.value[key] = voicesList;
+	const voicesMap: Record<string, Voice> = voicesList.reduce((acc, voice) => {
+      acc[voice.voiceID] = voice;
+      return acc;
+    }, {} as Record<string, Voice>);
+	if (voicesMap != null) {
+		voiceOptions.value[key] = voicesMap;
+	} else {
+		voiceOptions.value[key] = {};
+	}
 }
 
 async function getCharacterVoices() {
 	const result = await GetCharacterVoices();
-		const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
+	const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
+
 	characterVoices.value = characterVoiceData;
 
 	for (const name in characterVoiceData) {
@@ -61,8 +71,11 @@ async function getCharacterVoices() {
 		selectedModels[name] = {
 			[characterVoiceData[name].key]: true
 		};
-		selectedVoices[name] = voiceOptions.value[characterVoiceData[name].key][parseInt(voice)];
-		voiceOptionsMap.value[name] = voiceOptions.value[engine + ":" + model];
+		selectedVoices[name] = voiceOptions.value[characterVoiceData[name].key][voice];
+
+		const voiceOptionsRecord = voiceOptions.value[engine + ":" + model];
+
+		voiceOptionsMap.value[name] = Object.values(voiceOptionsRecord) ?? [];
 	}
 
 	addEmptyCharacterVoice();
@@ -74,7 +87,7 @@ function onModelSelect(nodeKey: TreeNode, characterKey: string) {
 	character.engine = engineId;
 	character.model = modelId;
 
-	voiceOptionsMap.value[characterKey] = voiceOptions.value[`${engineId}:${modelId}`] || [];
+	voiceOptionsMap.value[characterKey] = Object.values(voiceOptions.value[`${engineId}:${modelId}`]) || [];
 }
 
 async function onVoiceSelect(key: string ,event: DropdownChangeEvent) {

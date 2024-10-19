@@ -12,7 +12,7 @@ type Base interface {
 	Stop(modelName string) error
 	Play(message util.CharacterMessage) error
 	Save(messages []util.CharacterMessage, play bool) error
-	Generate(model string, jsonBytes []byte) ([]byte, error)
+	Generate(model string, payload []byte) ([]byte, error)
 	GetVoices(model string) ([]Voice, error)
 	//GetModels() []Model
 }

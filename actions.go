@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -168,6 +169,9 @@ func (app *App) GetCharacterVoices() string {
 			Detail:  err.Error(),
 		})
 	}
+
+	fmt.Println("string(voicesJSON)")
+	fmt.Println(string(voicesJSON))
 
 	status.Set(status.Ready, "")
 	return string(voicesJSON)

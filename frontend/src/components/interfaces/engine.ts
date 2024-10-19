@@ -12,7 +12,7 @@ export interface Model {
 }
 
 export interface Voice {
-	voiceID:    number;
+	voiceID:    string;
 	name:       string;
 	gender:     string;
 	key:        string;

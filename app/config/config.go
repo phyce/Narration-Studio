@@ -38,6 +38,8 @@ func (manager *ConfigManager) GetConfigPath() string {
 func (manager *ConfigManager) Initialize() error {
 	manager.filePath = filepath.Join(manager.GetConfigPath(), "narrator-studio-config.json")
 
+	fmt.Println("manager.filePath")
+	fmt.Println(manager.filePath)
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {

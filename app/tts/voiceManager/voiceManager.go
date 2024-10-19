@@ -102,8 +102,10 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 		}
 	}
 
-	//var voices map[string]CharacterVoice
-	var voices []CharacterVoice
+	var voices map[string]CharacterVoice
+	//var voices []CharacterVoice
+	fmt.Println("string(file)")
+	fmt.Println(string(file))
 	err = json.Unmarshal(file, &voices)
 	if err != nil {
 		panic("Failed to unmarshal voice config: " + err.Error())
@@ -349,11 +351,41 @@ func (manager *VoiceManager) GetEngine(ID string) (tts.Engine, bool) {
 }
 
 func (manager *VoiceManager) GetEngines() []tts.Engine {
-	var allEngines []tts.Engine
+	toggles := config.GetInstance().GetModelToggles()
+	var availableEngines []tts.Engine
+
 	for _, managerEngine := range manager.Engines {
-		allEngines = append(allEngines, managerEngine)
+		filteredEngine := tts.Engine{
+			ID:     managerEngine.ID,
+			Name:   managerEngine.Name,
+			Models: make(map[string]tts.Model),
+		}
+
+		for modelName, model := range managerEngine.Models {
+			engineToggles, engineExists := toggles[managerEngine.ID]
+			if engineExists {
+				if enabled, toggleExists := engineToggles[modelName]; toggleExists && enabled {
+					filteredEngine.Models[modelName] = tts.Model{
+						ID:       model.ID,
+						Name:     model.Name,
+						Engine:   model.Engine,
+						Download: model.Download,
+					}
+				}
+			} else {
+				filteredEngine.Models[modelName] = tts.Model{
+					ID:       model.ID,
+					Name:     model.Name,
+					Engine:   model.Engine,
+					Download: model.Download,
+				}
+			}
+		}
+
+		availableEngines = append(availableEngines, filteredEngine)
 	}
-	return allEngines
+
+	return availableEngines
 }
 
 func (manager *VoiceManager) GetAllModels() map[string]tts.Model {

@@ -210,65 +210,20 @@ func (app *App) GetAvailableModels() string {
 
 //</editor-fold>
 
-// <editor-fold desc="Common">
-func (app *App) GetEngines() string {
-	engines := voiceManager.GetInstance().GetEngines()
+// <editor-fold desc="Voice Packs">
+func (app *App) ReloadVoicePacks() {
+	status.Set(status.Loading, "Reloading Voice Packs")
 
-	jsonData, err := json.Marshal(engines)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to get engines",
-			Detail:  err.Error(),
-		})
-		return ""
-	}
+	voiceManager.GetInstance().ReloadModels()
 
-	return string(jsonData)
-}
-
-func (app *App) GetVoices(engine string, model string) string {
-	voices, err := voiceManager.GetInstance().GetVoices(engine, model)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to get voices",
-			Detail:  err.Error(),
-		})
-	}
-
-	jsonData, err := json.Marshal(voices)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to get voices",
-			Detail:  err.Error(),
-		})
-	}
-
-	return string(jsonData)
-}
-
-func (app *App) GetStatus() string {
-	status := status.Get()
-
-	jsonData, err := json.Marshal(status)
-	if err != nil {
-		panic(err)
-	}
-
-	return string(jsonData)
+	response.Success(response.Data{
+		Summary: "Success",
+		Detail:  "Voice Packs reloaded successfully",
+	})
+	status.Set(status.Ready, "")
 }
 
 //</editor-fold>
-
-// <editor-fold desc="Events">
-func (app *App) EventSubscribe(eventName string, handler func(data interface{})) {
-	eventManager.GetInstance().SubscribeToEvent(eventName, handler)
-}
-
-func (a *App) EventTrigger(eventName string, data interface{}) {
-	eventManager.GetInstance().TriggerEvent(eventName, data)
-}
-
-// </editor-fold>
 
 // <editor-fold desc="Settings">
 func (app *App) GetSettings() string {
@@ -382,6 +337,66 @@ func (app *App) RefreshModels() {
 }
 
 //</editor-fold>
+
+// <editor-fold desc="Common">
+func (app *App) GetEngines() string {
+	engines := voiceManager.GetInstance().GetEngines()
+
+	jsonData, err := json.Marshal(engines)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to get engines",
+			Detail:  err.Error(),
+		})
+		return ""
+	}
+
+	return string(jsonData)
+}
+
+func (app *App) GetVoices(engine string, model string) string {
+	voices, err := voiceManager.GetInstance().GetVoices(engine, model)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to get voices",
+			Detail:  err.Error(),
+		})
+	}
+
+	jsonData, err := json.Marshal(voices)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to get voices",
+			Detail:  err.Error(),
+		})
+	}
+
+	return string(jsonData)
+}
+
+func (app *App) GetStatus() string {
+	status := status.Get()
+
+	jsonData, err := json.Marshal(status)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(jsonData)
+}
+
+//</editor-fold>
+
+// <editor-fold desc="Events">
+func (app *App) EventSubscribe(eventName string, handler func(data interface{})) {
+	eventManager.GetInstance().SubscribeToEvent(eventName, handler)
+}
+
+func (a *App) EventTrigger(eventName string, data interface{}) {
+	eventManager.GetInstance().TriggerEvent(eventName, data)
+}
+
+// </editor-fold>
 
 func clearConsole() error {
 	var cmd *exec.Cmd

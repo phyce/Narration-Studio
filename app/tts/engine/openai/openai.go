@@ -135,6 +135,54 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
+func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
+	return make([]byte, 0), nil
+}
+
+func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {
+	return voices, nil
+}
+
+func (openAI *OpenAI) FetchModels() map[string]engine.Model {
+	return FetchModels()
+}
+
+// </editor-fold>
+
+// <editor-fold desc="Other">
+func playFLACAudioBytes(audioClip []byte) error {
+	audioReader := io.NopCloser(bytes.NewReader(audioClip))
+
+	streamer, format, err := pxlFlac.Decode(audioReader)
+	if err != nil {
+		return err
+	}
+	defer streamer.Close()
+
+	sampleRate := beep.SampleRate(48000)
+
+	//skipping, speaker already initialized, with:
+	/*
+		format := beep.Format{
+			SampleRate:  48000,
+			NumChannels: 1,
+			Precision:   2,
+		}
+	*/
+	//speaker.Init(sampleRate, sampleRate.N(time.Second/10))
+
+	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
+
+	done := make(chan bool)
+	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
+		done <- true
+	})))
+
+	<-done
+
+	return nil
+}
+
 func saveWavFile(flacData []byte, filename string) error {
 	// Create a bytes.Reader from the FLAC data
 	reader := bytes.NewReader(flacData)
@@ -187,48 +235,19 @@ func saveWavFile(flacData []byte, filename string) error {
 	return nil
 }
 
-func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
-	return make([]byte, 0), nil
-}
-
-func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {
-	return voices, nil
-}
-
-// </editor-fold>
-
-// <editor-fold desc="Other">
-func playFLACAudioBytes(audioClip []byte) error {
-	audioReader := io.NopCloser(bytes.NewReader(audioClip))
-
-	streamer, format, err := pxlFlac.Decode(audioReader)
-	if err != nil {
-		return err
+func FetchModels() map[string]engine.Model {
+	return map[string]engine.Model{
+		"tts-1": {
+			ID:     "tts-1",
+			Name:   "TTS-1",
+			Engine: "openai",
+		},
+		"tts-1-hd": {
+			ID:     "tts-1-hd",
+			Name:   "TTS-1 HD",
+			Engine: "openai",
+		},
 	}
-	defer streamer.Close()
-
-	sampleRate := beep.SampleRate(48000)
-
-	//skipping, speaker already initialized, with:
-	/*
-		format := beep.Format{
-			SampleRate:  48000,
-			NumChannels: 1,
-			Precision:   2,
-		}
-	*/
-	//speaker.Init(sampleRate, sampleRate.N(time.Second/10))
-
-	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
-
-	done := make(chan bool)
-	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
-		done <- true
-	})))
-
-	<-done
-
-	return nil
 }
 
 // </editor-fold>

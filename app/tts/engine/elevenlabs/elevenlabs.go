@@ -5,15 +5,19 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/go-audio/audio"
+	"github.com/go-audio/wav"
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/speaker"
 	"io"
 	"log"
 	"net/http"
 	"nstudio/app/common/response"
+	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	"nstudio/app/tts/voiceManager"
+	"os"
 )
 
 type ElevenLabs struct {
@@ -77,7 +81,7 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 		return util.TraceError(err)
 	}
 
-	err = playPCMAudioBytes(audioClip) // Assuming PCM format based on output_format
+	err = playPCMAudioBytes(audioClip)
 	if err != nil {
 		return util.TraceError(err)
 	}
@@ -90,6 +94,54 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 }
 
 func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error {
+	response.Debug(response.Data{
+		Summary: "Elevenlabs saving messages",
+	})
+
+	err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+	if err != nil {
+		return util.TraceError(err)
+	}
+
+	for _, message := range messages {
+		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
+		if err != nil {
+			return util.TraceError(err)
+		}
+
+		input := ElevenLabsRequest{
+			Text:    message.Text,
+			ModelID: voice.Model,
+			VoiceSettings: VoiceSettings{
+				Stability:       0.5,
+				SimilarityBoost: 0.5,
+			},
+		}
+
+		audioClip, err := labs.sendRequest(voice.Voice, input)
+		if err != nil {
+			return util.TraceError(err)
+		}
+
+		filename := util.GenerateFilename(
+			message,
+			util.FileIndexGet(),
+			expandedPath,
+		)
+
+		err = saveWavFile(audioClip, filename)
+		if err != nil {
+			return util.TraceError(err)
+		}
+
+		if play {
+			err = playPCMAudioBytes(audioClip)
+			if err != nil {
+				return util.TraceError(err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -99,6 +151,28 @@ func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
 
 func (labs *ElevenLabs) GetVoices(model string) ([]engine.Voice, error) {
 	return voices, nil
+}
+
+func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
+	models, err := FetchModels()
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to fetch elevenlabs models",
+			Detail:  err.Error(),
+		})
+		models = make(map[string]engine.Model)
+	}
+
+	voices, err = FetchVoices()
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to fetch elevenlabs models",
+			Detail:  err.Error(),
+		})
+		models = make(map[string]engine.Model)
+	}
+
+	return models
 }
 
 // </editor-fold>
@@ -196,6 +270,60 @@ func playPCMAudioBytes(audioClip []byte) error {
 
 	// Wait until playback is finished
 	<-done
+
+	return nil
+}
+
+func saveWavFile(audioClip []byte, filename string) error {
+	// Define WAV file parameters
+	sampleRate := 24000 // 24,000 Hz
+	numChannels := 1    // Mono
+	bitDepth := 16      // 16-bit PCM
+	bytesPerSample := bitDepth / 8
+
+	// Calculate the number of samples
+	numSamples := len(audioClip) / bytesPerSample
+
+	// Create an IntBuffer to hold the PCM samples
+	buf := &audio.IntBuffer{
+		Format: &audio.Format{
+			SampleRate:  sampleRate,
+			NumChannels: numChannels,
+		},
+		Data:           make([]int, numSamples),
+		SourceBitDepth: bitDepth,
+	}
+
+	// Read PCM data into the buffer
+	reader := bytes.NewReader(audioClip)
+	for i := 0; i < numSamples; i++ {
+		var sample int16
+		if err := binary.Read(reader, binary.LittleEndian, &sample); err != nil {
+			return err
+		}
+		buf.Data[i] = int(sample)
+	}
+
+	// Create the WAV file
+	outFile, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	// Initialize WAV encoder
+	encoder := wav.NewEncoder(outFile, buf.Format.SampleRate, buf.SourceBitDepth, buf.Format.NumChannels, 1)
+	defer encoder.Close()
+
+	// Write the buffer to the WAV file
+	if err := encoder.Write(buf); err != nil {
+		return err
+	}
+
+	// Finalize the WAV file
+	if err := encoder.Close(); err != nil {
+		return err
+	}
 
 	return nil
 }

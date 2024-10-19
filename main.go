@@ -36,28 +36,7 @@ func main() {
 		ID:     "piper",
 		Name:   "Piper",
 		Engine: &piper.Piper{},
-		Models: map[string]engine.Model{
-			"libritts": {
-				ID:     "libritts",
-				Name:   "LibriTTS",
-				Engine: "piper",
-				Download: engine.ModelDownload{
-					Metadata: "",
-					Model:    "https://mechanic.ink/narrator-studio/models/en/en_GB/vctk/medium/en_GB-vctk-medium.onnx",
-					Phonemes: "https://mechanic.ink/narrator-studio/models/en/en_GB/vctk/medium/en_GB-vctk-medium.onnx.json",
-				},
-			},
-			"vctk": {
-				ID:     "vctk",
-				Name:   "VCTK",
-				Engine: "piper",
-				Download: engine.ModelDownload{
-					Metadata: "",
-					Model:    "https://mechanic.ink/narrator-studio/models/en/en_GB/vctk/medium/en_GB-vctk-medium.onnx",
-					Phonemes: "https://mechanic.ink/narrator-studio/models/en/en_GB/vctk/medium/en_GB-vctk-medium.onnx.json",
-				},
-			},
-		},
+		Models: piper.FetchModels(),
 	}
 	voiceManager.GetInstance().RegisterEngine(piper)
 
@@ -65,18 +44,7 @@ func main() {
 		ID:     "openai",
 		Name:   "OpenAI",
 		Engine: &openai.OpenAI{},
-		Models: map[string]engine.Model{
-			"tts-1": {
-				ID:     "tts-1",
-				Name:   "TTS-1",
-				Engine: "openai",
-			},
-			"tts-1-hd": {
-				ID:     "tts-1-hd",
-				Name:   "TTS-1 HD",
-				Engine: "openai",
-			},
-		},
+		Models: openai.FetchModels(),
 	}
 	voiceManager.GetInstance().RegisterEngine(openAI)
 

@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"github.com/ncruces/zenity"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -19,18 +20,50 @@ import (
 var assets embed.FS
 
 func main() {
-	app := NewApp()
 	err := config.GetInstance().Initialize()
 	fmt.Println()
 	response.Initialize()
 
 	if err != nil {
-		// TODO error popup or separate window before closing application
-		fmt.Println("Failed to init config")
-		fmt.Println(err)
+		showErrorDialog(
+			"Failed to initialize config config",
+			err.Error(),
+		)
 		panic(err)
 	}
 
+	registerEngines()
+
+	app := NewApp()
+	err = wails.Run(&options.App{
+		Title:            "Narrator Studio v0.11.0",
+		Width:            1024,
+		Height:           768,
+		WindowStartState: options.Minimised,
+		AssetServer: &assetserver.Options{
+			Assets: assets,
+		},
+		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		OnStartup:        app.startup,
+		Bind: []interface{}{
+			app,
+			//&engine.Model{},
+			//&engine.Voice{},
+			//&config.Value{},
+			//&config.ConfigManager{},
+		},
+	})
+
+	if err != nil {
+		showErrorDialog(
+			"Failed to start Narrator Studio",
+			err.Error(),
+		)
+		println("Error:", err.Error())
+	}
+}
+
+func registerEngines() {
 	//TODO: Load Models from file
 	piperEngine := engine.Engine{
 		ID:     "piper",
@@ -60,28 +93,11 @@ func main() {
 		Models: models,
 	}
 	voiceManager.GetInstance().RegisterEngine(elevenLabsEngine)
+}
 
-	err = wails.Run(&options.App{
-		Title:            "Narrator Studio v0.11.0",
-		Width:            1024,
-		Height:           768,
-		WindowStartState: options.Minimised,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
-		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
-		Bind: []interface{}{
-			app,
-			//&engine.Model{},
-			//&engine.Voice{},
-			//&config.Value{},
-			//&config.ConfigManager{},
-		},
-	})
-
+func showErrorDialog(title, message string) {
+	err := zenity.Error(message, zenity.Title(title))
 	if err != nil {
-		// TODO error popup or separate window before closing application
-		println("Error:", err.Error())
+		panic("Failed to show error dialog: " + err.Error())
 	}
 }

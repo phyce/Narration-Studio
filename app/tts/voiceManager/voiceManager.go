@@ -21,7 +21,8 @@ import (
 type VoiceManager struct {
 	sync.Mutex
 	Engines         map[string]tts.Engine
-	CharacterVoices map[string]CharacterVoice
+	CharacterVoices map[string]util.CharacterVoice
+	AllocatedVoices map[string]util.CharacterVoice //These ones do not get saved permanently, only per run
 }
 
 var (
@@ -33,7 +34,8 @@ func GetInstance() *VoiceManager {
 	once.Do(func() {
 		instance = &VoiceManager{
 			Engines:         make(map[string]tts.Engine),
-			CharacterVoices: make(map[string]CharacterVoice),
+			CharacterVoices: make(map[string]util.CharacterVoice),
+			AllocatedVoices: make(map[string]util.CharacterVoice),
 		}
 
 		instance.LoadCharacterVoices()
@@ -71,7 +73,7 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 		}
 	}
 
-	var voices map[string]CharacterVoice
+	var voices map[string]util.CharacterVoice
 	//var voices []CharacterVoice
 	fmt.Println("string(file)")
 	fmt.Println(string(file))
@@ -87,7 +89,7 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 }
 
 func (manager *VoiceManager) UpdateCharacterVoices(data string) error {
-	var newVoices map[string]CharacterVoice
+	var newVoices map[string]util.CharacterVoice
 	err := json.Unmarshal([]byte(data), &newVoices)
 	if err != nil {
 		return util.TraceError(err)
@@ -106,14 +108,20 @@ func (manager *VoiceManager) UpdateCharacterVoices(data string) error {
 	return nil
 }
 
-func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, error) {
+func (manager *VoiceManager) GetVoice(name string, save bool) (util.CharacterVoice, error) {
 	manager.Lock()
 	defer manager.Unlock()
+
+	if allocatedVoice, exists := manager.AllocatedVoices[name]; exists {
+		return allocatedVoice, nil
+	}
+
+	fmt.Println("Getting Voice for: ", name)
 
 	if strings.HasPrefix(name, "::") {
 		parts := strings.Split(name, ":")
 		if len(parts) == 5 {
-			characterVoice := CharacterVoice{
+			characterVoice := util.CharacterVoice{
 				Name:   "",
 				Engine: parts[2],
 				Model:  parts[3],
@@ -121,7 +129,7 @@ func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, e
 			}
 			return characterVoice, nil
 		} else {
-			return CharacterVoice{}, util.TraceError(
+			return util.CharacterVoice{}, util.TraceError(
 				fmt.Errorf("invalid line could not be processed: " + name),
 			)
 		}
@@ -140,10 +148,13 @@ func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, e
 	engine := manager.calculateEngine(name)
 	model, voice, err := manager.calculateVoice(engine, name)
 	if err != nil {
-		return CharacterVoice{}, util.TraceError(err)
+		return util.CharacterVoice{}, util.TraceError(err)
 	}
 
-	characterVoice := CharacterVoice{
+	fmt.Println("engine, model, voice, name")
+	fmt.Println(engine, model, voice, name)
+
+	characterVoice := util.CharacterVoice{
 		Name:   name,
 		Engine: engine,
 		Model:  model,
@@ -153,17 +164,19 @@ func (manager *VoiceManager) GetVoice(name string, save bool) (CharacterVoice, e
 	if save {
 		err = manager.SaveVoice(name, characterVoice)
 		if err != nil {
-			return CharacterVoice{}, util.TraceError(err)
+			return util.CharacterVoice{}, util.TraceError(err)
 		}
+	} else {
+		manager.AllocatedVoices[name] = characterVoice
 	}
 
 	return characterVoice, nil
 }
 
-func (manager *VoiceManager) SaveVoice(name string, voice CharacterVoice) error {
+func (manager *VoiceManager) SaveVoice(name string, voice util.CharacterVoice) error {
 	manager.CharacterVoices[name] = voice
 
-	voicesArray := make([]CharacterVoice, 0, len(manager.CharacterVoices))
+	voicesArray := make([]util.CharacterVoice, 0, len(manager.CharacterVoices))
 	for _, v := range manager.CharacterVoices {
 		voicesArray = append(voicesArray, v)
 	}
@@ -409,4 +422,8 @@ func (manager *VoiceManager) ReloadModels() {
 		manager.Engines[name] = engine
 	}
 	manager.RefreshModels()
+}
+
+func (manager *VoiceManager) ResetAllocatedVoices() {
+	manager.AllocatedVoices = make(map[string]util.CharacterVoice)
 }

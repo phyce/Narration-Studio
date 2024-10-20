@@ -16,7 +16,6 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
-	"nstudio/app/tts/voiceManager"
 	"os"
 )
 
@@ -56,21 +55,16 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 		Detail:  message.Text,
 	})
 
-	voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
-	if err != nil {
-		return util.TraceError(err)
-	}
-
 	input := ElevenLabsRequest{
 		Text:    message.Text,
-		ModelID: voice.Model,
+		ModelID: message.Voice.Model,
 		VoiceSettings: VoiceSettings{
 			Stability:       0.5,
 			SimilarityBoost: 0.5,
 		},
 	}
 
-	audioClip, err := labs.sendRequest(voice.Voice, input)
+	audioClip, err := labs.sendRequest(message.Voice.Voice, input)
 	if err != nil {
 		return util.TraceError(err)
 	}
@@ -98,21 +92,20 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 	}
 
 	for _, message := range messages {
-		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
 		if err != nil {
 			return util.TraceError(err)
 		}
 
 		input := ElevenLabsRequest{
 			Text:    message.Text,
-			ModelID: voice.Model,
+			ModelID: message.Voice.Model,
 			VoiceSettings: VoiceSettings{
 				Stability:       0.5,
 				SimilarityBoost: 0.5,
 			},
 		}
 
-		audioClip, err := labs.sendRequest(voice.Voice, input)
+		audioClip, err := labs.sendRequest(message.Voice.Voice, input)
 		if err != nil {
 			return util.TraceError(err)
 		}

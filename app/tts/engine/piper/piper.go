@@ -14,7 +14,6 @@ import (
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
 	process "nstudio/app/tts/util/process"
-	"nstudio/app/tts/voiceManager"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -249,12 +248,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 		Detail:  message.Text,
 	})
 
-	voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
-	if err != nil {
-		return util.TraceError(err)
-	}
-
-	speakerID, _ := strconv.Atoi(voice.Voice)
+	speakerID, _ := strconv.Atoi(message.Voice.Voice)
 
 	input := PiperInputLite{
 		Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
@@ -267,7 +261,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	}
 	jsonBytes = append(jsonBytes, '\n')
 
-	audioClip, err := piper.Generate(voice.Model, jsonBytes)
+	audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
 	if err != nil {
 		return util.TraceError(err)
 	}
@@ -287,12 +281,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 	}
 
 	for _, message := range messages {
-		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
-		if err != nil {
-			return util.TraceError(err)
-		}
-
-		speakerID, _ := strconv.Atoi(voice.Voice)
+		speakerID, _ := strconv.Atoi(message.Voice.Voice)
 
 		input := PiperInput{
 			Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
@@ -310,7 +299,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 		}
 		jsonBytes = append(jsonBytes, '\n')
 
-		audioClip, err := piper.Generate(voice.Model, jsonBytes)
+		audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
 		if err != nil {
 			return util.TraceError(err)
 		}

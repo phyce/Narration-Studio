@@ -32,34 +32,34 @@ func main() {
 	}
 
 	//TODO: Load Models from file
-	piper := engine.Engine{
+	piperEngine := engine.Engine{
 		ID:     "piper",
 		Name:   "Piper",
 		Engine: &piper.Piper{},
 		Models: piper.FetchModels(),
 	}
-	voiceManager.GetInstance().RegisterEngine(piper)
+	voiceManager.GetInstance().RegisterEngine(piperEngine)
 
-	openAI := engine.Engine{
+	openAIEngine := engine.Engine{
 		ID:     "openai",
 		Name:   "OpenAI",
 		Engine: &openai.OpenAI{},
 		Models: openai.FetchModels(),
 	}
-	voiceManager.GetInstance().RegisterEngine(openAI)
+	voiceManager.GetInstance().RegisterEngine(openAIEngine)
 
 	models, err := elevenlabs.FetchModels()
 	if err != nil {
 		models = make(map[string]engine.Model)
 	}
 
-	elevenLabs := engine.Engine{
+	elevenLabsEngine := engine.Engine{
 		ID:     "elevenlabs",
 		Name:   "ElevenLabs",
 		Engine: &elevenlabs.ElevenLabs{},
 		Models: models,
 	}
-	voiceManager.GetInstance().RegisterEngine(elevenLabs)
+	voiceManager.GetInstance().RegisterEngine(elevenLabsEngine)
 
 	err = wails.Run(&options.App{
 		Title:            "Narrator Studio v0.11.0",

@@ -1,9 +1,16 @@
-package voiceManager
+package util
 
 import (
 	"encoding/json"
 	"fmt"
 )
+
+type CharacterMessage struct {
+	Character string         `json:"character"`
+	Text      string         `json:"text"`
+	Save      bool           `json:"save"`
+	Voice     CharacterVoice `json:"-"`
+}
 
 type CharacterVoice struct {
 	Name   string `json:"name"`

@@ -13,7 +13,6 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/util"
-	"nstudio/app/tts/voiceManager"
 	"os"
 )
 
@@ -54,15 +53,10 @@ func (openAI *OpenAI) Play(message util.CharacterMessage) error {
 		Detail:  message.Text,
 	})
 
-	voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
-	if err != nil {
-		return util.TraceError(err)
-	}
-
 	input := OpenAIRequest{
-		Voice:          voice.Voice,
+		Voice:          message.Voice.Voice,
 		Input:          message.Text,
-		Model:          voice.Model,
+		Model:          message.Voice.Model,
 		ResponseFormat: openAI.outputType,
 		Speed:          1,
 	}
@@ -93,15 +87,10 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 	}
 
 	for _, message := range messages {
-		voice, err := voiceManager.GetInstance().GetVoice(message.Character, false)
-		if err != nil {
-			return util.TraceError(err)
-		}
-
 		input := OpenAIRequest{
-			Voice:          voice.Voice,
+			Voice:          message.Voice.Voice,
 			Input:          message.Text,
-			Model:          voice.Model,
+			Model:          message.Voice.Model,
 			ResponseFormat: openAI.outputType,
 			Speed:          1,
 		}

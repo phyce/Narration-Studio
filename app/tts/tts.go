@@ -18,12 +18,20 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 			return util.TraceError(err)
 		}
 
+		fmt.Println("Got voice for Character:", message.Character)
+		fmt.Println(voice.Engine, voice.Model, voice.Voice)
+
 		engine, ok := voiceManager.GetEngine(voice.Engine)
 		if !ok {
 			return util.TraceError(
 				fmt.Errorf("Failed to retrieve engine: %s", voice.Engine),
 			)
 		}
+
+		fmt.Println("Got engine:", engine.Name)
+		fmt.Println(engine)
+
+		message.Voice = voice
 
 		if saveOutput {
 			err := engine.Engine.Save([]util.CharacterMessage{message}, false)
@@ -38,5 +46,6 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 			}
 		}
 	}
+	voiceManager.ResetAllocatedVoices()
 	return nil
 }

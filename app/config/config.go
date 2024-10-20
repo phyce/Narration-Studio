@@ -193,8 +193,5 @@ func (manager *ConfigManager) GetModelToggles() map[string]map[string]bool {
 		engineToggles2D[parts[0]][parts[1]] = value
 	}
 
-	fmt.Println("modelToggles HERE")
-	fmt.Println(engineToggles2D)
-
 	return engineToggles2D
 }

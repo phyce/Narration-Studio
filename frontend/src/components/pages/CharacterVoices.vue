@@ -62,24 +62,34 @@ async function getVoices(engine: string, model: string) {
 }
 
 async function getCharacterVoices() {
-	const result = await GetCharacterVoices();
-	const characterVoiceData: { [key: string]: CharacterVoice } = JSON.parse(result);
+    const result = await GetCharacterVoices();
+    const characterVoiceData = JSON.parse(result);
 
-	characterVoices.value = characterVoiceData;
+    characterVoices.value = characterVoiceData;
 
-	for (const name in characterVoiceData) {
-		const { engine, model, voice } = characterVoiceData[name];
-		selectedModels[name] = {
-			[characterVoiceData[name].key]: true
-		};
-		selectedVoices[name] = voiceOptions.value[characterVoiceData[name].key][voice];
+    for (const name in characterVoiceData) {
+        const data = characterVoiceData[name];
+        const { key, voice } = data;
 
-		const voiceOptionsRecord = voiceOptions.value[engine + ":" + model];
+        selectedModels[name] = { [key]: true };
 
-		voiceOptionsMap.value[name] = Object.values(voiceOptionsRecord) ?? [];
-	}
+        const voiceOption = voiceOptions.value[key];
+        if (voiceOption && voiceOption[voice]) {
+            selectedVoices[name] = voiceOption[voice];
+        } else {
+            data.engine = "";
+            data.model = "";
+            data.voice = "";
+            selectedModels[name] = {};
+            selectedVoices[name] = null;
+        }
 
-	addEmptyCharacterVoice();
+        const engineModelKey = data.engine + ":" + data.model;
+        const voiceOptionsRecord = voiceOptions.value[engineModelKey] || {};
+        voiceOptionsMap.value[name] = Object.values(voiceOptionsRecord);
+    }
+
+    addEmptyCharacterVoice();
 }
 
 function onModelSelect(nodeKey: TreeNode, characterKey: string) {
@@ -127,8 +137,6 @@ const saveCharacterVoices = () => {
 
 	SaveCharacterVoices(dataString);
 };
-
-
 
 async function previewVoice(key: string) {
 	const voice = characterVoices.value[key];

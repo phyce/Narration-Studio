@@ -22,7 +22,6 @@ import (
 
 type ElevenLabs struct {
 	Models     map[string]Model
-	apiKey     string
 	outputType string
 }
 
@@ -32,11 +31,6 @@ var voices = make([]engine.Voice, 0)
 func (labs *ElevenLabs) Initialize() error {
 	var err error
 	voices, err = FetchVoices()
-	if err != nil {
-		return util.TraceError(err)
-	}
-
-	labs.apiKey, err = getApiKey()
 	if err != nil {
 		return util.TraceError(err)
 	}
@@ -154,22 +148,26 @@ func (labs *ElevenLabs) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
+	if getApiKey() == "" {
+		return make(map[string]engine.Model)
+	}
+
 	models, err := FetchModels()
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to fetch elevenlabs models",
 			Detail:  err.Error(),
 		})
-		models = make(map[string]engine.Model)
+		return make(map[string]engine.Model)
 	}
 
 	voices, err = FetchVoices()
 	if err != nil {
 		response.Error(response.Data{
-			Summary: "Failed to fetch elevenlabs models",
+			Summary: "Failed to fetch elevenlabs voices",
 			Detail:  err.Error(),
 		})
-		models = make(map[string]engine.Model)
+		return make(map[string]engine.Model)
 	}
 
 	return models
@@ -191,12 +189,12 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 		return nil, util.TraceError(fmt.Errorf("failed to create HTTP request: %v", err))
 	}
 
-	req.Header.Set("xi-api-key", labs.apiKey)
+	req.Header.Set("xi-api-key", getApiKey())
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	defer client.CloseIdleConnections()
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, util.TraceError(fmt.Errorf("failed to send HTTP request: %v", err))

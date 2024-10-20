@@ -44,7 +44,7 @@ function showNotification(data: ToastMessageOptions) {
 
 let unsubscribeNotification: () => void;
 onMounted(() => {
-	unsubscribeNotification = eventManager.subscribe('notification', showNotification);
+	unsubscribeNotification = eventManager.subscribe('notification.send', showNotification);
 });
 onUnmounted(() => {
 	unsubscribeNotification();

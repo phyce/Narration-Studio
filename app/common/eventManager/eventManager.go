@@ -7,8 +7,9 @@ import (
 )
 
 /* Events
-notification - send a notification to the user
-notification_enabled - enable/disable notifications
+notification.send - send a notification to the user
+notification.enabled - enable/disable notifications
+app.refresh - reload current view
 status - current progress
 */
 

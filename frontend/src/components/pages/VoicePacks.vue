@@ -16,7 +16,7 @@ import {
 
 const models = ref<Record<string, Model>>({});
 const modelToggles = reactive<Record<string, boolean>>({});
-const reloadModelsButtonDisabled = ref<Bool>(false);
+const reloadModelsButtonDisabled = ref<boolean>(false);
 
 onMounted(async () => {
 	const savedModelTogglesResult = await GetSetting("modelToggles");

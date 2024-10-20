@@ -19,7 +19,6 @@ import (
 
 type OpenAI struct {
 	Models     map[string]Model
-	apiKey     string
 	outputType string
 }
 
@@ -34,7 +33,6 @@ var voices = []engine.Voice{
 
 // <editor-fold desc="Engine Interface">
 func (openAI *OpenAI) Initialize() error {
-	openAI.apiKey = *config.GetInstance().GetSetting("openAiApiKey").String
 	//openAI.outputType = *config.GetInstance().GetSetting("openAiOutputType").String
 	openAI.outputType = "flac"
 
@@ -144,6 +142,10 @@ func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (openAI *OpenAI) FetchModels() map[string]engine.Model {
+	if getApiKey() == "" {
+		return make(map[string]engine.Model)
+	}
+
 	return FetchModels()
 }
 

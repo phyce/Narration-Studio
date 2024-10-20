@@ -7,8 +7,20 @@ import (
 	"io"
 	"net/http"
 	"nstudio/app/common/response"
+	"nstudio/app/config"
 	"nstudio/app/tts/util"
 )
+
+func getApiKey() string {
+	apiKeyPointer := config.GetInstance().GetSetting("openAiApiKey").String
+	if apiKeyPointer == nil || *apiKeyPointer == "" {
+		response.Debug(response.Data{
+			Summary: "openAiApiKey is empty",
+		})
+		return ""
+	}
+	return *apiKeyPointer
+}
 
 func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 
@@ -22,7 +34,7 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 		return nil, util.TraceError(fmt.Errorf("failed to create HTTP request: %v", err))
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", openAI.apiKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getApiKey()))
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}

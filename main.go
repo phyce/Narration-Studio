@@ -50,10 +50,6 @@ func main() {
 
 	models, err := elevenlabs.FetchModels()
 	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to fetch elevenlabs models",
-			Detail:  err.Error(),
-		})
 		models = make(map[string]engine.Model)
 	}
 

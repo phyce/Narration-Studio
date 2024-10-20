@@ -135,9 +135,9 @@ async function previewVoice(key: string) {
 
 	const modelVoiceID = "::" + Object.keys(selectedModels[key])[0] + ":" + selectedVoices[key].voiceID;
 
-	await EventTrigger('notification_enabled', false);
+	await EventTrigger('notification.enabled', false);
 	await Play(voice.name + ": " + voice.name, false, modelVoiceID);
-	await EventTrigger('notification_enabled', true);
+	await EventTrigger('notification.enabled', true);
 }
 
 async function removeVoice(key: string) {
@@ -191,7 +191,7 @@ onMounted(async () => {
 });
 
 onUnmounted( () => {
-	EventTrigger('notification_enabled', true);
+	EventTrigger('notification.enabled', true);
 })
 
 </script>

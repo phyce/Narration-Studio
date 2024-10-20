@@ -9,13 +9,14 @@ import {Model} from '../interfaces/engine';
 import {
 	GetAvailableModels,
 	GetSetting,
-	SaveSetting,
 	RefreshModels,
 	ReloadVoicePacks,
+	SaveSetting,
 } from '../../../wailsjs/go/main/App';
 
 const models = ref<Record<string, Model>>({});
 const modelToggles = reactive<Record<string, boolean>>({});
+const reloadModelsButtonDisabled = ref<Bool>(false);
 
 onMounted(async () => {
 	const savedModelTogglesResult = await GetSetting("modelToggles");
@@ -30,15 +31,28 @@ onMounted(async () => {
 	});
 });
 
+const reloadModels = async () => {
+	reloadModelsButtonDisabled.value = true;
+
+	await ReloadVoicePacks();
+
+	const availableModelsResult = await GetAvailableModels();
+	const savedModelTogglesResult = await GetSetting("modelToggles");
+	const savedModelToggles = JSON.parse(JSON.parse(savedModelTogglesResult || '{}'));
+	models.value = await JSON.parse(availableModelsResult);
+
+	Object.entries(models.value).forEach(([key, model]) => {
+		const toggleKey = `${model.engine}:${model.id}`;
+		modelToggles[toggleKey] = savedModelToggles[toggleKey] ?? false;
+	});
+	reloadModelsButtonDisabled.value = false;
+};
+
 const handleCheckboxToggle = async () => {
 	const stringModelToggles = JSON.stringify(modelToggles);
 	await SaveSetting("modelToggles", stringModelToggles).then(() => {
 		RefreshModels();
 	});
-}
-
-const reloadModels = () => {
-	ReloadVoicePacks();
 }
 </script>
 
@@ -46,17 +60,19 @@ const reloadModels = () => {
 	<div class="voice-packs">
 		<div class="voice-packs__header">
 			<Button class="voices-packs__header__save"
+					id="voices-packs__header__save"
 					title="Reload voice packs & voices"
 					aria-label="Reload voice packs & voices"
-					@click="reloadModels()"
+					@click="reloadModels"
+					:disabled="reloadModelsButtonDisabled"
 			>
 				<i class="pi pi-refresh"/>&nbsp;
 				Reload Packs
 			</Button>
 		</div>
 		<div  class="voice-packs__container"
-			  :key="model.engine + ':' + model.id"
-			  v-for="model in models"
+			  :key="key"
+			  v-for="(model, key) in models"
 		>
 			<Card class="voice-pack">
 				<template #title>{{ model.name }} {{model.key}}</template>

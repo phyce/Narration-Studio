@@ -405,19 +405,18 @@ func (piper *Piper) GetProcessID(modelName string) int {
 
 func playRawAudioBytes(audioClip []byte) {
 	done := make(chan struct{})
+	defer close(done)
 	audioDataReader := bytes.NewReader(audioClip)
 
 	streamer := beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
 		for i := range samples {
-			if audioDataReader.Len() < 2 { // 2 bytes needed for one sample
-				close(done)
+			if audioDataReader.Len() < 2 {
 				return i, false
 			}
 			var sample int16
 
 			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
 			if err != nil {
-				close(done)
 				return i, false
 			}
 			flSample := float64(sample) / (1 << 15)
@@ -427,7 +426,11 @@ func playRawAudioBytes(audioClip []byte) {
 		return len(samples), true
 	})
 
-	speaker.Play(streamer)
+	resampledStreamer := beep.Resample(4, 22050, 48000, streamer)
+
+	speaker.Play(beep.Seq(resampledStreamer, beep.Callback(func() {
+	})))
+
 	<-done
 }
 

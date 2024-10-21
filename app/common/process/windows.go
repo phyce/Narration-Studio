@@ -5,7 +5,7 @@ package process
 
 import "os"
 
-func isRunning(p *os.Process) bool {
+func IsRunning(p *os.Process) bool {
 	if p == nil {
 		return false
 	}

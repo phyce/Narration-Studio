@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"fmt"
 	"github.com/ncruces/zenity"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -20,10 +19,9 @@ import (
 var assets embed.FS
 
 func main() {
-	err := config.GetInstance().Initialize()
-	fmt.Println()
 	response.Initialize()
 
+	err := config.GetInstance().Initialize()
 	if err != nil {
 		showErrorDialog(
 			"Failed to initialize config config",
@@ -47,10 +45,6 @@ func main() {
 		OnStartup:        app.startup,
 		Bind: []interface{}{
 			app,
-			//&engine.Model{},
-			//&engine.Voice{},
-			//&config.Value{},
-			//&config.ConfigManager{},
 		},
 	})
 

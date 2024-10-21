@@ -38,7 +38,7 @@ async function generateSpeech() {
 		voiceID = "::" + Object.keys(selectedModel.value)[0] + ":" + selectedVoice.value.voiceID;
 	}
 
-	await Play(text.value, (saveNewCharacters.value? true: false), voiceID);
+	await Play(text.value, (!!saveNewCharacters.value), voiceID);
 }
 
 async function getEngines() {
@@ -70,7 +70,6 @@ onMounted(async () => {
 	<div class="sandbox">
 		<div class="sandbox__panel">
 			<Button class="sandbox__panel__generate"
-					@click="generateSpeech"
 					title="Play All"
 					aria-label="Play"
 					:disabled="isDisabled"
@@ -96,7 +95,7 @@ onMounted(async () => {
 						  v-model="overrideVoices"
 						  inputId="overrideVoices"
 						  name="overrideVoices"
-						  value="1"
+						  :binary="true"
 				/>
 				<label class="checkbox-label" for="overrideVoices">
 					Override Voices

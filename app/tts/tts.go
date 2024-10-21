@@ -3,7 +3,7 @@ package tts
 import (
 	"fmt"
 	"nstudio/app/common/status"
-	"nstudio/app/tts/util"
+	"nstudio/app/common/util"
 	VoiceManger "nstudio/app/tts/voiceManager"
 )
 

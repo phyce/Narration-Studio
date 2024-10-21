@@ -5,14 +5,14 @@ import (
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/gopxl/beep"
-	pxlFlac "github.com/gopxl/beep/flac"
+	beepFlac "github.com/gopxl/beep/flac"
 	"github.com/gopxl/beep/speaker"
 	"github.com/mewkiz/flac"
 	"io"
 	"nstudio/app/common/response"
+	"nstudio/app/common/util"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
-	"nstudio/app/tts/util"
 	"os"
 )
 
@@ -144,7 +144,7 @@ func (openAI *OpenAI) FetchModels() map[string]engine.Model {
 func playFLACAudioBytes(audioClip []byte) error {
 	audioReader := io.NopCloser(bytes.NewReader(audioClip))
 
-	streamer, format, err := pxlFlac.Decode(audioReader)
+	streamer, format, err := beepFlac.Decode(audioReader)
 	if err != nil {
 		return err
 	}

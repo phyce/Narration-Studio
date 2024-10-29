@@ -99,11 +99,13 @@ func (piper *Piper) Initialize() error {
 		return util.TraceError(fmt.Errorf("Piper:Initialize:modelPathValue: is nil"))
 	}
 
-	if runtime.GOOS == "darwin" {
+	if util.InArray(runtime.GOOS, []string{"darwin", "linux"}) {
 		err, piper.modelPath = util.ExpandPath(*modelPathValue.String)
 		if err != nil {
 			return util.TraceError(err)
 		}
+	} else /*if runtime.GOOS == "windows"*/ {
+		piper.modelPath = *modelPathValue.String
 	}
 
 	piper.models = make(map[string]VoiceSynthesizer)
@@ -134,6 +136,7 @@ func (piper *Piper) Start(modelName string) error {
 	cmdArgs := []string{"--model", onnxPath, "--json-input", "--output-raw"}
 
 	command := exec.Command(piper.piperPath, cmdArgs...)
+
 	response.Debug(response.Data{
 		Summary: fmt.Sprintf("Preparing command: %s %s",
 			command.Path,
@@ -173,6 +176,7 @@ func (piper *Piper) Start(modelName string) error {
 
 	return nil
 }
+
 func (piper *Piper) Stop(modelName string) error {
 	defer delete(piper.models, modelName)
 

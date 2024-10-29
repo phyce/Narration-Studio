@@ -63,20 +63,17 @@ func (manager *VoiceManager) LoadCharacterVoices() {
 	file, err := os.ReadFile(voiceConfigPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.WriteFile(voiceConfigPath, []byte("[]"), 0644)
+			err = os.WriteFile(voiceConfigPath, []byte("{}"), 0644)
 			if err != nil {
 				panic("Failed to create voice config file: " + err.Error())
 			}
-			file = []byte("[]")
+			file = []byte("{}")
 		} else {
 			panic("Failed to open voice  config file: " + err.Error())
 		}
 	}
 
 	var voices map[string]util.CharacterVoice
-	//var voices []CharacterVoice
-	fmt.Println("string(file)")
-	fmt.Println(string(file))
 	err = json.Unmarshal(file, &voices)
 	if err != nil {
 		panic("Failed to unmarshal voice config: " + err.Error())
@@ -395,15 +392,32 @@ func (manager *VoiceManager) GetVoices(engineName string, model string) ([]tts.V
 func (manager *VoiceManager) RefreshModels() {
 	toggles := config.GetInstance().GetModelToggles()
 
+	fmt.Println("toggles")
+	fmt.Println(toggles)
+
 	enabledModels := 0
 	for engine, models := range toggles {
 		for model, enabled := range models {
 			if _, exists := manager.Engines[engine]; exists {
 				if enabled {
-					manager.Engines[engine].Engine.Start(model)
+					err := manager.Engines[engine].Engine.Start(model)
+					if err != nil {
+						util.TraceError(err)
+						response.Debug(response.Data{
+							Summary: "Failed to start piper model:" + model,
+							Detail:  err.Error(),
+						})
+					}
 					enabledModels++
 				} else {
-					manager.Engines[engine].Engine.Stop(model)
+					err := manager.Engines[engine].Engine.Stop(model)
+					if err != nil {
+						util.TraceError(err)
+						response.Debug(response.Data{
+							Summary: "Failed to stop piper model:" + model,
+							Detail:  err.Error(),
+						})
+					}
 				}
 			}
 		}

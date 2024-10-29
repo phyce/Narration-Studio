@@ -3,14 +3,22 @@
 
 package process
 
-import "os"
+import (
+	"os"
+	"syscall"
+)
+
+const (
+	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+	STILL_ACTIVE                      = 259
+)
 
 func IsRunning(p *os.Process) bool {
 	if p == nil {
 		return false
 	}
 
-	handle, err := syscall.OpenProcess(syscall.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(p.Pid))
+	handle, err := syscall.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(p.Pid))
 	if err != nil {
 		return false
 	}
@@ -22,5 +30,5 @@ func IsRunning(p *os.Process) bool {
 		return false
 	}
 
-	return exitCode == syscall.STILL_ACTIVE
+	return exitCode == STILL_ACTIVE
 }

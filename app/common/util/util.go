@@ -83,6 +83,15 @@ func PrepareDirectory(filePath string) error {
 	return nil
 }
 
+func InArray[T comparable](val T, arr []T) bool {
+	for _, v := range arr {
+		if v == val {
+			return true
+		}
+	}
+	return false
+}
+
 func shortFileName(fullPath string) string {
 	lastSlash := strings.LastIndex(fullPath, "/")
 	if lastSlash == -1 {

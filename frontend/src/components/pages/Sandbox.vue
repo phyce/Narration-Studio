@@ -73,6 +73,7 @@ onMounted(async () => {
 					title="Play All"
 					aria-label="Play"
 					:disabled="isDisabled"
+					@click="generateSpeech"
 			>
 				<i class="pi pi-play"/>
 			</Button>

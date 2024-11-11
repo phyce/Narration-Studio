@@ -13,19 +13,10 @@ import (
 	"sync"
 )
 
-var instance *ConfigManager
+var manager *ConfigManager
 var once sync.Once
 
-func GetInstance() *ConfigManager {
-	once.Do(func() {
-		instance = &ConfigManager{
-			settings: make(map[string]Value),
-		}
-	})
-	return instance
-}
-
-func (manager *ConfigManager) GetConfigPath() string {
+func GetConfigPath() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		util.TraceError(err)
@@ -35,11 +26,15 @@ func (manager *ConfigManager) GetConfigPath() string {
 	return filepath.Join(configDir, "Narrator Studio")
 }
 
-func (manager *ConfigManager) Initialize() error {
-	manager.filePath = filepath.Join(manager.GetConfigPath(), "narrator-studio-config.json")
+func Initialize() error {
+	once.Do(func() {
+		manager = &ConfigManager{
+			settings: make(map[string]Value),
+		}
+	})
 
-	fmt.Println("manager.filePath")
-	fmt.Println(manager.filePath)
+	manager.filePath = filepath.Join(GetConfigPath(), "narrator-studio-config.json")
+
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -74,7 +69,7 @@ func (manager *ConfigManager) Initialize() error {
 	return err
 }
 
-func (manager *ConfigManager) Export() (string, error) {
+func Export() (string, error) {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
@@ -86,7 +81,7 @@ func (manager *ConfigManager) Export() (string, error) {
 	return string(settingsJSON), nil
 }
 
-func (manager *ConfigManager) Import(jsonString string) error {
+func Import(jsonString string) error {
 	var newConfigs map[string]Value
 	err := json.Unmarshal([]byte(jsonString), &newConfigs)
 	if err != nil {
@@ -113,7 +108,7 @@ func (manager *ConfigManager) Import(jsonString string) error {
 	return nil
 }
 
-func (manager *ConfigManager) GetSettings() map[string]Value {
+func GetSettings() map[string]Value {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
@@ -124,7 +119,7 @@ func (manager *ConfigManager) GetSettings() map[string]Value {
 	return settings
 }
 
-func (manager *ConfigManager) GetSetting(name string) *Value {
+func GetSetting(name string) *Value {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
@@ -135,7 +130,7 @@ func (manager *ConfigManager) GetSetting(name string) *Value {
 	return nil
 }
 
-func (manager *ConfigManager) SetSetting(name string, value Value) error {
+func SetSetting(name string, value Value) error {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
@@ -149,22 +144,22 @@ func (manager *ConfigManager) SetSetting(name string, value Value) error {
 	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 }
 
-func (manager *ConfigManager) SetConfigString(name string, value string) error {
-	return manager.SetSetting(name, Value{String: &value})
+func SetConfigString(name string, value string) error {
+	return SetSetting(name, Value{String: &value})
 }
 
-func (manager *ConfigManager) SetConfigInt(name string, value int) error {
-	return manager.SetSetting(name, Value{Int: &value})
+func SetConfigInt(name string, value int) error {
+	return SetSetting(name, Value{Int: &value})
 }
 
 // TODO this might need to go elsewhere
-func (manager *ConfigManager) GetModelToggles() map[string]map[string]bool {
+func GetModelToggles() map[string]map[string]bool {
 	//Seems like for random reason sometimes modelToggles comes out as String?
 	//Not sure what the hell is going on
-	engineTogglesRaw := manager.GetSetting("modelToggles").Raw
+	engineTogglesRaw := GetSetting("modelToggles").Raw
 
 	if engineTogglesRaw == "" {
-		engineTogglesRaw = *manager.GetSetting("modelToggles").String
+		engineTogglesRaw = *GetSetting("modelToggles").String
 	}
 
 	engineToggles2D := make(map[string]map[string]bool)

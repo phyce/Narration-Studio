@@ -22,7 +22,7 @@ func main() {
 	response.Initialize()
 	voiceManager.Initialize()
 
-	err := config.GetInstance().Initialize()
+	err := config.Initialize()
 	if err != nil {
 		showErrorDialog(
 			"Failed to initialize config config",

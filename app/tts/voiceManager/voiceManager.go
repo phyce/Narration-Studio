@@ -52,7 +52,7 @@ func LoadCharacterVoices() {
 	manager.Lock()
 	defer manager.Unlock()
 
-	voiceConfigPath := filepath.Join(config.GetInstance().GetConfigPath(), "voiceConfig.json")
+	voiceConfigPath := filepath.Join(config.GetConfigPath(), "voiceConfig.json")
 
 	file, err := os.ReadFile(voiceConfigPath)
 	if err != nil {
@@ -92,7 +92,7 @@ func UpdateCharacterVoices(data string) error {
 
 	manager.CharacterVoices = newVoices
 
-	voiceConfigPath := filepath.Join(config.GetInstance().GetConfigPath(), "voiceConfig.json")
+	voiceConfigPath := filepath.Join(config.GetConfigPath(), "voiceConfig.json")
 
 	byteData := []byte(data)
 
@@ -108,7 +108,7 @@ func ResetAllocatedVoices() {
 }
 
 func RefreshModels() {
-	toggles := config.GetInstance().GetModelToggles()
+	toggles := config.GetModelToggles()
 
 	enabledModels := 0
 	for engine, models := range toggles {
@@ -173,7 +173,7 @@ func RegisterEngine(newEngine tts.Engine) error {
 }
 
 func RegisterModel(model tts.Model) {
-	toggles := config.GetInstance().GetModelToggles()
+	toggles := config.GetModelToggles()
 
 	engine := manager.Engines[model.Engine]
 
@@ -190,7 +190,7 @@ func RegisterModel(model tts.Model) {
 
 	engine.Models[model.ID] = model
 
-	modelToggles := config.GetInstance().GetModelToggles()
+	modelToggles := config.GetModelToggles()
 
 	if modelToggles[model.Engine][model.ID] {
 		err := engine.Engine.Start(model.ID)
@@ -216,7 +216,7 @@ func SaveVoice(name string, voice util.CharacterVoice) error {
 		return util.TraceError(err)
 	}
 
-	voiceConfigPath := filepath.Join(config.GetInstance().GetConfigPath(), "voiceConfig.json")
+	voiceConfigPath := filepath.Join(config.GetConfigPath(), "voiceConfig.json")
 
 	err = os.WriteFile(voiceConfigPath, data, 0644)
 	if err != nil {
@@ -254,7 +254,7 @@ func GetVoice(name string, save bool) (util.CharacterVoice, error) {
 
 	if voice, ok := manager.CharacterVoices[name]; ok {
 
-		modelToggles := config.GetInstance().GetModelToggles()
+		modelToggles := config.GetModelToggles()
 
 		if modelToggles[voice.Engine][voice.Model] {
 
@@ -293,7 +293,7 @@ func GetEngine(ID string) (tts.Engine, bool) {
 }
 
 func GetEngines() []tts.Engine {
-	toggles := config.GetInstance().GetModelToggles()
+	toggles := config.GetModelToggles()
 	var availableEngines []tts.Engine
 
 	for _, managerEngine := range manager.Engines {

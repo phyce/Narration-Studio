@@ -12,7 +12,7 @@ import (
 )
 
 func getApiKey() string {
-	apiKeyPointer := config.GetInstance().GetSetting("openAiApiKey").String
+	apiKeyPointer := config.GetSetting("openAiApiKey").String
 	if apiKeyPointer == nil || *apiKeyPointer == "" {
 		response.Debug(response.Data{
 			Summary: "openAiApiKey is empty",

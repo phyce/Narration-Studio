@@ -84,7 +84,7 @@ type Piper struct {
 func (piper *Piper) Initialize() error {
 	var err error
 
-	piperPathValue := config.GetInstance().GetSetting("piperPath")
+	piperPathValue := config.GetSetting("piperPath")
 	if piperPathValue.String == nil {
 		return util.TraceError(fmt.Errorf("Piper:Initialize:piperPathValue: is nil"))
 	}
@@ -94,7 +94,7 @@ func (piper *Piper) Initialize() error {
 		return util.TraceError(err)
 	}
 
-	modelPathValue := config.GetInstance().GetSetting("piperModelsDirectory")
+	modelPathValue := config.GetSetting("piperModelsDirectory")
 	if modelPathValue.String == nil {
 		return util.TraceError(fmt.Errorf("Piper:Initialize:modelPathValue: is nil"))
 	}
@@ -279,7 +279,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 		Summary: "Piper saving messages",
 	})
 
-	err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+	err, expandedPath := util.ExpandPath(*config.GetSetting("scriptOutputPath").String)
 	if err != nil {
 		return util.TraceError(err)
 	}
@@ -318,7 +318,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 
 func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	if piper.GetProcessID(model) == 0 {
-		if !config.GetInstance().GetModelToggles()["piper"][model] {
+		if !config.GetModelToggles()["piper"][model] {
 			return make([]byte, 0), util.TraceError(fmt.Errorf("Model is not running and not enabled:" + model))
 		}
 		util.TraceError(fmt.Errorf("Model is not running:" + model))

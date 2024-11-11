@@ -16,7 +16,7 @@ func calculateEngine(name string) string {
 
 	voice, exists := manager.CharacterVoices[name]
 	if exists {
-		enabled, exists := config.GetInstance().GetModelToggles()[voice.Engine][voice.Model]
+		enabled, exists := config.GetModelToggles()[voice.Engine][voice.Model]
 		if exists && enabled {
 			return voice.Engine
 		}
@@ -62,7 +62,7 @@ func calculateVoice(engineID string, name string) (string, string, error) {
 		}
 		rand.Seed(seed)
 
-		modelToggles := config.GetInstance().GetModelToggles()
+		modelToggles := config.GetModelToggles()
 
 		models := make([]string, 0, len(selectedEngine.Models))
 		for modelID, _ := range selectedEngine.Models {

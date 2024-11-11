@@ -110,10 +110,10 @@ func (app *App) ProcessScript(script string) {
 		return
 	}
 
-	outputTypeRaw := []byte(config.GetInstance().GetSetting("outputType").Raw)
+	outputTypeRaw := []byte(config.GetSetting("outputType").Raw)
 
 	if len(outputTypeRaw) == 0 {
-		outputTypeRaw = []byte(*config.GetInstance().GetSetting("outputType").String)
+		outputTypeRaw = []byte(*config.GetSetting("outputType").String)
 	}
 
 	var outputType config.ConfigValueInt
@@ -132,7 +132,7 @@ func (app *App) ProcessScript(script string) {
 		now := time.Now().Format("2006-01-02")
 		dateString := now
 
-		err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+		err, expandedPath := util.ExpandPath(*config.GetSetting("scriptOutputPath").String)
 		if err != nil {
 			response.Error(response.Data{
 				Summary: "Failed to expand path",
@@ -266,7 +266,7 @@ func (app *App) ReloadVoicePacks() {
 
 // <editor-fold desc="Settings">
 func (app *App) GetSettings() string {
-	result, err := config.GetInstance().Export()
+	result, err := config.Export()
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to get settings",
@@ -278,7 +278,7 @@ func (app *App) GetSettings() string {
 }
 
 func (app *App) GetSetting(name string) string {
-	result := config.GetInstance().GetSetting(name)
+	result := config.GetSetting(name)
 	data, err := json.Marshal(result)
 	if err != nil {
 		response.Error(response.Data{
@@ -291,7 +291,7 @@ func (app *App) GetSetting(name string) string {
 
 func (app *App) SaveSettings(settings string) {
 	status.Set(status.Loading, "Saving settings")
-	err := config.GetInstance().Import(settings)
+	err := config.Import(settings)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to save settings",
@@ -317,7 +317,7 @@ func (app *App) SaveSetting(name string, newValue string) {
 		})
 	}
 
-	err = config.GetInstance().SetSetting(name, value)
+	err = config.SetSetting(name, value)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to set new value",

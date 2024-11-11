@@ -14,7 +14,7 @@ import (
 )
 
 func getApiKey() string {
-	apiKeyPointer := config.GetInstance().GetSetting("elevenlabsApiKey").String
+	apiKeyPointer := config.GetSetting("elevenlabsApiKey").String
 	if apiKeyPointer == nil || *apiKeyPointer == "" {
 		response.Debug(response.Data{
 			Summary: "elevenlabsApiKey is empty",

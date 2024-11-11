@@ -86,7 +86,7 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 		Summary: "Elevenlabs saving messages",
 	})
 
-	err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+	err, expandedPath := util.ExpandPath(*config.GetSetting("scriptOutputPath").String)
 	if err != nil {
 		return util.TraceError(err)
 	}

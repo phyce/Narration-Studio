@@ -32,7 +32,7 @@ var voices = []engine.Voice{
 
 // <editor-fold desc="Engine Interface">
 func (openAI *OpenAI) Initialize() error {
-	//openAI.outputType = *config.GetInstance().GetSetting("openAiOutputType").String
+	//openAI.outputType = *config.GetSetting("openAiOutputType").String
 	openAI.outputType = "flac"
 
 	//TODO add api key check
@@ -81,7 +81,7 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 		Summary: "Openai saving messages",
 	})
 
-	err, expandedPath := util.ExpandPath(*config.GetInstance().GetSetting("scriptOutputPath").String)
+	err, expandedPath := util.ExpandPath(*config.GetSetting("scriptOutputPath").String)
 	if err != nil {
 		return util.TraceError(err)
 	}

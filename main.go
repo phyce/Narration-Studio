@@ -20,6 +20,7 @@ var assets embed.FS
 
 func main() {
 	response.Initialize()
+	voiceManager.Initialize()
 
 	err := config.GetInstance().Initialize()
 	if err != nil {
@@ -65,7 +66,7 @@ func registerEngines() {
 		Engine: &piper.Piper{},
 		Models: piper.FetchModels(),
 	}
-	voiceManager.GetInstance().RegisterEngine(piperEngine)
+	voiceManager.RegisterEngine(piperEngine)
 
 	openAIEngine := engine.Engine{
 		ID:     "openai",
@@ -73,7 +74,7 @@ func registerEngines() {
 		Engine: &openai.OpenAI{},
 		Models: openai.FetchModels(),
 	}
-	voiceManager.GetInstance().RegisterEngine(openAIEngine)
+	voiceManager.RegisterEngine(openAIEngine)
 
 	models, err := elevenlabs.FetchModels()
 	if err != nil {
@@ -86,7 +87,7 @@ func registerEngines() {
 		Engine: &elevenlabs.ElevenLabs{},
 		Models: models,
 	}
-	voiceManager.GetInstance().RegisterEngine(elevenLabsEngine)
+	voiceManager.RegisterEngine(elevenLabsEngine)
 }
 
 func showErrorDialog(title, message string) {

@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"nstudio/app/common/status"
 	"nstudio/app/common/util"
-	VoiceManger "nstudio/app/tts/voiceManager"
+	"nstudio/app/tts/voiceManager"
 )
 
 func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 	status.Set(status.Generating, "")
-	voiceManager := VoiceManger.GetInstance()
 
 	util.FileIndexReset()
 	for _, message := range messages {
@@ -18,9 +17,6 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 			return util.TraceError(err)
 		}
 
-		fmt.Println("Got voice for Character:", message.Character)
-		fmt.Println(voice.Engine, voice.Model, voice.Voice)
-
 		engine, ok := voiceManager.GetEngine(voice.Engine)
 		if !ok {
 			return util.TraceError(
@@ -28,19 +24,16 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 			)
 		}
 
-		fmt.Println("Got engine:", engine.Name)
-		fmt.Println(engine)
-
 		message.Voice = voice
 
 		if saveOutput {
-			err := engine.Engine.Save([]util.CharacterMessage{message}, false)
+			err = engine.Engine.Save([]util.CharacterMessage{message}, false)
 			if err != nil {
 				return util.TraceError(err)
 			}
 		} else {
 			status.Set(status.Playing, "")
-			err := engine.Engine.Play(message)
+			err = engine.Engine.Play(message)
 			if err != nil {
 				return util.TraceError(err)
 			}

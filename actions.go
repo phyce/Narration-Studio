@@ -199,7 +199,7 @@ func (app *App) ProcessScript(script string) {
 // <editor-fold desc="Character Voices">
 func (app *App) GetCharacterVoices() string {
 	status.Set(status.Loading, "Getting character voices")
-	voices := voiceManager.GetInstance().CharacterVoices
+	voices := voiceManager.GetCharacterVoices()
 
 	voicesJSON, err := json.Marshal(voices)
 	if err != nil {
@@ -218,7 +218,7 @@ func (app *App) GetCharacterVoices() string {
 
 func (app *App) SaveCharacterVoices(voices string) {
 	status.Set(status.Loading, "Saving character voices")
-	err := voiceManager.GetInstance().UpdateCharacterVoices(voices)
+	err := voiceManager.UpdateCharacterVoices(voices)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to save character voices",
@@ -234,7 +234,7 @@ func (app *App) SaveCharacterVoices(voices string) {
 
 func (app *App) GetAvailableModels() string {
 	status.Set(status.Loading, "Getting available models")
-	models := voiceManager.GetInstance().GetAllModels()
+	models := voiceManager.GetAllModels()
 
 	modelsJSON, err := json.Marshal(models)
 	if err != nil {
@@ -253,7 +253,7 @@ func (app *App) GetAvailableModels() string {
 func (app *App) ReloadVoicePacks() {
 	status.Set(status.Loading, "Reloading Voice Packs")
 
-	voiceManager.GetInstance().ReloadModels()
+	voiceManager.ReloadModels()
 
 	response.Success(response.Data{
 		Summary: "Success",
@@ -372,7 +372,7 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 func (app *App) RefreshModels() {
 	clearConsole()
 	status.Set(status.Loading, "Refreshing models")
-	voiceManager.GetInstance().RefreshModels()
+	voiceManager.RefreshModels()
 	response.Success(response.Data{
 		Summary: "Models refreshed",
 	})
@@ -383,7 +383,7 @@ func (app *App) RefreshModels() {
 
 // <editor-fold desc="Common">
 func (app *App) GetEngines() string {
-	engines := voiceManager.GetInstance().GetEngines()
+	engines := voiceManager.GetEngines()
 
 	jsonData, err := json.Marshal(engines)
 	if err != nil {
@@ -398,7 +398,7 @@ func (app *App) GetEngines() string {
 }
 
 func (app *App) GetVoices(engine string, model string) string {
-	voices, err := voiceManager.GetInstance().GetVoices(engine, model)
+	voices, err := voiceManager.GetVoices(engine, model)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to get voices",

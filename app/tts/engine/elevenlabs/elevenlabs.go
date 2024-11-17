@@ -12,8 +12,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
+	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"os"
@@ -31,7 +33,7 @@ func (labs *ElevenLabs) Initialize() error {
 	var err error
 	voices, err = FetchVoices()
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	labs.outputType = "pcm_24000"
@@ -66,12 +68,12 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 
 	audioClip, err := labs.sendRequest(message.Voice.Voice, input)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	err = playPCMAudioBytes(audioClip)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	return response.Success(response.Data{
@@ -86,14 +88,14 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 		Summary: "Elevenlabs saving messages",
 	})
 
-	err, expandedPath := util.ExpandPath(*config.GetSetting("scriptOutputPath").String)
+	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	for _, message := range messages {
 		if err != nil {
-			return util.TraceError(err)
+			return issue.Trace(err)
 		}
 
 		input := ElevenLabsRequest{
@@ -107,24 +109,24 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 
 		audioClip, err := labs.sendRequest(message.Voice.Voice, input)
 		if err != nil {
-			return util.TraceError(err)
+			return issue.Trace(err)
 		}
 
 		filename := util.GenerateFilename(
 			message,
-			util.FileIndexGet(),
+			fileIndex.Get(),
 			expandedPath,
 		)
 
 		err = saveWavFile(audioClip, filename)
 		if err != nil {
-			return util.TraceError(err)
+			return issue.Trace(err)
 		}
 
 		if play {
 			err = playPCMAudioBytes(audioClip)
 			if err != nil {
-				return util.TraceError(err)
+				return issue.Trace(err)
 			}
 		}
 	}
@@ -141,7 +143,8 @@ func (labs *ElevenLabs) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
-	if getApiKey() == "" {
+	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
+	if apiKey == "" {
 		return make(map[string]engine.Model)
 	}
 
@@ -170,19 +173,24 @@ func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
 
 // <editor-fold desc="Other">
 func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]byte, error) {
+	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
+	if apiKey == "" {
+		return nil, issue.Trace(fmt.Errorf("Elevenlabs API Key is not set"))
+	}
+
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to marshal request body: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to marshal request body: %v", err))
 	}
 
 	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=%s", voiceID, labs.outputType)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to create HTTP request: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to create HTTP request: %v", err))
 	}
 
-	req.Header.Set("xi-api-key", getApiKey())
+	req.Header.Set("xi-api-key", apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
@@ -190,18 +198,18 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to send HTTP request: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to send HTTP request: %v", err))
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, util.TraceError(fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes)))
+		return nil, issue.Trace(fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes)))
 	}
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to read response body: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to read response body: %v", err))
 	}
 
 	response.Success(response.Data{

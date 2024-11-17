@@ -7,22 +7,25 @@ import InputText from 'primevue/inputtext';
 import Editor from "../common/Editor.vue";
 import { SelectDirectory, GetSettings, SaveSettings, ProcessScript } from '../../../wailsjs/go/main/App';
 import { useLocalStorage } from "@vueuse/core";
-import { UserSettings } from "../interfaces/settings";
 import { onMounted, ref } from "vue";
+import {config as configuration} from "../../../wailsjs/go/models";
+import configBase = configuration.Base;
 
 const text = useLocalStorage<string>('scriptText', 'user: hello world');
-const settings = ref<UserSettings>({} as UserSettings);
+const config = ref<configBase>({} as configBase);
+const loading = ref<boolean>(true);
+
 const regexes = [
 	{ regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence' },
 	{ regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character' },
 ];
 
 const handleBrowseClick = async () => {
-	const result = await SelectDirectory(settings.value.scriptOutputPath as string);
-	if (result.length > 0 && settings.value.scriptOutputPath != result) {
-		settings.value.scriptOutputPath =  result;
+	const result = await SelectDirectory(config.value.settings.outputPath as string);
+	if (result.length > 0 && config.value.settings.outputPath != result) {
+		config.value.settings.outputPath =  result;
 
-		await SaveSettings(JSON.stringify(settings.value));
+		await SaveSettings(JSON.stringify(config.value));
 	}
 }
 
@@ -31,17 +34,17 @@ const processScript = () => {
 }
 
 onMounted(async () => {
-	const settingsString = await GetSettings();
-	settings.value = JSON.parse(settingsString) as UserSettings;
+	config.value = await GetSettings();
+	loading.value = false;
 });
 </script>
 
 <template>
-	<div class="script">
+	<div class="script" v-if="!loading">
 		<div class="script__panel">
-			<InputGroup :title="settings.scriptOutputPath">
+			<InputGroup v-if="!loading" :title="config.settings.outputPath">
 				<InputText class="script__panel__input"
-						   :value="settings.scriptOutputPath"
+						   :value="config.settings.outputPath"
 						   placeholder="Output Path"
 						   disabled
 				/>

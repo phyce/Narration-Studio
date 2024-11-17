@@ -8,7 +8,7 @@ import {onMounted, reactive, ref} from "vue";
 import {Model} from '../interfaces/engine';
 import {
 	GetAvailableModels,
-	GetSetting,
+	GetSetting, GetSettings,
 	RefreshModels,
 	ReloadVoicePacks,
 	SaveSetting,
@@ -19,8 +19,7 @@ const modelToggles = reactive<Record<string, boolean>>({});
 const reloadModelsButtonDisabled = ref<boolean>(false);
 
 onMounted(async () => {
-	const savedModelTogglesResult = await GetSetting("modelToggles");
-	const savedModelToggles = JSON.parse(JSON.parse(savedModelTogglesResult || '{}'));
+	const savedModelToggles = (await GetSettings()).modelToggles;
 
 	const availableModelsResult = await GetAvailableModels();
 	models.value = JSON.parse(availableModelsResult);
@@ -36,10 +35,8 @@ const reloadModels = async () => {
 
 	await ReloadVoicePacks();
 
-	const availableModelsResult = await GetAvailableModels();
-	const savedModelTogglesResult = await GetSetting("modelToggles");
-	const savedModelToggles = JSON.parse(JSON.parse(savedModelTogglesResult || '{}'));
-	models.value = await JSON.parse(availableModelsResult);
+	const savedModelToggles = (await GetSettings()).modelToggles;
+	models.value = await JSON.parse(await GetAvailableModels());
 
 	Object.entries(models.value).forEach(([key, model]) => {
 		const toggleKey = `${model.engine}:${model.id}`;

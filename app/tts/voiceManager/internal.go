@@ -3,8 +3,8 @@ package voiceManager
 import (
 	"fmt"
 	"math/rand"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
 	"nstudio/app/config"
 	"strings"
 )
@@ -16,7 +16,7 @@ func calculateEngine(name string) string {
 
 	voice, exists := manager.CharacterVoices[name]
 	if exists {
-		enabled, exists := config.GetModelToggles()[voice.Engine][voice.Model]
+		enabled, exists := config.GetEngineToggles()[voice.Engine][voice.Model]
 		if exists && enabled {
 			return voice.Engine
 		}
@@ -34,7 +34,7 @@ func calculateEngine(name string) string {
 	}
 
 	if len(engines) == 0 {
-		util.TraceError(fmt.Errorf("No engines found"))
+		issue.Trace(fmt.Errorf("No engines found"))
 		return ""
 	} else if len(engines) == 1 {
 		return engines[0]
@@ -49,7 +49,7 @@ func calculateVoice(engineID string, name string) (string, string, error) {
 		segments := strings.Split(name, ":")
 
 		if len(segments) < 2 {
-			return "", "", util.TraceError(fmt.Errorf("Failed to parse voice name:" + name))
+			return "", "", issue.Trace(fmt.Errorf("Failed to parse voice name:" + name))
 		}
 
 		return segments[0], segments[1], nil
@@ -62,7 +62,7 @@ func calculateVoice(engineID string, name string) (string, string, error) {
 		}
 		rand.Seed(seed)
 
-		modelToggles := config.GetModelToggles()
+		modelToggles := config.GetEngineToggles()
 
 		models := make([]string, 0, len(selectedEngine.Models))
 		for modelID, _ := range selectedEngine.Models {
@@ -74,7 +74,7 @@ func calculateVoice(engineID string, name string) (string, string, error) {
 		var selectedModel string
 
 		if len(models) == 0 {
-			return "", "", util.TraceError(
+			return "", "", issue.Trace(
 				fmt.Errorf("No enabled models found for engine %s", selectedEngine),
 			)
 		} else if len(models) == 1 {
@@ -85,7 +85,7 @@ func calculateVoice(engineID string, name string) (string, string, error) {
 
 		voices, _ := selectedEngine.Engine.GetVoices(selectedModel)
 		if len(voices) == 0 {
-			return "", "", util.TraceError(
+			return "", "", issue.Trace(
 				fmt.Errorf("No voices found for engine %s", selectedEngine),
 			)
 		}

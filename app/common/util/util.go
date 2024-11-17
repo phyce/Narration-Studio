@@ -2,7 +2,9 @@ package util
 
 import (
 	"fmt"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
+	"nstudio/app/common/util/fileIndex"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -21,24 +23,6 @@ func GetKeys[KeyType comparable, ValueType any](inputMap map[KeyType]ValueType) 
 	return keys
 }
 
-func TraceError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	_, file, line, ok := runtime.Caller(1)
-	if !ok {
-		panic(fmt.Errorf("TraceError failed: %v", err))
-	}
-
-	shortFile := shortFileName(file)
-	traceLine := fmt.Sprintf("%s:%d", shortFile, line)
-
-	result := fmt.Errorf("%v\n%s", err, traceLine)
-
-	return result
-}
-
 func GenerateFilename(message CharacterMessage, index int, outputPath string) string {
 	currentTime := time.Now()
 	//datePath := currentTime.Format("2006-01-02_15-04-05")
@@ -50,7 +34,7 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 	filename := fmt.Sprintf("%d) %s-%s.wav", index, message.Character, text)
 
 	outputPath = filepath.Join(outputPath, datePath)
-	outputPath = filepath.Join(outputPath, timestamp)
+	outputPath = filepath.Join(outputPath, fileIndex.Timestamp())
 	fullPath := filepath.Join(outputPath, filename)
 
 	err := PrepareDirectory(outputPath)
@@ -65,12 +49,14 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 }
 
 func ExpandPath(path string) (error, string) {
-	if strings.HasPrefix(path, "~") {
-		usr, err := user.Current()
-		if err != nil {
-			return TraceError(err), ""
+	if InArray(runtime.GOOS, []string{"darwin", "linux"}) {
+		if strings.HasPrefix(path, "~") {
+			usr, err := user.Current()
+			if err != nil {
+				return issue.Trace(err), ""
+			}
+			path = filepath.Join(usr.HomeDir, path[1:])
 		}
-		path = filepath.Join(usr.HomeDir, path[1:])
 	}
 	return nil, path
 }
@@ -78,29 +64,18 @@ func ExpandPath(path string) (error, string) {
 func PrepareDirectory(filePath string) error {
 	err := os.MkdirAll(filePath, 0755)
 	if err != nil {
-		return TraceError(err)
+		return issue.Trace(err)
 	}
 	return nil
 }
 
-func InArray[T comparable](val T, arr []T) bool {
-	for _, v := range arr {
-		if v == val {
+func InArray[T comparable](needle T, haystack []T) bool {
+	for _, v := range haystack {
+		if v == needle {
 			return true
 		}
 	}
 	return false
-}
-
-func shortFileName(fullPath string) string {
-	lastSlash := strings.LastIndex(fullPath, "/")
-	if lastSlash == -1 {
-		lastSlash = strings.LastIndex(fullPath, "\\")
-	}
-	if lastSlash == -1 {
-		return fullPath
-	}
-	return fullPath[lastSlash+1:]
 }
 
 func truncateString(str string, maxLength int) string {

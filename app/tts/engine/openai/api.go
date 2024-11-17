@@ -6,59 +6,52 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
 	"nstudio/app/config"
 )
 
-func getApiKey() string {
-	apiKeyPointer := config.GetSetting("openAiApiKey").String
-	if apiKeyPointer == nil || *apiKeyPointer == "" {
-		response.Debug(response.Data{
-			Summary: "openAiApiKey is empty",
-		})
-		return ""
-	}
-	return *apiKeyPointer
-}
-
 func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
+	apiKey := config.GetEngine().Api.OpenAI.ApiKey
+	if apiKey == "" {
+		return nil, issue.Trace(fmt.Errorf("OpenAI API key is not set"))
+	}
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to marshal request body: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to marshal request body: %v", err))
 	}
 
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/audio/speech", bytes.NewBuffer(jsonData))
+	request, err := http.NewRequest("POST", "https://api.openai.com/v1/audio/speech", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to create HTTP request: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to create HTTP request: %v", err))
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getApiKey()))
-	req.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	request.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	defer client.CloseIdleConnections()
 
-	resp, err := client.Do(req)
+	httpResponse, err := client.Do(request)
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to send HTTP request: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to send HTTP request: %v", err))
 	}
-	defer resp.Body.Close()
+	defer httpResponse.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, util.TraceError(fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes)))
+	if httpResponse.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(httpResponse.Body)
+		return nil, issue.Trace(fmt.Errorf("request failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes)))
 	}
 
-	responseData, err := io.ReadAll(resp.Body)
+	responseData, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
-		return nil, util.TraceError(fmt.Errorf("failed to read response body: %v", err))
+		return nil, issue.Trace(fmt.Errorf("failed to read response body: %v", err))
 	}
 
 	response.Success(response.Data{
 		Summary: "Request succeeded?",
-		Detail:  "Response Status: " + resp.Status,
+		Detail:  "Response Status: " + httpResponse.Status,
 	})
 
 	return responseData, nil

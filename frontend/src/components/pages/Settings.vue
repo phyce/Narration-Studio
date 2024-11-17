@@ -6,21 +6,27 @@ import InputGroup from "primevue/inputgroup";
 import InputGroupAddon from "primevue/inputgroupaddon";
 import Button from "primevue/button";
 import Dropdown from "primevue/dropdown";
-import {onMounted, ref} from "vue";
+import {onBeforeMount, onMounted, reactive, ref} from "vue";
 import { GetSettings, SaveSettings } from "../../../wailsjs/go/main/App";
-import { UserSettings } from "../interfaces/settings";
 import { OutputTypeOptions } from "../enums/outputType";
+import {config as configuration} from "../../../wailsjs/go/models";
+import configBase = configuration.Base;
 
-const settings = ref<UserSettings>({} as UserSettings);
+const config = reactive<configBase>({} as configBase);
+const loading = ref<boolean>(true);
 
 function handleSaveSettings() {
-	SaveSettings(JSON.stringify(settings.value));
+	console.log(config.settings.outputType);
+	// SaveSettings(JSON.stringify(config));
 }
 
-onMounted(async () => {
-	settings.value = JSON.parse(await GetSettings()) as UserSettings;
-	settings.value.outputType = JSON.parse(settings.value.outputType as string);
-});
+onBeforeMount( async () => {
+	Object.assign(config, await GetSettings());
+	loading.value = false;
+	console.log("config.value");
+	console.log(config.engine.local.piper.directory);
+	console.log(config.engine.api.elevenLabs.apiKey);
+})
 </script>
 
 <template>
@@ -35,11 +41,11 @@ onMounted(async () => {
 				Save Settings
 			</Button>
 		</div>
-		<div class="settings__container">
+		<div class="settings__container" v-if="!loading">
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">Piper path</InputGroupAddon>
 				<InputText class="input-group__input"
-						   :value="settings.piperPath"
+						   :value="config.engine.local.piper.directory"
 						   placeholder="Select a directory"
 						   disabled
 				/>
@@ -50,7 +56,7 @@ onMounted(async () => {
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">Models directory</InputGroupAddon>
 				<InputText class="input-group__input"
-						   :value="settings.piperModelsDirectory"
+						   :value="config.engine.local.piper.modelsDirectory"
 						   placeholder="Output Path"
 						   disabled
 				/>
@@ -61,20 +67,21 @@ onMounted(async () => {
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">Output Type</InputGroupAddon>
 				<Dropdown class="input-group__dropdown"
-						  v-model="settings.outputType"
+						  v-model="config.settings.outputType"
 						  :options="OutputTypeOptions"
 						  inputId="outputType"
 						  optionLabel="label"
+						  optionValue="value"
 						  placeholder="select type"
 				/>
 			</InputGroup>
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">OpenAI API Key</InputGroupAddon>
-				<InputText class="input-group__input" v-model="settings.openAiApiKey" />
+				<InputText class="input-group__input" v-model="config.engine.api.openAI.apiKey" />
 			</InputGroup>
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">Elevenlabs API Key</InputGroupAddon>
-				<InputText class="input-group__input" v-model="settings.elevenlabsApiKey" />
+				<InputText class="input-group__input" v-model="config.engine.api.elevenLabs.apiKey" />
 			</InputGroup>
 		</div>
 	</div>

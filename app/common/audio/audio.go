@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
-	"nstudio/app/common/util"
+	"nstudio/app/common/issue"
 	"os"
 	"path/filepath"
 	"sort"
@@ -25,7 +25,7 @@ func CombineWavFiles(dirPath, outputFilename string, pauseDuration time.Duration
 	}
 
 	if len(wavFiles) == 0 {
-		return util.TraceError(fmt.Errorf("no WAV files found in directory"))
+		return issue.Trace(fmt.Errorf("no WAV files found in directory"))
 	}
 
 	sort.Strings(wavFiles)
@@ -52,7 +52,7 @@ func CombineWavFiles(dirPath, outputFilename string, pauseDuration time.Duration
 		decoder := wav.NewDecoder(file)
 		if !decoder.IsValidFile() {
 			file.Close()
-			return util.TraceError(fmt.Errorf("invalid WAV file: " + wavPath))
+			return issue.Trace(fmt.Errorf("invalid WAV file: " + wavPath))
 		}
 
 		buf, err := decoder.FullPCMBuffer()
@@ -176,7 +176,7 @@ func ChangeNumChannels(buf *audio.IntBuffer, targetNumChannels int) (*audio.IntB
 			}
 		}
 	} else {
-		return nil, util.TraceError(fmt.Errorf("unsupported channel conversion"))
+		return nil, issue.Trace(fmt.Errorf("unsupported channel conversion"))
 	}
 
 	convertedBuf := &audio.IntBuffer{

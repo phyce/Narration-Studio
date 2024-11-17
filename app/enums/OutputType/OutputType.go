@@ -1,7 +1,9 @@
 package OutputType
 
+type Option int
+
 const (
-	CombinedFile = iota
+	CombinedFile Option = iota
 	SeparateFiles
 	Both
 )

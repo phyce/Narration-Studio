@@ -267,6 +267,10 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 	}
 
 	playRawAudioBytes(audioClip)
+	response.Debug(response.Data{
+		Summary: "Finshed playing audio for:" + message.Character,
+		Detail:  message.Text,
+	})
 	return nil
 }
 
@@ -325,9 +329,13 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 		}
 	}
 
-	if utf8.Valid(payload) == false {
+	if !utf8.Valid(payload) {
 		return nil, issue.Trace(fmt.Errorf("input JSON is not valid UTF-8"))
 	}
+
+	response.Debug(response.Data{
+		Summary: fmt.Sprintf("Sending to piper model: %s payload: %s", model, string(payload)),
+	})
 	if _, err := piper.models[model].stdin.Write(payload); err != nil {
 		return nil, issue.Trace(err)
 	}
@@ -405,7 +413,6 @@ func (piper *Piper) GetProcessID(modelName string) int {
 
 func playRawAudioBytes(audioClip []byte) {
 	done := make(chan struct{})
-	defer close(done)
 	audioDataReader := bytes.NewReader(audioClip)
 
 	streamer := beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
@@ -429,6 +436,7 @@ func playRawAudioBytes(audioClip []byte) {
 	resampledStreamer := beep.Resample(4, 22050, 48000, streamer)
 
 	speaker.Play(beep.Seq(resampledStreamer, beep.Callback(func() {
+		close(done)
 	})))
 
 	<-done

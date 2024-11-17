@@ -52,6 +52,10 @@ func (app *App) Play(
 				Text:      text,
 				Save:      saveNewCharacters,
 			})
+			response.Debug(response.Data{
+				Summary: "added message by character: " + character,
+				Detail:  text,
+			})
 		}
 	}
 
@@ -250,18 +254,6 @@ func (app *App) ReloadVoicePacks() {
 //</editor-fold>
 
 // <editor-fold desc="Settings">
-//func (app *App) GetSettings() string {
-//	result, err := config.Export()
-//	if err != nil {
-//		response.Error(response.Data{
-//			Summary: "Failed to get settings",
-//			Detail:  err.Error(),
-//		})
-//	}
-//
-//	return result
-//}
-
 func (app *App) GetSettings() config.Base {
 	return config.Get()
 }

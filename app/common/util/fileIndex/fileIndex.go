@@ -1,20 +1,20 @@
-package util
+package fileIndex
 
 import "time"
 
 var index int
 var timestamp string
 
-func FileIndexReset() {
+func Reset() {
 	index = -1
 	timestamp = time.Now().Format("15-04-05")
 }
 
-func FileIndexGet() int {
+func Get() int {
 	index++
 	return index
 }
 
-func FileTimestampGet() string {
+func Timestamp() string {
 	return timestamp
 }

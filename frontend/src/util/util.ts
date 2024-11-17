@@ -29,7 +29,7 @@ export function formatToTreeSelectData(engines: Engine[]) {
 // 		const engines: Engine[] = JSON.parse(result);
 //
 // 		return engines;
-// 	} catch (error) {
-// 		toast.add({ severity: 'error', summary: 'Error getting engines:', detail: error, life: 5000});
+// 	} catch (issue) {
+// 		toast.add({ severity: 'issue', summary: 'Error getting engines:', detail: issue, life: 5000});
 // 	}
 // }

@@ -22,7 +22,7 @@ func main() {
 	response.Initialize()
 	voiceManager.Initialize()
 
-	err := config.Initialize()
+	err := config.Initialize(Info())
 	if err != nil {
 		showErrorDialog(
 			"Failed to initialize config config",
@@ -34,8 +34,9 @@ func main() {
 	registerEngines()
 
 	app := NewApp()
+
 	err = wails.Run(&options.App{
-		Title:            "Narrator Studio v0.11.0",
+		Title:            config.GetInfo().Title + " v" + config.GetInfo().Version,
 		Width:            1024,
 		Height:           768,
 		WindowStartState: options.Minimised,
@@ -93,6 +94,6 @@ func registerEngines() {
 func showErrorDialog(title, message string) {
 	err := zenity.Error(message, zenity.Title(title))
 	if err != nil {
-		panic("Failed to show error dialog: " + err.Error())
+		panic("Failed to show issue dialog: " + err.Error())
 	}
 }

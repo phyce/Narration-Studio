@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/speaker"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
 	"nstudio/app/common/util"
@@ -87,7 +88,7 @@ func UpdateCharacterVoices(data string) error {
 	var newVoices map[string]util.CharacterVoice
 	err := json.Unmarshal([]byte(data), &newVoices)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	manager.CharacterVoices = newVoices
@@ -97,7 +98,7 @@ func UpdateCharacterVoices(data string) error {
 	byteData := []byte(data)
 
 	if err := os.WriteFile(voiceConfigPath, byteData, 0644); err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	return nil
@@ -108,7 +109,7 @@ func ResetAllocatedVoices() {
 }
 
 func RefreshModels() {
-	toggles := config.GetModelToggles()
+	toggles := config.GetEngineToggles()
 
 	enabledModels := 0
 	for engine, models := range toggles {
@@ -117,7 +118,7 @@ func RefreshModels() {
 				if enabled {
 					err := manager.Engines[engine].Engine.Start(model)
 					if err != nil {
-						util.TraceError(err)
+						issue.Trace(err)
 						response.Debug(response.Data{
 							Summary: "Failed to start piper model:" + model,
 							Detail:  err.Error(),
@@ -127,7 +128,7 @@ func RefreshModels() {
 				} else {
 					err := manager.Engines[engine].Engine.Stop(model)
 					if err != nil {
-						util.TraceError(err)
+						issue.Trace(err)
 						response.Debug(response.Data{
 							Summary: "Failed to stop piper model:" + model,
 							Detail:  err.Error(),
@@ -160,7 +161,7 @@ func RegisterEngine(newEngine tts.Engine) error {
 	manager.Engines[newEngine.ID] = newEngine
 	err := manager.Engines[newEngine.ID].Engine.Initialize()
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	for _, model := range newEngine.Models {
@@ -173,7 +174,7 @@ func RegisterEngine(newEngine tts.Engine) error {
 }
 
 func RegisterModel(model tts.Model) {
-	toggles := config.GetModelToggles()
+	toggles := config.GetEngineToggles()
 
 	engine := manager.Engines[model.Engine]
 
@@ -190,7 +191,7 @@ func RegisterModel(model tts.Model) {
 
 	engine.Models[model.ID] = model
 
-	modelToggles := config.GetModelToggles()
+	modelToggles := config.GetEngineToggles()
 
 	if modelToggles[model.Engine][model.ID] {
 		err := engine.Engine.Start(model.ID)
@@ -213,14 +214,14 @@ func SaveVoice(name string, voice util.CharacterVoice) error {
 
 	data, err := json.Marshal(voicesArray)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	voiceConfigPath := filepath.Join(config.GetConfigPath(), "voiceConfig.json")
 
 	err = os.WriteFile(voiceConfigPath, data, 0644)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 	return nil
 }
@@ -246,7 +247,7 @@ func GetVoice(name string, save bool) (util.CharacterVoice, error) {
 			}
 			return characterVoice, nil
 		} else {
-			return util.CharacterVoice{}, util.TraceError(
+			return util.CharacterVoice{}, issue.Trace(
 				fmt.Errorf("invalid line could not be processed: " + name),
 			)
 		}
@@ -254,7 +255,7 @@ func GetVoice(name string, save bool) (util.CharacterVoice, error) {
 
 	if voice, ok := manager.CharacterVoices[name]; ok {
 
-		modelToggles := config.GetModelToggles()
+		modelToggles := config.GetEngineToggles()
 
 		if modelToggles[voice.Engine][voice.Model] {
 
@@ -265,7 +266,7 @@ func GetVoice(name string, save bool) (util.CharacterVoice, error) {
 	engine := calculateEngine(name)
 	model, voice, err := calculateVoice(engine, name)
 	if err != nil {
-		return util.CharacterVoice{}, util.TraceError(err)
+		return util.CharacterVoice{}, issue.Trace(err)
 	}
 
 	characterVoice := util.CharacterVoice{
@@ -278,7 +279,7 @@ func GetVoice(name string, save bool) (util.CharacterVoice, error) {
 	if save {
 		err = SaveVoice(name, characterVoice)
 		if err != nil {
-			return util.CharacterVoice{}, util.TraceError(err)
+			return util.CharacterVoice{}, issue.Trace(err)
 		}
 	} else {
 		manager.AllocatedVoices[name] = characterVoice
@@ -293,7 +294,7 @@ func GetEngine(ID string) (tts.Engine, bool) {
 }
 
 func GetEngines() []tts.Engine {
-	toggles := config.GetModelToggles()
+	toggles := config.GetEngineToggles()
 	var availableEngines []tts.Engine
 
 	for _, managerEngine := range manager.Engines {
@@ -346,7 +347,7 @@ func GetVoices(engineName string, model string) ([]tts.Voice, error) {
 	voiceEngine, exists := manager.Engines[engineName]
 
 	if !exists {
-		return nil, util.TraceError(fmt.Errorf("Engine %s not found", engineName))
+		return nil, issue.Trace(fmt.Errorf("Engine %s not found", engineName))
 	}
 
 	return voiceEngine.Engine.GetVoices(model)

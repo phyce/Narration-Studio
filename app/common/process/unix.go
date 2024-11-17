@@ -15,7 +15,7 @@ func IsRunning(p *os.Process) bool {
 	}
 
 	// On Unix systems, sending signal 0 to a process is a way to check for its existence.
-	// If the process does not exist, an error will be returned.
+	// If the process does not exist, an issue will be returned.
 	err := p.Signal(syscall.Signal(0))
 	return err == nil
 }

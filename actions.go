@@ -9,6 +9,7 @@ import (
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
 	"nstudio/app/common/util"
+	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/enums/OutputType"
 	"nstudio/app/tts"
@@ -110,29 +111,13 @@ func (app *App) ProcessScript(script string) {
 		return
 	}
 
-	outputTypeRaw := []byte(config.GetSetting("outputType").Raw)
+	outputType := config.GetSettings().OutputType
 
-	if len(outputTypeRaw) == 0 {
-		outputTypeRaw = []byte(*config.GetSetting("outputType").String)
-	}
-
-	var outputType config.ConfigValueInt
-
-	err = json.Unmarshal(outputTypeRaw, &outputType)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to process config",
-			Detail:  err.Error(),
-		})
-	}
-
-	if outputType.Value == OutputType.CombinedFile ||
-		outputType.Value == OutputType.Both {
-
+	if util.InArray(outputType, []OutputType.Option{OutputType.CombinedFile, OutputType.Both}) {
 		now := time.Now().Format("2006-01-02")
 		dateString := now
 
-		err, expandedPath := util.ExpandPath(*config.GetSetting("scriptOutputPath").String)
+		err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 		if err != nil {
 			response.Error(response.Data{
 				Summary: "Failed to expand path",
@@ -144,7 +129,7 @@ func (app *App) ProcessScript(script string) {
 		outputPath := filepath.Join(
 			expandedPath,
 			dateString,
-			util.FileTimestampGet(),
+			fileIndex.Timestamp(),
 		)
 
 		err = audio.CombineWavFiles(
@@ -163,7 +148,7 @@ func (app *App) ProcessScript(script string) {
 			return
 		}
 
-		if outputType.Value != OutputType.Both {
+		if outputType == OutputType.CombinedFile {
 			files, err := os.ReadDir(outputPath)
 			if err != nil {
 				response.Error(response.Data{
@@ -265,27 +250,41 @@ func (app *App) ReloadVoicePacks() {
 //</editor-fold>
 
 // <editor-fold desc="Settings">
-func (app *App) GetSettings() string {
-	result, err := config.Export()
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to get settings",
-			Detail:  err.Error(),
-		})
-	}
+//func (app *App) GetSettings() string {
+//	result, err := config.Export()
+//	if err != nil {
+//		response.Error(response.Data{
+//			Summary: "Failed to get settings",
+//			Detail:  err.Error(),
+//		})
+//	}
+//
+//	return result
+//}
 
-	return result
+func (app *App) GetSettings() config.Base {
+	return config.Get()
 }
 
-func (app *App) GetSetting(name string) string {
-	result := config.GetSetting(name)
-	data, err := json.Marshal(result)
+func (app *App) GetSetting(name string) interface{} {
+	value, err := config.GetValueFromPath(name)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to get setting",
 			Detail:  err.Error(),
 		})
+		return ""
 	}
+
+	data, err := json.Marshal(value)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to marshal setting",
+			Detail:  err.Error(),
+		})
+		return ""
+	}
+
 	return string(data)
 }
 
@@ -306,24 +305,19 @@ func (app *App) SaveSettings(settings string) {
 	status.Set(status.Ready, "")
 }
 
-func (app *App) SaveSetting(name string, newValue string) {
-	var value config.Value
-
-	err := json.Unmarshal([]byte(newValue), &value)
+func (app *App) SaveSetting(name string, value string) {
+	err := config.SetValueToPath(name, value)
 	if err != nil {
 		response.Error(response.Data{
-			Summary: "Failed to unmarshal new value",
+			Summary: "Failed to set setting",
 			Detail:  err.Error(),
 		})
 	}
 
-	err = config.SetSetting(name, value)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to set new value",
-			Detail:  err.Error(),
-		})
-	}
+	response.Debug(response.Data{
+		Summary: fmt.Sprintf("Value for %s updated", name),
+		Detail:  value,
+	})
 }
 
 func (app *App) SelectDirectory(defaultDirectory string) string {

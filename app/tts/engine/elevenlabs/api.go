@@ -7,27 +7,15 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"nstudio/app/common/response"
-	"nstudio/app/common/util"
+	"nstudio/app/common/issue"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 )
 
-func getApiKey() string {
-	apiKeyPointer := config.GetSetting("elevenlabsApiKey").String
-	if apiKeyPointer == nil || *apiKeyPointer == "" {
-		response.Debug(response.Data{
-			Summary: "elevenlabsApiKey is empty",
-		})
-		return ""
-	}
-	return *apiKeyPointer
-}
-
 func FetchModels() (map[string]engine.Model, error) {
-	apiKey := getApiKey()
+	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
 	if apiKey == "" {
-		return make(map[string]engine.Model, 0), util.TraceError(fmt.Errorf("api key is empty"))
+		return make(map[string]engine.Model, 0), issue.Trace(fmt.Errorf("api key is empty"))
 	}
 
 	client := &http.Client{}
@@ -35,7 +23,7 @@ func FetchModels() (map[string]engine.Model, error) {
 
 	request, err := http.NewRequest("GET", "https://api.elevenlabs.io/v1/models", nil)
 	if err != nil {
-		return make(map[string]engine.Model, 0), util.TraceError(err)
+		return make(map[string]engine.Model, 0), issue.Trace(err)
 	}
 	request.Header.Set("xi-api-key", apiKey)
 
@@ -47,18 +35,18 @@ func FetchModels() (map[string]engine.Model, error) {
 
 	if response.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(response.Body)
-		return make(map[string]engine.Model, 0), util.TraceError(errors.New(string(bodyBytes)))
+		return make(map[string]engine.Model, 0), issue.Trace(errors.New(string(bodyBytes)))
 	}
 
 	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
-		return make(map[string]engine.Model, 0), util.TraceError(err)
+		return make(map[string]engine.Model, 0), issue.Trace(err)
 	}
 
 	var modelsResponse []ModelResponse
 	err = json.Unmarshal(bodyBytes, &modelsResponse)
 	if err != nil {
-		return make(map[string]engine.Model, 0), util.TraceError(err)
+		return make(map[string]engine.Model, 0), issue.Trace(err)
 	}
 
 	modelsMap := make(map[string]engine.Model)
@@ -75,9 +63,9 @@ func FetchModels() (map[string]engine.Model, error) {
 }
 
 func FetchVoices() ([]engine.Voice, error) {
-	apiKey := getApiKey()
+	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
 	if apiKey == "" {
-		return make([]engine.Voice, 0), util.TraceError(fmt.Errorf("api key is empty"))
+		return make([]engine.Voice, 0), issue.Trace(fmt.Errorf("api key is empty"))
 	}
 
 	client := &http.Client{}
@@ -85,31 +73,31 @@ func FetchVoices() ([]engine.Voice, error) {
 
 	request, err := http.NewRequest("GET", "https://api.elevenlabs.io/v1/voices", nil)
 	if err != nil {
-		return make([]engine.Voice, 0), util.TraceError(fmt.Errorf("creating request failed: %w", err))
+		return make([]engine.Voice, 0), issue.Trace(fmt.Errorf("creating request failed: %w", err))
 	}
 
 	request.Header.Set("xi-api-key", apiKey)
 
 	response, err := client.Do(request)
 	if err != nil {
-		return make([]engine.Voice, 0), util.TraceError(fmt.Errorf("performing request failed: %w", err))
+		return make([]engine.Voice, 0), issue.Trace(fmt.Errorf("performing request failed: %w", err))
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(response.Body)
-		return make([]engine.Voice, 0), util.TraceError(fmt.Errorf("unexpected status code: %d, response: %s", response.StatusCode, string(bodyBytes)))
+		return make([]engine.Voice, 0), issue.Trace(fmt.Errorf("unexpected status code: %d, response: %s", response.StatusCode, string(bodyBytes)))
 	}
 
 	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
-		return make([]engine.Voice, 0), util.TraceError(fmt.Errorf("reading response body failed: %w", err))
+		return make([]engine.Voice, 0), issue.Trace(fmt.Errorf("reading response body failed: %w", err))
 	}
 
 	var voicesResp VoicesResponse
 	err = json.Unmarshal(bodyBytes, &voicesResp)
 	if err != nil {
-		return make([]engine.Voice, 0), util.TraceError(fmt.Errorf("parsing JSON failed: %w", err))
+		return make([]engine.Voice, 0), issue.Trace(fmt.Errorf("parsing JSON failed: %w", err))
 	}
 
 	responseVoices := make([]engine.Voice, 0, len(voicesResp.Voices))

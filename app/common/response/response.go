@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"nstudio/app/common/eventManager"
+	"nstudio/app/config"
 )
 
 type Data struct {
@@ -27,12 +28,12 @@ func Initialize() {
 	})
 }
 
-// TODO enable/disable logging
 func Debug(data Data) {
-	data.Severity = "info"
-	data.Life = 2500
-	//TODO toggle logging if debug mode on/off
-	emitEvent("notification.send", data, true)
+	if config.Debug() {
+		data.Severity = "info"
+		data.Life = 2500
+		emitEvent("notification.send", data, true)
+	}
 }
 
 func Info(data Data) error {
@@ -57,7 +58,7 @@ func Warning(data Data) error {
 }
 
 func Error(data Data) error {
-	data.Severity = "error"
+	data.Severity = "issue"
 	data.Life = 25000
 	emitEvent("notification.send", data, true)
 	return errors.New(data.Summary)

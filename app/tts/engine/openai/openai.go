@@ -9,8 +9,10 @@ import (
 	"github.com/gopxl/beep/speaker"
 	"github.com/mewkiz/flac"
 	"io"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
+	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"os"
@@ -32,7 +34,7 @@ var voices = []engine.Voice{
 
 // <editor-fold desc="Engine Interface">
 func (openAI *OpenAI) Initialize() error {
-	//openAI.outputType = *config.GetSetting("openAiOutputType").String
+	//openAI.outputType = config.GetEngine().Api.OpenAI.OutputType
 	openAI.outputType = "flac"
 
 	//TODO add api key check
@@ -63,12 +65,12 @@ func (openAI *OpenAI) Play(message util.CharacterMessage) error {
 
 	audioClip, err := openAI.sendRequest(input)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	err = playFLACAudioBytes(audioClip)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	return response.Success(response.Data{
@@ -81,9 +83,9 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 		Summary: "Openai saving messages",
 	})
 
-	err, expandedPath := util.ExpandPath(*config.GetSetting("scriptOutputPath").String)
+	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	for _, message := range messages {
@@ -97,24 +99,24 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 
 		audioClip, err := openAI.sendRequest(input)
 		if err != nil {
-			return util.TraceError(err)
+			return issue.Trace(err)
 		}
 
 		filename := util.GenerateFilename(
 			message,
-			util.FileIndexGet(),
+			fileIndex.Get(),
 			expandedPath,
 		)
 
 		err = saveWavFile(audioClip, filename)
 		if err != nil {
-			return util.TraceError(err)
+			return issue.Trace(err)
 		}
 
 		if play {
 			err = playFLACAudioBytes(audioClip)
 			if err != nil {
-				return util.TraceError(err)
+				return issue.Trace(err)
 			}
 		}
 	}
@@ -131,7 +133,8 @@ func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (openAI *OpenAI) FetchModels() map[string]engine.Model {
-	if getApiKey() == "" {
+	apiKey := config.GetEngine().Api.OpenAI.ApiKey
+	if apiKey == "" {
 		return make(map[string]engine.Model)
 	}
 
@@ -181,7 +184,7 @@ func saveWavFile(flacData []byte, filename string) error {
 	// Decode the FLAC data
 	stream, err := flac.New(reader)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	// Prepare an audio buffer
@@ -197,7 +200,7 @@ func saveWavFile(flacData []byte, filename string) error {
 			break
 		}
 		if err != nil {
-			return util.TraceError(err)
+			return issue.Trace(err)
 		}
 		// Append the samples from each subframe to the buffer
 		for _, subframe := range frame.Subframes {
@@ -210,17 +213,17 @@ func saveWavFile(flacData []byte, filename string) error {
 	// Create the output WAV file
 	outFile, err := os.Create(filename)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 	defer outFile.Close()
 
 	// Encode the buffer as WAV
 	encoder := wav.NewEncoder(outFile, buf.Format.SampleRate, int(stream.Info.BitsPerSample), buf.Format.NumChannels, 1)
 	if err := encoder.Write(&buf); err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 	if err := encoder.Close(); err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	return nil

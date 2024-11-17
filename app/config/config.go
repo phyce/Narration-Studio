@@ -4,55 +4,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"nstudio/app/common/response"
-	"nstudio/app/common/util"
+	"nstudio/app/common/issue"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
-	"sync"
 )
 
 var manager *ConfigManager
-var once sync.Once
 
-func GetConfigPath() string {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		util.TraceError(err)
-		panic(err)
+func init() {
+	manager = &ConfigManager{
+		config: Base{},
 	}
-
-	return filepath.Join(configDir, "Narrator Studio")
 }
 
-func Initialize() error {
-	once.Do(func() {
-		manager = &ConfigManager{
-			settings: make(map[string]Value),
-		}
-	})
-
+func Initialize(info Info) error {
+	manager.config.Info = info
 	manager.filePath = filepath.Join(GetConfigPath(), "narrator-studio-config.json")
 
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			var defaultConfigPath string
-			if runtime.GOOS == "windows" {
-				defaultConfigPath = filepath.Join(".", "config", "config-windows-default.json")
-			} else if runtime.GOOS == "darwin" {
-				defaultConfigPath = filepath.Join(".", "config", "config-macos-default.json")
-			}
+			defaultConfigPath := filepath.Join(".", "config", fmt.Sprintf("config-%s-default.json", runtime.GOOS))
 
 			configFile, err = ioutil.ReadFile(defaultConfigPath)
 			if err != nil {
-				return util.TraceError(err)
+				return issue.Trace(err)
 			}
 
 			configPath := filepath.Dir(manager.filePath)
 			if err := os.MkdirAll(configPath, 0755); err != nil {
-				return util.TraceError(err)
+				return issue.Trace(err)
 			}
 
 			err = ioutil.WriteFile(manager.filePath, configFile, 0644)
@@ -61,132 +45,290 @@ func Initialize() error {
 		}
 	}
 
-	err = json.Unmarshal(configFile, &manager.settings)
+	err = json.Unmarshal(configFile, &manager.config)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	return err
+}
+
+func GetConfigPath() string {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		issue.Panic(err)
+	}
+
+	return filepath.Join(configDir, manager.config.Info.Title)
 }
 
 func Export() (string, error) {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
-	settingsJSON, err := json.Marshal(manager.settings)
+	settingsJSON, err := json.Marshal(manager.config)
 	if err != nil {
-		return "", util.TraceError(err)
+		return "", issue.Trace(err)
 	}
 
 	return string(settingsJSON), nil
 }
 
 func Import(jsonString string) error {
-	var newConfigs map[string]Value
-	err := json.Unmarshal([]byte(jsonString), &newConfigs)
+	var newConfig Base
+	err := json.Unmarshal([]byte(jsonString), &newConfig)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
+	manager.config = newConfig
 
-	manager.settings = newConfigs
-
-	updatedConfigs, err := json.Marshal(manager.settings)
+	updatedConfigs, err := json.Marshal(manager.config)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
 	err = ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 	if err != nil {
-		return util.TraceError(err)
+		return issue.Trace(err)
 	}
 
-	fmt.Println("Wrote new config to file: ", manager.filePath)
+	if manager.config.Settings.Debug {
 
-	return nil
-}
-
-func GetSettings() map[string]Value {
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
-
-	settings := make(map[string]Value)
-	for key, value := range manager.settings {
-		settings[key] = value
 	}
-	return settings
-}
 
-func GetSetting(name string) *Value {
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
-
-	if value, exists := manager.settings[name]; exists {
-		return &value
+	if Debug() {
+		fmt.Println("Wrote new config to file: ", manager.filePath)
 	}
 
 	return nil
 }
 
-func SetSetting(name string, value Value) error {
+func Get() Base {
+	return manager.config
+}
+
+func GetSettings() Settings {
+	return manager.config.Settings
+}
+
+func GetEngine() Engine {
+	return manager.config.Engine
+}
+
+func GetModelToggles() map[string]bool {
+	return manager.config.ModelToggles
+}
+
+func GetEngineToggles() map[string]map[string]bool {
+	engineToggles := make(map[string]map[string]bool)
+
+	for key, value := range manager.config.ModelToggles {
+		parts := strings.SplitN(key, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		engine := parts[0]
+		model := parts[1]
+
+		if _, exists := engineToggles[engine]; !exists {
+			engineToggles[engine] = make(map[string]bool)
+		}
+
+		engineToggles[engine][model] = value
+	}
+
+	return engineToggles
+}
+
+func GetInfo() Info {
+	return manager.config.Info
+}
+
+func GetValueFromPath(path string) (interface{}, error) {
+	parts := strings.Split(path, ".")
+	if len(parts) == 0 {
+		return nil, issue.Trace(fmt.Errorf("invalid path"))
+	}
+
+	current := reflect.ValueOf(manager.config)
+
+	for _, part := range parts {
+		if current.Kind() == reflect.Ptr {
+			current = current.Elem()
+		}
+
+		if current.Kind() != reflect.Struct {
+			return nil, issue.Trace(fmt.Errorf("path segment '%s' is not a struct", part))
+		}
+
+		field, found := findFieldByJSONTag(current, part)
+		if !found {
+			return nil, issue.Trace(fmt.Errorf("field '%s' not found", part))
+		}
+
+		current = field
+	}
+
+	return current.Interface(), nil
+}
+
+func Set(newConfig interface{}) error {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
-	manager.settings[name] = value
-
-	updatedConfigs, err := json.Marshal(manager.settings)
+	// Start the update process
+	err := updateStruct(reflect.ValueOf(&manager.config).Elem(), reflect.ValueOf(newConfig))
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
+	return nil
 }
 
-func SetConfigString(name string, value string) error {
-	return SetSetting(name, Value{String: &value})
-}
-
-func SetConfigInt(name string, value int) error {
-	return SetSetting(name, Value{Int: &value})
-}
-
-// TODO this might need to go elsewhere
-func GetModelToggles() map[string]map[string]bool {
-	//Seems like for random reason sometimes modelToggles comes out as String?
-	//Not sure what the hell is going on
-	engineTogglesRaw := GetSetting("modelToggles").Raw
-
-	if engineTogglesRaw == "" {
-		engineTogglesRaw = *GetSetting("modelToggles").String
+func SetValueToPath(path string, value string) error {
+	parts := strings.Split(path, ".")
+	if len(parts) == 0 {
+		return issue.Trace(fmt.Errorf("invalid path"))
 	}
 
-	engineToggles2D := make(map[string]map[string]bool)
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
 
-	var togglesMap map[string]bool
-	err := json.Unmarshal([]byte(engineTogglesRaw), &togglesMap)
+	current := reflect.ValueOf(&manager.config).Elem() // Get a reflect.Value of the Base struct
 
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed unmarshaling json",
-			Detail:  err.Error(),
-		})
-		return engineToggles2D
-	}
-
-	for key, value := range togglesMap {
-		parts := strings.Split(key, ":")
-		if len(parts) != 2 {
-			continue
+	for i, part := range parts {
+		if current.Kind() == reflect.Ptr {
+			if current.IsNil() {
+				// Initialize the pointer to a new struct
+				current.Set(reflect.New(current.Type().Elem()))
+			}
+			current = current.Elem()
 		}
 
-		if _, exists := engineToggles2D[parts[0]]; !exists {
-			engineToggles2D[parts[0]] = make(map[string]bool)
+		if current.Kind() != reflect.Struct {
+			return issue.Trace(fmt.Errorf("path segment '%s' is not a struct", part))
 		}
 
-		engineToggles2D[parts[0]][parts[1]] = value
+		field, found := findFieldByJSONTag(current, part)
+		if !found {
+			return issue.Trace(fmt.Errorf("field '%s' not found", part))
+		}
+
+		if i == len(parts)-1 {
+			// This is the target field to set
+			if !field.CanSet() {
+				return issue.Trace(fmt.Errorf("cannot set field '%s'", part))
+			}
+
+			// Determine the type of the field
+			fieldType := field.Type()
+
+			// Create a new instance of the field's type
+			newValuePtr := reflect.New(fieldType)
+
+			// Unmarshal the JSON value into the new instance
+			err := json.Unmarshal([]byte(value), newValuePtr.Interface())
+			if err != nil {
+				return issue.Trace(fmt.Errorf("failed to unmarshal value: %w", err))
+			}
+
+			// Set the field to the new value (dereference the pointer)
+			field.Set(newValuePtr.Elem())
+			return nil
+		} else {
+			// Traverse to the next nested struct
+			current = field
+		}
 	}
 
-	return engineToggles2D
+	return issue.Trace(fmt.Errorf("path '%s' did not reach a field", path))
 }
+
+// Recursive function to update structs
+func updateStruct(dest, src reflect.Value) error {
+	if src.Kind() == reflect.Ptr {
+		src = src.Elem()
+	}
+	if src.Kind() != reflect.Struct {
+		return fmt.Errorf("Set expects a struct or a pointer to a struct")
+	}
+
+	srcType := src.Type()
+	for i := 0; i < src.NumField(); i++ {
+		srcField := src.Field(i)
+		srcFieldType := srcType.Field(i)
+
+		// Get the JSON tag or use the field name
+		jsonTag := srcFieldType.Tag.Get("json")
+		if jsonTag == "" {
+			jsonTag = srcFieldType.Name
+		}
+
+		// Find the corresponding field in dest by JSON tag
+		destField, found := findFieldByJSONTag(dest, jsonTag)
+		if !found {
+			continue // Field not found in destination; skip
+		}
+
+		if srcField.Kind() == reflect.Struct && destField.Kind() == reflect.Struct {
+			// Recursively update nested structs
+			err := updateStruct(destField, srcField)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Only set non-zero values
+			if !isZeroValue(srcField) {
+				if destField.CanSet() {
+					destField.Set(srcField)
+				} else {
+					return fmt.Errorf("cannot set field %s", destField.Type().Name())
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Helper function to find a field in dest by JSON tag
+func findFieldByJSONTag(dest reflect.Value, jsonTag string) (reflect.Value, bool) {
+	destType := dest.Type()
+	for i := 0; i < dest.NumField(); i++ {
+		field := dest.Field(i)
+		fieldType := destType.Field(i)
+		tag := fieldType.Tag.Get("json")
+		if tag == jsonTag {
+			return field, true
+		}
+	}
+	return reflect.Value{}, false
+}
+
+// Helper function to check if a value is zero
+func isZeroValue(v reflect.Value) bool {
+	zero := reflect.Zero(v.Type())
+	return reflect.DeepEqual(v.Interface(), zero.Interface())
+}
+
+//func SetSetting(name string, value Value) error {
+//	manager.lock.Lock()
+//	defer manager.lock.Unlock()
+//
+//	manager.config[name] = value
+//
+//	updatedConfigs, err := json.Marshal(manager.config)
+//	if err != nil {
+//		return err
+//	}
+//
+//	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
+//}
+//
+//func SetConfigString(name string, value string) error {
+//	return SetSetting(name, Value{String: &value})
+//}
+//
+//func SetConfigInt(name string, value int) error {
+//	return SetSetting(name, Value{Int: &value})
+//}

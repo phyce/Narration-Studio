@@ -56,6 +56,8 @@ func LoadCharacterVoices() {
 	voiceConfigPath := filepath.Join(config.GetConfigPath(), "voiceConfig.json")
 
 	file, err := os.ReadFile(voiceConfigPath)
+	fmt.Println(string(file))
+
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = os.WriteFile(voiceConfigPath, []byte("{}"), 0644)
@@ -74,6 +76,9 @@ func LoadCharacterVoices() {
 		panic("Failed to unmarshal voice config: " + err.Error())
 	}
 
+	fmt.Println("voices")
+	fmt.Println(voices)
+
 	//manager.CharacterVoices = voices
 	for _, voice := range voices {
 		manager.CharacterVoices[voice.Name] = voice
@@ -81,9 +86,11 @@ func LoadCharacterVoices() {
 }
 
 // TODO maybe accept struct instead of string?
-func UpdateCharacterVoices(data string) error {
+func SaveCharacterVoices(data string) error {
 	manager.Lock()
 	defer manager.Unlock()
+
+	fmt.Println()
 
 	var newVoices map[string]util.CharacterVoice
 	err := json.Unmarshal([]byte(data), &newVoices)
@@ -207,12 +214,7 @@ func RegisterModel(model tts.Model) {
 func SaveVoice(name string, voice util.CharacterVoice) error {
 	manager.CharacterVoices[name] = voice
 
-	voicesArray := make([]util.CharacterVoice, 0, len(manager.CharacterVoices))
-	for _, v := range manager.CharacterVoices {
-		voicesArray = append(voicesArray, v)
-	}
-
-	data, err := json.Marshal(voicesArray)
+	data, err := json.Marshal(manager.CharacterVoices)
 	if err != nil {
 		return issue.Trace(err)
 	}
@@ -233,8 +235,6 @@ func GetVoice(name string, save bool) (util.CharacterVoice, error) {
 	if allocatedVoice, exists := manager.AllocatedVoices[name]; exists {
 		return allocatedVoice, nil
 	}
-
-	fmt.Println("Getting Voice for: ", name)
 
 	if strings.HasPrefix(name, "::") {
 		parts := strings.Split(name, ":")

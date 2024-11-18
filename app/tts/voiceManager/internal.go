@@ -30,7 +30,12 @@ func calculateEngine(name string) string {
 
 	engines := make([]string, 0, len(manager.Engines))
 	for engine := range manager.Engines {
-		engines = append(engines, engine)
+		for _, enabled := range config.GetEngineToggles()[engine] {
+			if enabled {
+				engines = append(engines, engine)
+				break
+			}
+		}
 	}
 
 	if len(engines) == 0 {

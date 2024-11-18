@@ -25,7 +25,7 @@ const handleBrowseClick = async () => {
 	if (result.length > 0 && config.value.settings.outputPath != result) {
 		config.value.settings.outputPath =  result;
 
-		await SaveSettings(JSON.stringify(config.value));
+		// await SaveSettings(JSON.stringify(config.value));
 	}
 }
 

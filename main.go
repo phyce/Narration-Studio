@@ -20,7 +20,6 @@ var assets embed.FS
 
 func main() {
 	response.Initialize()
-	voiceManager.Initialize()
 
 	err := config.Initialize(Info())
 	if err != nil {
@@ -30,6 +29,8 @@ func main() {
 		)
 		panic(err)
 	}
+
+	voiceManager.Initialize()
 
 	registerEngines()
 

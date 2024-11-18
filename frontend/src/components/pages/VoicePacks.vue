@@ -8,11 +8,13 @@ import {onMounted, reactive, ref} from "vue";
 import {Model} from '../interfaces/engine';
 import {
 	GetAvailableModels,
-	GetSetting, GetSettings,
+	GetSettings,
 	RefreshModels,
 	ReloadVoicePacks,
-	SaveSetting,
+	SaveSettings,
 } from '../../../wailsjs/go/main/App';
+import {config as configuration} from "../../../wailsjs/go/models";
+import configBase = configuration.Base;
 
 const models = ref<Record<string, Model>>({});
 const modelToggles = reactive<Record<string, boolean>>({});
@@ -46,8 +48,10 @@ const reloadModels = async () => {
 };
 
 const handleCheckboxToggle = async () => {
-	const stringModelToggles = JSON.stringify(modelToggles);
-	await SaveSetting("modelToggles", stringModelToggles).then(() => {
+	const payload = new configBase;
+	payload.modelToggles = modelToggles;
+
+	await SaveSettings(payload).then(() => {
 		RefreshModels();
 	});
 }
@@ -79,7 +83,10 @@ const handleCheckboxToggle = async () => {
 							{{ model.engine + ':' + model.id }}
 						</div>
 						<div class="voice-pack__container__toggle">
-							<InputSwitch v-model="modelToggles[model.engine + ':' + model.id]" @update:modelValue="handleCheckboxToggle" />
+							<InputSwitch
+								v-model="modelToggles[model.engine + ':' + model.id]"
+								@update:modelValue="handleCheckboxToggle"
+							/>
 						</div>
 					</div>
 				</template>

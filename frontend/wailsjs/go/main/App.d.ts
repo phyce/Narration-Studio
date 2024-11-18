@@ -30,8 +30,6 @@ export function ReloadVoicePacks():Promise<void>;
 
 export function SaveCharacterVoices(arg1:string):Promise<void>;
 
-export function SaveSetting(arg1:string,arg2:string):Promise<void>;
-
-export function SaveSettings(arg1:string):Promise<void>;
+export function SaveSettings(arg1:config.Base):Promise<void>;
 
 export function SelectDirectory(arg1:string):Promise<string>;

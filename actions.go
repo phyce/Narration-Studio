@@ -207,7 +207,7 @@ func (app *App) GetCharacterVoices() string {
 
 func (app *App) SaveCharacterVoices(voices string) {
 	status.Set(status.Loading, "Saving character voices")
-	err := voiceManager.UpdateCharacterVoices(voices)
+	err := voiceManager.SaveCharacterVoices(voices)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to save character voices",
@@ -280,9 +280,10 @@ func (app *App) GetSetting(name string) interface{} {
 	return string(data)
 }
 
-func (app *App) SaveSettings(settings string) {
+func (app *App) SaveSettings(settings config.Base) {
 	status.Set(status.Loading, "Saving settings")
-	err := config.Import(settings)
+
+	err := config.Set(settings)
 	if err != nil {
 		response.Error(response.Data{
 			Summary: "Failed to save settings",
@@ -297,20 +298,20 @@ func (app *App) SaveSettings(settings string) {
 	status.Set(status.Ready, "")
 }
 
-func (app *App) SaveSetting(name string, value string) {
-	err := config.SetValueToPath(name, value)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to set setting",
-			Detail:  err.Error(),
-		})
-	}
-
-	response.Debug(response.Data{
-		Summary: fmt.Sprintf("Value for %s updated", name),
-		Detail:  value,
-	})
-}
+//func (app *App) SaveSetting(name string, value string) {
+//	err := config.SetValueToPath(name, value)
+//	if err != nil {
+//		response.Error(response.Data{
+//			Summary: "Failed to set setting",
+//			Detail:  err.Error(),
+//		})
+//	}
+//
+//	response.Debug(response.Data{
+//		Summary: fmt.Sprintf("Value for %s updated", name),
+//		Detail:  value,
+//	})
+//}
 
 func (app *App) SelectDirectory(defaultDirectory string) string {
 	status.Set(status.Loading, "Selecting directory")

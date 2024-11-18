@@ -58,10 +58,6 @@ export function SaveCharacterVoices(arg1) {
   return window['go']['main']['App']['SaveCharacterVoices'](arg1);
 }
 
-export function SaveSetting(arg1, arg2) {
-  return window['go']['main']['App']['SaveSetting'](arg1, arg2);
-}
-
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }

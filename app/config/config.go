@@ -59,6 +59,9 @@ func GetConfigPath() string {
 		issue.Panic(err)
 	}
 
+	fmt.Println("manager.config.Info.Title")
+	fmt.Println(manager.config.Info.Title)
+
 	return filepath.Join(configDir, manager.config.Info.Title)
 }
 
@@ -91,14 +94,6 @@ func Import(jsonString string) error {
 	err = ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 	if err != nil {
 		return issue.Trace(err)
-	}
-
-	if manager.config.Settings.Debug {
-
-	}
-
-	if Debug() {
-		fmt.Println("Wrote new config to file: ", manager.filePath)
 	}
 
 	return nil
@@ -176,6 +171,7 @@ func GetValueFromPath(path string) (interface{}, error) {
 func Set(newConfig interface{}) error {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
+	fmt.Println("in config.Set()")
 
 	// Start the update process
 	err := updateStruct(reflect.ValueOf(&manager.config).Elem(), reflect.ValueOf(newConfig))
@@ -183,7 +179,12 @@ func Set(newConfig interface{}) error {
 		return err
 	}
 
-	return nil
+	updatedConfigs, err := json.Marshal(manager.config)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 }
 
 func SetValueToPath(path string, value string) error {
@@ -244,91 +245,3 @@ func SetValueToPath(path string, value string) error {
 
 	return issue.Trace(fmt.Errorf("path '%s' did not reach a field", path))
 }
-
-// Recursive function to update structs
-func updateStruct(dest, src reflect.Value) error {
-	if src.Kind() == reflect.Ptr {
-		src = src.Elem()
-	}
-	if src.Kind() != reflect.Struct {
-		return fmt.Errorf("Set expects a struct or a pointer to a struct")
-	}
-
-	srcType := src.Type()
-	for i := 0; i < src.NumField(); i++ {
-		srcField := src.Field(i)
-		srcFieldType := srcType.Field(i)
-
-		// Get the JSON tag or use the field name
-		jsonTag := srcFieldType.Tag.Get("json")
-		if jsonTag == "" {
-			jsonTag = srcFieldType.Name
-		}
-
-		// Find the corresponding field in dest by JSON tag
-		destField, found := findFieldByJSONTag(dest, jsonTag)
-		if !found {
-			continue // Field not found in destination; skip
-		}
-
-		if srcField.Kind() == reflect.Struct && destField.Kind() == reflect.Struct {
-			// Recursively update nested structs
-			err := updateStruct(destField, srcField)
-			if err != nil {
-				return err
-			}
-		} else {
-			// Only set non-zero values
-			if !isZeroValue(srcField) {
-				if destField.CanSet() {
-					destField.Set(srcField)
-				} else {
-					return fmt.Errorf("cannot set field %s", destField.Type().Name())
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// Helper function to find a field in dest by JSON tag
-func findFieldByJSONTag(dest reflect.Value, jsonTag string) (reflect.Value, bool) {
-	destType := dest.Type()
-	for i := 0; i < dest.NumField(); i++ {
-		field := dest.Field(i)
-		fieldType := destType.Field(i)
-		tag := fieldType.Tag.Get("json")
-		if tag == jsonTag {
-			return field, true
-		}
-	}
-	return reflect.Value{}, false
-}
-
-// Helper function to check if a value is zero
-func isZeroValue(v reflect.Value) bool {
-	zero := reflect.Zero(v.Type())
-	return reflect.DeepEqual(v.Interface(), zero.Interface())
-}
-
-//func SetSetting(name string, value Value) error {
-//	manager.lock.Lock()
-//	defer manager.lock.Unlock()
-//
-//	manager.config[name] = value
-//
-//	updatedConfigs, err := json.Marshal(manager.config)
-//	if err != nil {
-//		return err
-//	}
-//
-//	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
-//}
-//
-//func SetConfigString(name string, value string) error {
-//	return SetSetting(name, Value{String: &value})
-//}
-//
-//func SetConfigInt(name string, value int) error {
-//	return SetSetting(name, Value{Int: &value})
-//}

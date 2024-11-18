@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"nstudio/app/common/issue"
+	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 )
@@ -18,27 +18,33 @@ func FetchModels() (map[string]engine.Model, error) {
 		return make(map[string]engine.Model, 0), issue.Trace(fmt.Errorf("api key is empty"))
 	}
 
+	modelsMap := make(map[string]engine.Model)
+
 	client := &http.Client{}
 	defer client.CloseIdleConnections()
 
 	request, err := http.NewRequest("GET", "https://api.elevenlabs.io/v1/models", nil)
 	if err != nil {
-		return make(map[string]engine.Model, 0), issue.Trace(err)
+		return modelsMap, issue.Trace(err)
 	}
 	request.Header.Set("xi-api-key", apiKey)
 
-	response, err := client.Do(request)
+	httpResponse, err := client.Do(request)
 	if err != nil {
-		log.Fatalf("Failed to perform request: %v", err)
+		response.Error(response.Data{
+			Summary: "Failed to fetch elevenlabs models",
+			Detail:  err.Error(),
+		})
+		return modelsMap, issue.Trace(err)
 	}
-	defer response.Body.Close()
+	defer httpResponse.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(response.Body)
+	if httpResponse.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(httpResponse.Body)
 		return make(map[string]engine.Model, 0), issue.Trace(errors.New(string(bodyBytes)))
 	}
 
-	bodyBytes, err := io.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
 		return make(map[string]engine.Model, 0), issue.Trace(err)
 	}
@@ -49,7 +55,6 @@ func FetchModels() (map[string]engine.Model, error) {
 		return make(map[string]engine.Model, 0), issue.Trace(err)
 	}
 
-	modelsMap := make(map[string]engine.Model)
 	for _, m := range modelsResponse {
 		model := engine.Model{
 			ID:     m.ModelID,

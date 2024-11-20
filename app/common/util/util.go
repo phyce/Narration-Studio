@@ -28,7 +28,7 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 	//datePath := currentTime.Format("2006-01-02_15-04-05")
 	datePath := currentTime.Format("2006-01-02")
 
-	text := truncateString(message.Text, 20)
+	text := TruncateString(message.Text, 20)
 	text = strings.ReplaceAll(text, " ", "_")
 
 	filename := fmt.Sprintf("%d) %s-%s.wav", index, message.Character, text)
@@ -78,7 +78,7 @@ func InArray[T comparable](needle T, haystack []T) bool {
 	return false
 }
 
-func truncateString(str string, maxLength int) string {
+func TruncateString(str string, maxLength int) string {
 	if len(str) > maxLength {
 		return str[:maxLength]
 	}

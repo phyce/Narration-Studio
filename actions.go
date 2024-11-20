@@ -136,7 +136,7 @@ func (app *App) ProcessScript(script string) {
 			fileIndex.Timestamp(),
 		)
 
-		err = audio.CombineWavFiles(
+		err = audio.CombineWAVFiles(
 			outputPath,
 			"combined.wav",
 			time.Second,

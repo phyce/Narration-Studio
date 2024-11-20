@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"nstudio/app/common/eventManager"
+	"nstudio/app/common/issue"
 	"nstudio/app/config"
 )
 
@@ -61,7 +62,7 @@ func Error(data Data) error {
 	data.Severity = "issue"
 	data.Life = 25000
 	emitEvent("notification.send", data, true)
-	return errors.New(data.Summary)
+	return issue.Trace(errors.New(data.Summary))
 }
 
 func emitEvent(name string, data Data, log bool) {

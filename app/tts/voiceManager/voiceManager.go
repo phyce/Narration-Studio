@@ -76,10 +76,6 @@ func LoadCharacterVoices() {
 		panic("Failed to unmarshal voice config: " + err.Error())
 	}
 
-	fmt.Println("voices")
-	fmt.Println(voices)
-
-	//manager.CharacterVoices = voices
 	for _, voice := range voices {
 		manager.CharacterVoices[voice.Name] = voice
 	}

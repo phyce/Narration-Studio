@@ -1,21 +1,13 @@
 package openai
 
 import (
-	"bytes"
-	"github.com/go-audio/audio"
-	"github.com/go-audio/wav"
-	"github.com/gopxl/beep"
-	beepFlac "github.com/gopxl/beep/flac"
-	"github.com/gopxl/beep/speaker"
-	"github.com/mewkiz/flac"
-	"io"
+	"nstudio/app/common/audio"
 	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
-	"os"
 )
 
 type OpenAI struct {
@@ -68,7 +60,7 @@ func (openAI *OpenAI) Play(message util.CharacterMessage) error {
 		return issue.Trace(err)
 	}
 
-	err = playFLACAudioBytes(audioClip)
+	err = audio.PlayFLACAudioBytes(audioClip)
 	if err != nil {
 		return issue.Trace(err)
 	}
@@ -108,13 +100,13 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 			expandedPath,
 		)
 
-		err = saveWavFile(audioClip, filename)
+		err = audio.SaveFLACAsWAV(audioClip, filename)
 		if err != nil {
 			return issue.Trace(err)
 		}
 
 		if play {
-			err = playFLACAudioBytes(audioClip)
+			err = audio.PlayFLACAudioBytes(audioClip)
 			if err != nil {
 				return issue.Trace(err)
 			}
@@ -144,91 +136,6 @@ func (openAI *OpenAI) FetchModels() map[string]engine.Model {
 // </editor-fold>
 
 // <editor-fold desc="Other">
-func playFLACAudioBytes(audioClip []byte) error {
-	audioReader := io.NopCloser(bytes.NewReader(audioClip))
-
-	streamer, format, err := beepFlac.Decode(audioReader)
-	if err != nil {
-		return err
-	}
-	defer streamer.Close()
-
-	sampleRate := beep.SampleRate(48000)
-
-	//skipping, speaker already initialized, with:
-	/*
-		format := beep.Format{
-			SampleRate:  48000,
-			NumChannels: 1,
-			Precision:   2,
-		}
-	*/
-	//speaker.Init(sampleRate, sampleRate.N(time.Second/10))
-
-	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
-
-	done := make(chan bool)
-	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
-		done <- true
-	})))
-
-	<-done
-
-	return nil
-}
-
-func saveWavFile(flacData []byte, filename string) error {
-	// Create a bytes.Reader from the FLAC data
-	reader := bytes.NewReader(flacData)
-
-	// Decode the FLAC data
-	stream, err := flac.New(reader)
-	if err != nil {
-		return issue.Trace(err)
-	}
-
-	// Prepare an audio buffer
-	var buf audio.IntBuffer
-	buf.Format = &audio.Format{
-		NumChannels: int(stream.Info.NChannels),
-		SampleRate:  int(stream.Info.SampleRate),
-	}
-
-	for {
-		frame, err := stream.ParseNext()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return issue.Trace(err)
-		}
-		// Append the samples from each subframe to the buffer
-		for _, subframe := range frame.Subframes {
-			for _, sample := range subframe.Samples {
-				buf.Data = append(buf.Data, int(sample))
-			}
-		}
-	}
-
-	// Create the output WAV file
-	outFile, err := os.Create(filename)
-	if err != nil {
-		return issue.Trace(err)
-	}
-	defer outFile.Close()
-
-	// Encode the buffer as WAV
-	encoder := wav.NewEncoder(outFile, buf.Format.SampleRate, int(stream.Info.BitsPerSample), buf.Format.NumChannels, 1)
-	if err := encoder.Write(&buf); err != nil {
-		return issue.Trace(err)
-	}
-	if err := encoder.Close(); err != nil {
-		return issue.Trace(err)
-	}
-
-	return nil
-}
-
 func FetchModels() map[string]engine.Model {
 	return map[string]engine.Model{
 		"tts-1": {

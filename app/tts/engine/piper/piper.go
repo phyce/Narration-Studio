@@ -3,12 +3,10 @@ package piper
 import (
 	"bufio"
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/gopxl/beep"
-	"github.com/gopxl/beep/speaker"
 	"io"
+	"nstudio/app/common/audio"
 	"nstudio/app/common/issue"
 	"nstudio/app/common/process"
 	"nstudio/app/common/response"
@@ -52,35 +50,6 @@ func (ab *AudioBuffer) Reset() {
 
 //</editor-fold>
 
-type VoiceSynthesizer struct {
-	//modelsDirectory string
-	//piperPath       string
-	command   *exec.Cmd
-	stdin     io.WriteCloser
-	stderr    io.ReadCloser
-	stdout    io.ReadCloser
-	audioData *AudioBuffer
-	Voices    []engine.Voice
-}
-
-type PiperInput struct {
-	Text       string `json:"text"`
-	SpeakerID  int    `json:"speaker_id"`
-	OutputFile string `json:"output_file"`
-}
-
-type PiperInputLite struct {
-	Text      string `json:"text"`
-	SpeakerID int    `json:"speaker_id"`
-}
-
-type Piper struct {
-	models    map[string]VoiceSynthesizer
-	piperPath string
-	modelPath string
-	initOnce  sync.Once
-}
-
 // <editor-fold desc="Engine Interface">
 func (piper *Piper) Initialize() error {
 	var err error
@@ -104,7 +73,7 @@ func (piper *Piper) Initialize() error {
 		return issue.Trace(err)
 	}
 
-	piper.models = make(map[string]VoiceSynthesizer)
+	piper.models = make(map[string]PiperInstance)
 
 	return err
 }
@@ -129,9 +98,9 @@ func (piper *Piper) Start(modelName string) error {
 
 	onnxPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
 
-	cmdArgs := []string{"--model", onnxPath, "--json-input", "--output-raw"}
+	commandArguments := []string{"--model", onnxPath, "--json-input", "--output-raw"}
 
-	command := exec.Command(piper.piperPath, cmdArgs...)
+	command := exec.Command(piper.piperPath, commandArguments...)
 
 	response.Debug(response.Data{
 		Summary: fmt.Sprintf("Preparing command: %s %s",
@@ -140,7 +109,7 @@ func (piper *Piper) Start(modelName string) error {
 		),
 	})
 
-	instance := VoiceSynthesizer{
+	instance := PiperInstance{
 		command:   command,
 		audioData: &AudioBuffer{},
 		Voices:    voices,
@@ -184,41 +153,26 @@ func (piper *Piper) Stop(modelName string) error {
 		return nil
 	}
 
-	// Send interrupt signal to the process
 	if err := instance.command.Process.Signal(os.Interrupt); err != nil {
-		// If sending interrupt fails, attempt to kill the process
 		if killErr := instance.command.Process.Kill(); killErr != nil {
 			return issue.Trace(fmt.Errorf("failed to kill process for model %s: %v, original issue: %v", modelName, killErr, err))
 		}
 	}
 
-	// Wait for the process to exit
 	err := instance.command.Wait()
 
-	// Handle the issue returned by Wait()
 	if err != nil {
-		// Check if the issue is an ExitError
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			// Check if the process was terminated by a signal
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				if status.Signaled() && status.Signal() == os.Interrupt {
-					// Process exited due to os.Interrupt, which is expected
-					// Do not treat as an issue
-				} else {
-					// Process was terminated by a different signal or exited with a non-zero status
+				if !(status.Signaled() && status.Signal() == os.Interrupt) {
 					return issue.Trace(fmt.Errorf("process for model %s exited with signal: %v", modelName, status.Signal()))
 				}
-			} else {
-				// Unable to determine the exit status
-				return issue.Trace(fmt.Errorf("process for model %s exited with issue: %v", modelName, err))
 			}
-		} else {
-			// Some other issue occurred
-			return issue.Trace(fmt.Errorf("process for model %s exited with issue: %v", modelName, err))
 		}
+
+		return issue.Trace(fmt.Errorf("process for model %s exited with issue: %v", modelName, err))
 	}
 
-	// Close stdin, stdout, and stderr
 	if instance.stdin != nil {
 		if err := instance.stdin.Close(); err != nil {
 			return issue.Trace(fmt.Errorf("failed to close stdin for model %s: %v", modelName, err))
@@ -266,7 +220,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 		return issue.Trace(err)
 	}
 
-	playRawAudioBytes(audioClip)
+	audio.PlayRawAudioBytes(audioClip)
 	response.Debug(response.Data{
 		Summary: "Finshed playing audio for:" + message.Character,
 		Detail:  message.Text,
@@ -309,7 +263,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 		}
 
 		if play {
-			playRawAudioBytes(audioClip)
+			audio.PlayRawAudioBytes(audioClip)
 		}
 	}
 
@@ -321,6 +275,8 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 		if !config.GetEngineToggles()["piper"][model] {
 			return make([]byte, 0), issue.Trace(fmt.Errorf("Model is not enabled:" + model))
 		}
+
+		//no need to return, simply send error
 		issue.Trace(fmt.Errorf("Model is not running:" + model))
 
 		err := piper.Start(model)
@@ -378,7 +334,7 @@ func (piper *Piper) FetchModels() map[string]engine.Model {
 // </editor-fold>
 
 // <editor-fold desc="Other">
-func (piper *Piper) StartAudioCapture(instance VoiceSynthesizer) {
+func (piper *Piper) StartAudioCapture(instance PiperInstance) {
 	go func() {
 		_, err := io.Copy(instance.audioData, instance.stdout)
 		if err != nil {
@@ -409,37 +365,6 @@ func (piper *Piper) GetProcessID(modelName string) int {
 	}
 
 	return instance.command.Process.Pid
-}
-
-func playRawAudioBytes(audioClip []byte) {
-	done := make(chan struct{})
-	audioDataReader := bytes.NewReader(audioClip)
-
-	streamer := beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
-		for i := range samples {
-			if audioDataReader.Len() < 2 {
-				return i, false
-			}
-			var sample int16
-
-			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
-			if err != nil {
-				return i, false
-			}
-			flSample := float64(sample) / (1 << 15)
-			samples[i][0] = flSample
-			samples[i][1] = flSample
-		}
-		return len(samples), true
-	})
-
-	resampledStreamer := beep.Resample(4, 22050, 48000, streamer)
-
-	speaker.Play(beep.Seq(resampledStreamer, beep.Callback(func() {
-		close(done)
-	})))
-
-	<-done
 }
 
 func FetchModels() map[string]engine.Model {

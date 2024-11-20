@@ -1,17 +1,26 @@
 package audio
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
+	"github.com/gopxl/beep"
+	beepFlac "github.com/gopxl/beep/flac"
+	"github.com/gopxl/beep/speaker"
+	"github.com/mewkiz/flac"
+	"io"
+	"io/ioutil"
 	"nstudio/app/common/issue"
+	"nstudio/app/common/response"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
 )
 
-func CombineWavFiles(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate, numChannels, bitDepth int) error {
+func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate, channelCount, bitDepth int) error {
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return err
@@ -33,79 +42,77 @@ func CombineWavFiles(dirPath, outputFilename string, pauseDuration time.Duration
 	var combinedBuffer *audio.IntBuffer
 
 	silenceSamples := int(float64(pauseDuration.Seconds()) * float64(sampleRate))
-	silenceData := make([]int, silenceSamples*numChannels)
+	silenceData := make([]int, silenceSamples*channelCount)
 	silenceBuffer := &audio.IntBuffer{
 		Data: silenceData,
 		Format: &audio.Format{
-			NumChannels: numChannels,
+			NumChannels: channelCount,
 			SampleRate:  sampleRate,
 		},
 		SourceBitDepth: bitDepth,
 	}
 
-	for idx, wavPath := range wavFiles {
+	for index, wavPath := range wavFiles {
 		file, err := os.Open(wavPath)
 		if err != nil {
 			return err
 		}
 
 		decoder := wav.NewDecoder(file)
+		file.Close()
 		if !decoder.IsValidFile() {
-			file.Close()
 			return issue.Trace(fmt.Errorf("invalid WAV file: " + wavPath))
 		}
 
-		buf, err := decoder.FullPCMBuffer()
+		pcmBuffer, err := decoder.FullPCMBuffer()
 		if err != nil {
-			file.Close()
 			return err
 		}
-		file.Close()
 
-		if buf.Format.SampleRate != sampleRate {
-			buf, err = ResampleBuffer(buf, sampleRate)
+		if pcmBuffer.Format.SampleRate != sampleRate {
+			pcmBuffer, err = ResampleBuffer(pcmBuffer, sampleRate)
 			if err != nil {
 				return err
 			}
 		}
 
-		if buf.Format.NumChannels != numChannels {
-			buf, err = ChangeNumChannels(buf, numChannels)
+		if pcmBuffer.Format.NumChannels != channelCount {
+			pcmBuffer, err = ChangeChannelCount(pcmBuffer, channelCount)
 			if err != nil {
 				return err
 			}
 		}
 
-		if buf.SourceBitDepth != bitDepth {
-			buf, err = ChangeBitDepth(buf, bitDepth)
+		if pcmBuffer.SourceBitDepth != bitDepth {
+			pcmBuffer, err = ChangeBitDepth(pcmBuffer, bitDepth)
 			if err != nil {
 				return err
 			}
 		}
 
-		if idx == 0 {
+		if index == 0 {
 			combinedBuffer = &audio.IntBuffer{
 				Data:           []int{},
-				Format:         buf.Format,
-				SourceBitDepth: buf.SourceBitDepth,
+				Format:         pcmBuffer.Format,
+				SourceBitDepth: pcmBuffer.SourceBitDepth,
 			}
 		}
 
-		combinedBuffer.Data = append(combinedBuffer.Data, buf.Data...)
+		combinedBuffer.Data = append(combinedBuffer.Data, pcmBuffer.Data...)
 
-		if idx < len(wavFiles)-1 {
+		if index < len(wavFiles)-1 {
 			combinedBuffer.Data = append(combinedBuffer.Data, silenceBuffer.Data...)
 		}
 	}
 
 	outputPath := filepath.Join(dirPath, outputFilename)
-	outFile, err := os.Create(outputPath)
+	combinedFile, err := os.Create(outputPath)
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
+	defer combinedFile.Close()
 
-	encoder := wav.NewEncoder(outFile, sampleRate, bitDepth, numChannels, 1)
+	encoder := wav.NewEncoder(combinedFile, sampleRate, bitDepth, channelCount, 1)
 	err = encoder.Write(combinedBuffer)
 	if err != nil {
 		return err
@@ -119,60 +126,59 @@ func CombineWavFiles(dirPath, outputFilename string, pauseDuration time.Duration
 	return nil
 }
 
-func ResampleBuffer(buf *audio.IntBuffer, targetSampleRate int) (*audio.IntBuffer, error) {
-	srcSampleRate := buf.Format.SampleRate
-	if srcSampleRate == targetSampleRate {
-		return buf, nil
+func ResampleBuffer(buffer *audio.IntBuffer, targetSampleRate int) (*audio.IntBuffer, error) {
+	sourceSampleRate := buffer.Format.SampleRate
+	if sourceSampleRate == targetSampleRate {
+		return buffer, nil
 	}
 
-	resampleRatio := float64(targetSampleRate) / float64(srcSampleRate)
-	srcData := buf.Data
-	srcLength := len(srcData)
-	dstLength := int(float64(srcLength) * resampleRatio)
-	dstData := make([]int, dstLength)
+	resampleRatio := float64(targetSampleRate) / float64(sourceSampleRate)
+	sourceLength := len(buffer.Data)
+	outputLength := int(float64(sourceLength) * resampleRatio)
+	outputData := make([]int, outputLength)
 
-	for i := 0; i < dstLength; i++ {
-		srcPos := float64(i) / resampleRatio
-		srcIndex := int(srcPos)
-		if srcIndex >= srcLength-1 {
-			srcIndex = srcLength - 2
+	for i := 0; i < outputLength; i++ {
+		sourcePosition := float64(i) / resampleRatio
+		sourceIndex := int(sourcePosition)
+		if sourceIndex >= sourceLength-1 {
+			sourceIndex = sourceLength - 2
 		}
-		frac := srcPos - float64(srcIndex)
-		sample := int(float64(srcData[srcIndex])*(1-frac) + float64(srcData[srcIndex+1])*frac)
-		dstData[i] = sample
+		interpolationFraction := sourcePosition - float64(sourceIndex)
+		sample := int(float64(buffer.Data[sourceIndex])*(1-interpolationFraction) + float64(buffer.Data[sourceIndex+1])*interpolationFraction)
+		outputData[i] = sample
 	}
 
-	resampledBuf := &audio.IntBuffer{
-		Data:           dstData,
-		Format:         &audio.Format{SampleRate: targetSampleRate, NumChannels: buf.Format.NumChannels},
-		SourceBitDepth: buf.SourceBitDepth,
+	resampledBuffer := &audio.IntBuffer{
+		Data:           outputData,
+		Format:         &audio.Format{SampleRate: targetSampleRate, NumChannels: buffer.Format.NumChannels},
+		SourceBitDepth: buffer.SourceBitDepth,
 	}
-	return resampledBuf, nil
+	return resampledBuffer, nil
 }
 
-func ChangeNumChannels(buf *audio.IntBuffer, targetNumChannels int) (*audio.IntBuffer, error) {
-	srcNumChannels := buf.Format.NumChannels
-	if srcNumChannels == targetNumChannels {
-		return buf, nil
+func ChangeChannelCount(buffer *audio.IntBuffer, targetChannelCount int) (*audio.IntBuffer, error) {
+	sourceChannelCount := buffer.Format.NumChannels
+	if sourceChannelCount == targetChannelCount {
+		return buffer, nil
 	}
-	srcData := buf.Data
-	numSamples := len(srcData) / srcNumChannels
-	dstData := make([]int, numSamples*targetNumChannels)
+	sourceData := buffer.Data
+	sampleCount := len(sourceData) / sourceChannelCount
+	resultData := make([]int, sampleCount*targetChannelCount)
 
-	if targetNumChannels == 1 && srcNumChannels > 1 {
-		for i := 0; i < numSamples; i++ {
+	if targetChannelCount == 1 && sourceChannelCount > 1 {
+		for sampleIndex := 0; sampleIndex < sampleCount; sampleIndex++ {
 			sum := 0
-			for c := 0; c < srcNumChannels; c++ {
-				sum += srcData[i*srcNumChannels+c]
+			for channelIndex := 0; channelIndex < sourceChannelCount; channelIndex++ {
+				sum += sourceData[sampleIndex*sourceChannelCount+channelIndex]
 			}
-			avg := sum / srcNumChannels
-			dstData[i] = avg
+			avg := sum / sourceChannelCount
+			resultData[sampleIndex] = avg
 		}
-	} else if targetNumChannels > 1 && srcNumChannels == 1 {
-		for i := 0; i < numSamples; i++ {
-			sample := srcData[i]
-			for c := 0; c < targetNumChannels; c++ {
-				dstData[i*targetNumChannels+c] = sample
+	} else if targetChannelCount > 1 && sourceChannelCount == 1 {
+		for sampleIndex := 0; sampleIndex < sampleCount; sampleIndex++ {
+			sample := sourceData[sampleIndex]
+			for channelIndex := 0; channelIndex < targetChannelCount; channelIndex++ {
+				resultData[sampleIndex*targetChannelCount+channelIndex] = sample
 			}
 		}
 	} else {
@@ -180,34 +186,291 @@ func ChangeNumChannels(buf *audio.IntBuffer, targetNumChannels int) (*audio.IntB
 	}
 
 	convertedBuf := &audio.IntBuffer{
-		Data:           dstData,
-		Format:         &audio.Format{SampleRate: buf.Format.SampleRate, NumChannels: targetNumChannels},
-		SourceBitDepth: buf.SourceBitDepth,
+		Data:           resultData,
+		Format:         &audio.Format{SampleRate: buffer.Format.SampleRate, NumChannels: targetChannelCount},
+		SourceBitDepth: buffer.SourceBitDepth,
 	}
 	return convertedBuf, nil
 }
 
-func ChangeBitDepth(buf *audio.IntBuffer, targetBitDepth int) (*audio.IntBuffer, error) {
-	srcBitDepth := buf.SourceBitDepth
-	if srcBitDepth == targetBitDepth {
-		return buf, nil
+func ChangeBitDepth(buffer *audio.IntBuffer, targetBitDepth int) (*audio.IntBuffer, error) {
+	sourceBitDepth := buffer.SourceBitDepth
+	if sourceBitDepth == targetBitDepth {
+		return buffer, nil
 	}
 
-	srcData := buf.Data
-	dstData := make([]int, len(srcData))
+	sourceData := buffer.Data
+	resultData := make([]int, len(sourceData))
 
-	maxSrcValue := 1 << (srcBitDepth - 1)
-	maxDstValue := 1 << (targetBitDepth - 1)
+	maxSourceValue := 1 << (sourceBitDepth - 1)
+	maxResultValue := 1 << (targetBitDepth - 1)
 
-	for i, sample := range srcData {
-		scaledSample := sample * maxDstValue / maxSrcValue
-		dstData[i] = scaledSample
+	for index, sample := range sourceData {
+		scaledSample := sample * maxResultValue / maxSourceValue
+		resultData[index] = scaledSample
 	}
 
-	convertedBuf := &audio.IntBuffer{
-		Data:           dstData,
-		Format:         buf.Format,
+	convertedBuffer := &audio.IntBuffer{
+		Data:           resultData,
+		Format:         buffer.Format,
 		SourceBitDepth: targetBitDepth,
 	}
-	return convertedBuf, nil
+	return convertedBuffer, nil
+}
+
+func PlayPCMAudioBytes(audioClip []byte) error {
+	audioDataReader := bytes.NewReader(audioClip)
+
+	//TODO add ability to change format details
+	originalFormat := beep.Format{
+		SampleRate:  24000,
+		NumChannels: 1,
+		Precision:   2,
+	}
+
+	streamer := beep.StreamerFunc(func(samples [][2]float64) (processedSamples int, ok bool) {
+		for sampleIndex := range samples {
+			if audioDataReader.Len() < 2 {
+				return sampleIndex, false
+			}
+
+			var sample int16
+			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
+			if err != nil {
+				response.Error(response.Data{
+					Summary: "Error reading PCM data",
+					Detail:  err.Error(),
+				})
+				return sampleIndex, false
+			}
+
+			floatSample := float64(sample) / (1 << 15)
+
+			samples[sampleIndex][0] = floatSample
+			samples[sampleIndex][1] = floatSample
+
+			processedSamples++
+		}
+		return len(samples), true
+	})
+
+	resampler := beep.Resample(4, originalFormat.SampleRate, beep.SampleRate(48000), streamer)
+
+	done := make(chan bool)
+
+	speaker.Play(beep.Seq(resampler, beep.Callback(func() {
+		done <- true
+	})))
+
+	<-done
+
+	return nil
+}
+
+func SaveWAVFile(audioClip []byte, filename string) error {
+	sampleRate := 24000
+	channelCount := 1
+	bitDepth := 16
+	bytesPerSample := bitDepth / 8
+
+	sampleCount := len(audioClip) / bytesPerSample
+
+	buffer := &audio.IntBuffer{
+		Format: &audio.Format{
+			SampleRate:  sampleRate,
+			NumChannels: channelCount,
+		},
+		Data:           make([]int, sampleCount),
+		SourceBitDepth: bitDepth,
+	}
+
+	reader := bytes.NewReader(audioClip)
+	for i := 0; i < sampleCount; i++ {
+		var sample int16
+		if err := binary.Read(reader, binary.LittleEndian, &sample); err != nil {
+			return err
+		}
+		buffer.Data[i] = int(sample)
+	}
+
+	outputFile, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer outputFile.Close()
+
+	encoder := wav.NewEncoder(outputFile, buffer.Format.SampleRate, buffer.SourceBitDepth, buffer.Format.NumChannels, 1)
+	defer encoder.Close()
+
+	if err := encoder.Write(buffer); err != nil {
+		return err
+	}
+
+	if err := encoder.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
+	reader := bytes.NewReader(flacAudioClip)
+
+	stream, err := flac.New(reader)
+	if err != nil {
+		return issue.Trace(err)
+	}
+
+	var buffer audio.IntBuffer
+	buffer.Format = &audio.Format{
+		NumChannels: int(stream.Info.NChannels),
+		SampleRate:  int(stream.Info.SampleRate),
+	}
+
+	for {
+		frame, err := stream.ParseNext()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return issue.Trace(err)
+		}
+		for _, subframe := range frame.Subframes {
+			for _, sample := range subframe.Samples {
+				buffer.Data = append(buffer.Data, int(sample))
+			}
+		}
+	}
+
+	outputFile, err := os.Create(filename)
+	if err != nil {
+		return issue.Trace(err)
+	}
+	defer outputFile.Close()
+
+	encoder := wav.NewEncoder(outputFile, buffer.Format.SampleRate, int(stream.Info.BitsPerSample), buffer.Format.NumChannels, 1)
+	if err := encoder.Write(&buffer); err != nil {
+		return issue.Trace(err)
+	}
+	if err := encoder.Close(); err != nil {
+		return issue.Trace(err)
+	}
+
+	return nil
+}
+
+func PlayFLACAudioBytes(audioClip []byte) error {
+	audioReader := io.NopCloser(bytes.NewReader(audioClip))
+
+	streamer, format, err := beepFlac.Decode(audioReader)
+	if err != nil {
+		return err
+	}
+	defer streamer.Close()
+
+	sampleRate := beep.SampleRate(48000)
+
+	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
+
+	done := make(chan bool)
+	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
+		done <- true
+	})))
+
+	<-done
+
+	return nil
+}
+
+func PlayRawAudioBytes(audioClip []byte) {
+	done := make(chan struct{})
+	audioDataReader := bytes.NewReader(audioClip)
+
+	streamer := beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
+		for i := range samples {
+			if audioDataReader.Len() < 2 {
+				return i, false
+			}
+			var sample int16
+
+			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
+			if err != nil {
+				return i, false
+			}
+			flSample := float64(sample) / (1 << 15)
+			samples[i][0] = flSample
+			samples[i][1] = flSample
+		}
+		return len(samples), true
+	})
+
+	resampledStreamer := beep.Resample(4, 22050, 48000, streamer)
+
+	speaker.Play(beep.Seq(resampledStreamer, beep.Callback(func() {
+		close(done)
+	})))
+
+	<-done
+}
+
+func ConvertPCMtoWAV(inputPath, outputPath string, sampleRate, channelCount, bitDepth int) error {
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	var intData []int
+	switch bitDepth {
+	case 16:
+		sampleCount := len(data) / 2
+		intData = make([]int, sampleCount)
+		for i := 0; i < sampleCount; i++ {
+			sampleBytes := data[i*2 : i*2+2]
+			sample := int16(binary.LittleEndian.Uint16(sampleBytes))
+			intData[i] = int(sample)
+		}
+	case 8:
+		sampleCount := len(data)
+		intData = make([]int, sampleCount)
+		for i := 0; i < sampleCount; i++ {
+			sample := int8(data[i])
+			intData[i] = int(sample)
+		}
+	default:
+		return fmt.Errorf("unsupported bit depth: %d", bitDepth)
+	}
+
+	buffer := &audio.IntBuffer{
+		Data: intData,
+		Format: &audio.Format{
+			NumChannels: channelCount,
+			SampleRate:  sampleRate,
+		},
+		SourceBitDepth: bitDepth,
+	}
+
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	encoder := wav.NewEncoder(outFile, sampleRate, bitDepth, channelCount, 1)
+	err = encoder.Write(buffer)
+	if err != nil {
+		return err
+	}
+
+	err = encoder.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -22,7 +22,7 @@ func init() {
 
 func Initialize(info Info) error {
 	manager.config.Info = info
-	manager.filePath = filepath.Join(GetConfigPath(), "narrator-studio-config.json")
+	manager.filePath = filepath.Join(GetConfigPath(), "config.json")
 
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
@@ -58,9 +58,6 @@ func GetConfigPath() string {
 	if err != nil {
 		issue.Panic(err)
 	}
-
-	fmt.Println("manager.config.Info.Title")
-	fmt.Println(manager.config.Info.Title)
 
 	return filepath.Join(configDir, manager.config.Info.Title)
 }

@@ -16,8 +16,7 @@ const config = reactive<configBase>({} as configBase);
 const loading = ref<boolean>(true);
 
 function handleSaveSettings() {
-	console.log(config.settings.outputType);
-	// SaveSettings(JSON.stringify(config));
+	SaveSettings(config);
 }
 
 onBeforeMount( async () => {

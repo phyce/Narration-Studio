@@ -11,7 +11,6 @@ import (
 	"github.com/gopxl/beep/speaker"
 	"github.com/mewkiz/flac"
 	"io"
-	"io/ioutil"
 	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"os"
@@ -21,20 +20,12 @@ import (
 )
 
 func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate, channelCount, bitDepth int) error {
-	files, err := os.ReadDir(dirPath)
+	wavFiles, err := filepath.Glob(filepath.Join(dirPath, "*.wav"))
 	if err != nil {
-		return err
+		return issue.Trace(fmt.Errorf("failed to list WAV files: %v", err))
 	}
-
-	var wavFiles []string
-	for _, file := range files {
-		if !file.IsDir() && filepath.Ext(file.Name()) == ".wav" {
-			wavFiles = append(wavFiles, filepath.Join(dirPath, file.Name()))
-		}
-	}
-
 	if len(wavFiles) == 0 {
-		return issue.Trace(fmt.Errorf("no WAV files found in directory"))
+		return issue.Trace(fmt.Errorf("no WAV files found in the directory"))
 	}
 
 	sort.Strings(wavFiles)
@@ -54,39 +45,39 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 
 	for index, wavPath := range wavFiles {
 		file, err := os.Open(wavPath)
+		defer file.Close()
 		if err != nil {
 			return err
 		}
 
 		decoder := wav.NewDecoder(file)
-		file.Close()
 		if !decoder.IsValidFile() {
 			return issue.Trace(fmt.Errorf("invalid WAV file: " + wavPath))
 		}
 
 		pcmBuffer, err := decoder.FullPCMBuffer()
 		if err != nil {
-			return err
+			return issue.Trace(err)
 		}
 
 		if pcmBuffer.Format.SampleRate != sampleRate {
 			pcmBuffer, err = ResampleBuffer(pcmBuffer, sampleRate)
 			if err != nil {
-				return err
+				issue.Trace(err)
 			}
 		}
 
 		if pcmBuffer.Format.NumChannels != channelCount {
 			pcmBuffer, err = ChangeChannelCount(pcmBuffer, channelCount)
 			if err != nil {
-				return err
+				issue.Trace(err)
 			}
 		}
 
 		if pcmBuffer.SourceBitDepth != bitDepth {
 			pcmBuffer, err = ChangeBitDepth(pcmBuffer, bitDepth)
 			if err != nil {
-				return err
+				issue.Trace(err)
 			}
 		}
 
@@ -108,19 +99,19 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 	outputPath := filepath.Join(dirPath, outputFilename)
 	combinedFile, err := os.Create(outputPath)
 	if err != nil {
-		return err
+		issue.Trace(err)
 	}
 	defer combinedFile.Close()
 
 	encoder := wav.NewEncoder(combinedFile, sampleRate, bitDepth, channelCount, 1)
 	err = encoder.Write(combinedBuffer)
 	if err != nil {
-		return err
+		issue.Trace(err)
 	}
 
 	err = encoder.Close()
 	if err != nil {
-		return err
+		issue.Trace(err)
 	}
 
 	return nil
@@ -411,66 +402,4 @@ func PlayRawAudioBytes(audioClip []byte) {
 	})))
 
 	<-done
-}
-
-func ConvertPCMtoWAV(inputPath, outputPath string, sampleRate, channelCount, bitDepth int) error {
-	file, err := os.Open(inputPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	var intData []int
-	switch bitDepth {
-	case 16:
-		sampleCount := len(data) / 2
-		intData = make([]int, sampleCount)
-		for i := 0; i < sampleCount; i++ {
-			sampleBytes := data[i*2 : i*2+2]
-			sample := int16(binary.LittleEndian.Uint16(sampleBytes))
-			intData[i] = int(sample)
-		}
-	case 8:
-		sampleCount := len(data)
-		intData = make([]int, sampleCount)
-		for i := 0; i < sampleCount; i++ {
-			sample := int8(data[i])
-			intData[i] = int(sample)
-		}
-	default:
-		return fmt.Errorf("unsupported bit depth: %d", bitDepth)
-	}
-
-	buffer := &audio.IntBuffer{
-		Data: intData,
-		Format: &audio.Format{
-			NumChannels: channelCount,
-			SampleRate:  sampleRate,
-		},
-		SourceBitDepth: bitDepth,
-	}
-
-	outFile, err := os.Create(outputPath)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
-
-	encoder := wav.NewEncoder(outFile, sampleRate, bitDepth, channelCount, 1)
-	err = encoder.Write(buffer)
-	if err != nil {
-		return err
-	}
-
-	err = encoder.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

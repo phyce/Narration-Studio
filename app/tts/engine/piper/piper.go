@@ -241,14 +241,16 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 	for _, message := range messages {
 		speakerID, _ := strconv.Atoi(message.Voice.Voice)
 
+		outputFilename := util.GenerateFilename(
+			message,
+			fileIndex.Get(),
+			outputPath,
+		)
+
 		input := PiperInput{
-			Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
-			SpeakerID: speakerID,
-			OutputFile: util.GenerateFilename(
-				message,
-				fileIndex.Get(),
-				outputPath,
-			),
+			Text:       strings.ReplaceAll(message.Text, `"`, `\"`),
+			SpeakerID:  speakerID,
+			OutputFile: outputFilename,
 		}
 
 		jsonBytes, err := json.Marshal(input)

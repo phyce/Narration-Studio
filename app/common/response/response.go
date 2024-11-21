@@ -59,8 +59,8 @@ func Warning(data Data) error {
 }
 
 func Error(data Data) error {
-	data.Severity = "issue"
-	data.Life = 25000
+	data.Severity = "error"
+	data.Life = 50000
 	emitEvent("notification.send", data, true)
 	return issue.Trace(errors.New(data.Summary))
 }

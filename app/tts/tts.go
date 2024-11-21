@@ -21,9 +21,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool) error {
 
 		engine, ok := voiceManager.GetEngine(voice.Engine)
 		if !ok {
-			return issue.Trace(
-				fmt.Errorf("Failed to retrieve engine: %s", voice.Engine),
-			)
+			return issue.Trace(fmt.Errorf("Failed to retrieve engine: %s", voice.Engine))
 		}
 
 		message.Voice = voice

@@ -17,7 +17,7 @@ var once sync.Once
 func Info() config.Info {
 	once.Do(func() {
 		if err := json.Unmarshal(wailsJSON, &info); err != nil {
-			issue.Panic(err)
+			issue.Panic("Failed to read app info", err)
 		}
 	})
 

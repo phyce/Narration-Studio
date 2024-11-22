@@ -6,6 +6,7 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/eventManager"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
 	"nstudio/app/common/util"
@@ -409,7 +410,7 @@ func (app *App) GetStatus() string {
 
 	jsonData, err := json.Marshal(status)
 	if err != nil {
-		panic(err)
+		issue.Panic("GetStatus failed: ", err)
 	}
 
 	return string(jsonData)

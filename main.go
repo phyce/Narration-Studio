@@ -2,10 +2,10 @@ package main
 
 import (
 	"embed"
-	"github.com/ncruces/zenity"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
@@ -23,11 +23,7 @@ func main() {
 
 	err := config.Initialize(Info())
 	if err != nil {
-		showErrorDialog(
-			"Failed to initialize config config",
-			err.Error(),
-		)
-		panic(err)
+		issue.Panic("Failed to initialize config", err)
 	}
 
 	voiceManager.Initialize()
@@ -52,11 +48,7 @@ func main() {
 	})
 
 	if err != nil {
-		showErrorDialog(
-			"Failed to start Narrator Studio",
-			err.Error(),
-		)
-		println("Error:", err.Error())
+		issue.Panic("Failed to start app", err)
 	}
 }
 
@@ -90,11 +82,4 @@ func registerEngines() {
 		Models: models,
 	}
 	voiceManager.RegisterEngine(elevenLabsEngine)
-}
-
-func showErrorDialog(title, message string) {
-	err := zenity.Error(message, zenity.Title(title))
-	if err != nil {
-		panic("Failed to show issue dialog: " + err.Error())
-	}
 }

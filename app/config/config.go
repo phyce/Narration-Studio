@@ -56,7 +56,7 @@ func Initialize(info Info) error {
 func GetConfigPath() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		issue.Panic(err)
+		issue.Panic("Failed to get user config directory", err)
 	}
 
 	return filepath.Join(configDir, manager.config.Info.Title)

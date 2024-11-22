@@ -2,6 +2,7 @@ package issue
 
 import (
 	"fmt"
+	"github.com/ncruces/zenity"
 	"runtime"
 	"strings"
 )
@@ -24,10 +25,14 @@ func Trace(err error) error {
 	return result
 }
 
-func Panic(err error) {
+func Panic(message string, err error) {
 	/*
 		Add some form of crash dump/log
 	*/
+	showErrorDialog(
+		message,
+		err.Error(),
+	)
 	panic(Trace(err))
 }
 
@@ -40,4 +45,11 @@ func shortFileName(fullPath string) string {
 		return fullPath
 	}
 	return fullPath[lastSlash+1:]
+}
+
+func showErrorDialog(title, message string) {
+	err := zenity.Error(message, zenity.Title(title))
+	if err != nil {
+		panic(err)
+	}
 }

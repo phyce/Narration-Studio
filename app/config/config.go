@@ -165,16 +165,11 @@ func GetValueFromPath(path string) (interface{}, error) {
 	return current.Interface(), nil
 }
 
-func Set(newConfig interface{}) error {
+func Set(newConfig Base) error {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
-	fmt.Println("in config.Set()")
 
-	// Start the update process
-	err := updateStruct(reflect.ValueOf(&manager.config).Elem(), reflect.ValueOf(newConfig))
-	if err != nil {
-		return err
-	}
+	manager.config = newConfig
 
 	updatedConfigs, err := json.Marshal(manager.config)
 	if err != nil {

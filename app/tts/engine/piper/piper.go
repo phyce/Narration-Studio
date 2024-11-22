@@ -82,7 +82,11 @@ func (piper *Piper) Start(modelName string) error {
 	var err error
 	modelProcessID := piper.GetProcessID(modelName)
 	if modelProcessID > 0 {
-		return issue.Trace(fmt.Errorf("Piper:Start:modelName[%s] already exists. PID: ", modelName, modelProcessID))
+		response.Debug(response.Data{
+			Summary: "Piper model '%s' already exists. " + modelName,
+			Detail:  fmt.Sprintf("PID: %d", modelProcessID),
+		})
+		return nil
 	}
 
 	metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))

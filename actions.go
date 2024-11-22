@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/eventManager"
@@ -199,9 +198,6 @@ func (app *App) GetCharacterVoices() string {
 		})
 	}
 
-	fmt.Println("string(voicesJSON)")
-	fmt.Println(string(voicesJSON))
-
 	status.Set(status.Ready, "")
 	return string(voicesJSON)
 }
@@ -298,21 +294,6 @@ func (app *App) SaveSettings(settings config.Base) {
 	}
 	status.Set(status.Ready, "")
 }
-
-//func (app *App) SaveSetting(name string, value string) {
-//	err := config.SetValueToPath(name, value)
-//	if err != nil {
-//		response.Error(response.Data{
-//			Summary: "Failed to set setting",
-//			Detail:  err.Error(),
-//		})
-//	}
-//
-//	response.Debug(response.Data{
-//		Summary: fmt.Sprintf("Value for %s updated", name),
-//		Detail:  value,
-//	})
-//}
 
 func (app *App) SelectDirectory(defaultDirectory string) string {
 	status.Set(status.Loading, "Selecting directory")

@@ -66,7 +66,9 @@ func Error(data Data) error {
 }
 
 func emitEvent(name string, data Data, log bool) {
-	fmt.Println(data.Severity+": ", data.Summary, data.Detail)
+	if config.Debug() {
+		fmt.Println(fmt.Sprintf("event: %s - %s - %s ", data.Severity, data.Summary, data.Detail))
+	}
 	if notificationEnabled {
 		eventManager.GetInstance().EmitEvent(name, data)
 	}

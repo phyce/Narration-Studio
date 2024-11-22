@@ -17,15 +17,12 @@ const config = reactive<configBase>({} as configBase);
 const loading = ref<boolean>(true);
 
 function handleSaveSettings() {
-	console.log(config.settings);
 	SaveSettings(config);
 }
 
 onBeforeMount( async () => {
 	Object.assign(config, await GetSettings());
 	loading.value = false;
-	console.log("config.value");
-	console.log(config);
 })
 </script>
 

@@ -56,7 +56,6 @@ func LoadCharacterVoices() {
 	voiceConfigPath := filepath.Join(config.GetConfigPath(), "voiceConfig.json")
 
 	file, err := os.ReadFile(voiceConfigPath)
-	fmt.Println(string(file))
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -85,8 +84,6 @@ func LoadCharacterVoices() {
 func SaveCharacterVoices(data string) error {
 	manager.Lock()
 	defer manager.Unlock()
-
-	fmt.Println()
 
 	var newVoices map[string]util.CharacterVoice
 	err := json.Unmarshal([]byte(data), &newVoices)

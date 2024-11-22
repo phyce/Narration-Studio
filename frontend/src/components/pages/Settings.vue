@@ -3,6 +3,7 @@ import '../../css/pages/settings.css';
 
 import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
+import InputSwitch from 'primevue/inputswitch';
 import InputGroupAddon from "primevue/inputgroupaddon";
 import Button from "primevue/button";
 import Dropdown from "primevue/dropdown";
@@ -16,6 +17,7 @@ const config = reactive<configBase>({} as configBase);
 const loading = ref<boolean>(true);
 
 function handleSaveSettings() {
+	console.log(config.settings);
 	SaveSettings(config);
 }
 
@@ -23,8 +25,7 @@ onBeforeMount( async () => {
 	Object.assign(config, await GetSettings());
 	loading.value = false;
 	console.log("config.value");
-	console.log(config.engine.local.piper.directory);
-	console.log(config.engine.api.elevenLabs.apiKey);
+	console.log(config);
 })
 </script>
 
@@ -39,12 +40,22 @@ onBeforeMount( async () => {
 				<i class="pi pi-save"/>&nbsp;
 				Save Settings
 			</Button>
+			<div class="settings_actions_debug">
+				<InputSwitch
+					v-model="config.settings.debug"
+					:true-value="true"
+					:false-value="false"
+				/>
+				<label class="checkbox-label" for="overrideVoices">
+					Debug Mode
+				</label>
+			</div>
 		</div>
 		<div class="settings__container" v-if="!loading">
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">Piper path</InputGroupAddon>
 				<InputText class="input-group__input"
-						   :value="config.engine.local.piper.directory"
+						   v-model="config.engine.local.piper.directory"
 						   placeholder="Select a directory"
 						   disabled
 				/>
@@ -55,7 +66,7 @@ onBeforeMount( async () => {
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">Models directory</InputGroupAddon>
 				<InputText class="input-group__input"
-						   :value="config.engine.local.piper.modelsDirectory"
+						   v-model="config.engine.local.piper.modelsDirectory"
 						   placeholder="Output Path"
 						   disabled
 				/>

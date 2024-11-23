@@ -55,20 +55,20 @@ func (piper *Piper) Initialize() error {
 	var err error
 	settings := config.GetEngine().Local.Piper
 
-	if settings.Path == "" {
-		return issue.Trace(fmt.Errorf("piper executable path is empty"))
+	if settings.Location == "" {
+		return issue.Trace(fmt.Errorf("Piper executable location is not set"))
 	}
 
-	err, piper.piperPath = util.ExpandPath(settings.Path)
+	err, piper.piperPath = util.ExpandPath(settings.Location)
 	if err != nil {
 		return issue.Trace(err)
 	}
 
-	if settings.ModelsPath == "" {
-		return issue.Trace(fmt.Errorf("Piper:Initialize:modelPathValue: is nil"))
+	if settings.ModelsDirectory == "" {
+		return issue.Trace(fmt.Errorf("Piper model location is not set"))
 	}
 
-	err, piper.modelPath = util.ExpandPath(settings.ModelsPath)
+	err, piper.modelPath = util.ExpandPath(settings.ModelsDirectory)
 	if err != nil {
 		return issue.Trace(err)
 	}
@@ -90,6 +90,11 @@ func (piper *Piper) Start(modelName string) error {
 	}
 
 	metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
+	response.Debug(response.Data{
+		Summary: "Metadata for Model:" + modelName,
+		Detail:  metadataPath,
+	})
+
 	data, err := os.ReadFile(metadataPath)
 	if err != nil {
 		return issue.Trace(err)

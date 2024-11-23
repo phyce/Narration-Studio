@@ -7,8 +7,13 @@
 	"engine": {
 		"local": {
 			"piper": {
-				"directory": "C:\\piper\\piper.exe",
-				"modelsDirectory": "C:\\piper\\models"
+				"location": "",
+				"modelsDirectory": ""
+			},
+			"msSapi4": {
+				"location": "",
+				"pitch": 150,
+				"speed": 100
 			}
 		},
 		"api": {

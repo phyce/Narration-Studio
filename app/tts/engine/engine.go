@@ -13,6 +13,8 @@ type Base interface {
 	Stop(modelName string) error
 	Play(message util.CharacterMessage) error
 	Save(messages []util.CharacterMessage, play bool) error
+
+	//TODO Maybe remove Generate() from Base? this is only used by Play and Save
 	Generate(model string, payload []byte) ([]byte, error)
 	GetVoices(model string) ([]Voice, error)
 	FetchModels() map[string]Model

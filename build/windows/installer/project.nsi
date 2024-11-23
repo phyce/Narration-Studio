@@ -106,10 +106,8 @@ SectionEnd
 Section "Piper" SEC_PIPER
     DetailPrint "Installing Piper..."
 
-    ; Set the output path to the 'engines\piper' directory within the installation directory.
     SetOutPath "$INSTDIR\engines\piper"
 
-    ; Include the 'piper' folder and its contents.
     File /r "engines\piper\*"
 SectionEnd
 
@@ -118,13 +116,11 @@ Section "Microsoft Speech API 4" SEC_MSAPI4
 
     InitPluginsDir
 
-    ; Include the installer files in the installer package.
     File /oname=$PLUGINSDIR\SAPI4SDK.exe "engines\mssapi4\SAPI4SDK.exe"
     File /oname=$PLUGINSDIR\spchapi.exe "engines\mssapi4\spchapi.exe"
     File /oname=$PLUGINSDIR\msttsl.exe "engines\mssapi4\msttsl.exe"
     File /oname=$PLUGINSDIR\tv_enua.exe "engines\mssapi4\tv_enua.exe"
 
-    ; Execute the installers in order, waiting for each to complete.
     DetailPrint "Installing SAPI4 SDK..."
     ExecWait '"$PLUGINSDIR\SAPI4SDK.exe"'
 
@@ -142,6 +138,10 @@ Section "Microsoft Speech API 4" SEC_MSAPI4
     Delete "$PLUGINSDIR\spchapi.exe"
     Delete "$PLUGINSDIR\msttsl.exe"
     Delete "$PLUGINSDIR\tv_enua.exe"
+
+    SetOutPath "$INSTDIR\engines\mssapi4"
+
+    File /r "engines\mssapi4\sapi4out"
 SectionEnd
 
 Section "Uninstall"

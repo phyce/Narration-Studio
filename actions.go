@@ -316,7 +316,7 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 		app.context,
 		wailsRuntime.OpenDialogOptions{
 			DefaultDirectory: fullPath,
-			Title:            "Select Directory",
+			Title:            "Select Location",
 		},
 	)
 
@@ -328,7 +328,7 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 	} else {
 		if directory != "" {
 			response.Success(response.Data{
-				Summary: "Directory changed",
+				Summary: "Location changed",
 			})
 		} else {
 			directory = defaultDirectory

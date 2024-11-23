@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"nstudio/app/common/issue"
 	"nstudio/app/config"
+	"runtime"
 	"sync"
 )
 
@@ -20,6 +21,8 @@ func Info() config.Info {
 			issue.Panic("Failed to read app info", err)
 		}
 	})
+
+	info.OS = runtime.GOOS
 
 	return info
 }

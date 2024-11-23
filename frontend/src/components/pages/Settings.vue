@@ -21,9 +21,9 @@ function handleSaveSettings() {
 }
 
 const handlePiperEngineLocationSelect = async () => {
-	const result = await SelectFile(config.engine.local.piper.directory as string);
-	if (result.length > 0 && config.engine.local.piper.directory != result) {
-		config.engine.local.piper.directory =  result;
+	const result = await SelectFile(config.engine.local.piper.location as string);
+	if (result.length > 0 && config.engine.local.piper.location != result) {
+		config.engine.local.piper.location =  result;
 	}
 };
 
@@ -31,6 +31,13 @@ const handlePiperModelLocationSelect = async () => {
 	const result = await SelectDirectory(config.engine.local.piper.modelsDirectory as string);
 	if (result.length > 0 && config.engine.local.piper.modelsDirectory != result) {
 		config.engine.local.piper.modelsDirectory =  result;
+	}
+}
+
+const handleMssapi4EngineLocationSelect = async() => {
+	const result = await SelectFile(config.engine.local.msSapi4.location as string);
+	if (result.length > 0 && config.engine.local.msSapi4.location != result) {
+		config.engine.local.msSapi4.location =  result;
 	}
 }
 
@@ -66,7 +73,7 @@ onBeforeMount( async () => {
 			<InputGroup class="input-group">
 				<InputGroupAddon class="input-group__addon">Piper path</InputGroupAddon>
 				<InputText class="input-group__input"
-						   v-model="config.engine.local.piper.directory"
+						   v-model="config.engine.local.piper.location"
 						   placeholder="Select a directory"
 						   disabled
 				/>
@@ -79,7 +86,7 @@ onBeforeMount( async () => {
 				</Button>
 			</InputGroup>
 			<InputGroup class="input-group">
-				<InputGroupAddon class="input-group__addon">Models directory</InputGroupAddon>
+				<InputGroupAddon class="input-group__addon">Piper Models directory</InputGroupAddon>
 				<InputText class="input-group__input"
 						   v-model="config.engine.local.piper.modelsDirectory"
 						   placeholder="Output Path"
@@ -89,6 +96,21 @@ onBeforeMount( async () => {
 						title="Browse"
 						aria-label="Browse"
 						@click="handlePiperModelLocationSelect"
+				>
+					<i class="pi pi-folder-open"/>
+				</Button>
+			</InputGroup>
+			<InputGroup class="input-group" v-if="config.info.os == 'windows'">
+				<InputGroupAddon class="input-group__addon">Microsoft Speech API 4 sapi4out.exe</InputGroupAddon>
+				<InputText class="input-group__input"
+						   v-model="config.engine.local.msSapi4.location"
+						   placeholder="Select a directory"
+						   disabled
+				/>
+				<Button class="input-group__button"
+						title="Browse"
+						aria-label="Browse"
+						@click="handleMssapi4EngineLocationSelect"
 				>
 					<i class="pi pi-folder-open"/>
 				</Button>

@@ -10,9 +10,11 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/elevenlabs"
+	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/voiceManager"
+	"runtime"
 )
 
 //go:embed all:frontend/dist
@@ -67,7 +69,10 @@ func registerEngines() {
 		Engine: &piper.Piper{},
 		Models: piper.FetchModels(),
 	}
-	voiceManager.RegisterEngine(piperEngine)
+	err := voiceManager.RegisterEngine(piperEngine)
+	if err != nil {
+		issue.Trace(err)
+	}
 
 	openAIEngine := engine.Engine{
 		ID:     "openai",
@@ -75,7 +80,10 @@ func registerEngines() {
 		Engine: &openai.OpenAI{},
 		Models: openai.FetchModels(),
 	}
-	voiceManager.RegisterEngine(openAIEngine)
+	err = voiceManager.RegisterEngine(openAIEngine)
+	if err != nil {
+		issue.Trace(err)
+	}
 
 	models, err := elevenlabs.FetchModels()
 	if err != nil {
@@ -88,5 +96,22 @@ func registerEngines() {
 		Engine: &elevenlabs.ElevenLabs{},
 		Models: models,
 	}
-	voiceManager.RegisterEngine(elevenLabsEngine)
+	err = voiceManager.RegisterEngine(elevenLabsEngine)
+	if err != nil {
+		issue.Trace(err)
+	}
+
+	if runtime.GOOS == "windows" {
+		msSapi4Engine := engine.Engine{
+			ID:     "mssapi4",
+			Name:   "Microsoft SAPI4",
+			Engine: &mssapi4.MsSapi4{},
+		}
+		err = voiceManager.RegisterEngine(msSapi4Engine)
+		if err != nil {
+			issue.Trace(err)
+		}
+	}
+
+	voiceManager.ReloadModels()
 }

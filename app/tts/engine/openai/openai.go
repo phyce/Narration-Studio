@@ -16,12 +16,12 @@ type OpenAI struct {
 }
 
 var voices = []engine.Voice{
-	engine.Voice{ID: "alloy", Name: "Alloy", Gender: ""},
-	engine.Voice{ID: "echo", Name: "Echo", Gender: ""},
-	engine.Voice{ID: "fable", Name: "Fable", Gender: ""},
-	engine.Voice{ID: "onyx", Name: "Onyx", Gender: ""},
-	engine.Voice{ID: "nova", Name: "Nova", Gender: ""},
-	engine.Voice{ID: "shimmer", Name: "Shimmer", Gender: ""},
+	{ID: "alloy", Name: "Alloy", Gender: ""},
+	{ID: "echo", Name: "Echo", Gender: ""},
+	{ID: "fable", Name: "Fable", Gender: ""},
+	{ID: "onyx", Name: "Onyx", Gender: ""},
+	{ID: "nova", Name: "Nova", Gender: ""},
+	{ID: "shimmer", Name: "Shimmer", Gender: ""},
 }
 
 // <editor-fold desc="Engine Interface">

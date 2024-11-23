@@ -64,6 +64,7 @@ export namespace config {
 	    name: string;
 	    version: string;
 	    website: string;
+	    os: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
@@ -74,10 +75,27 @@ export namespace config {
 	        this.name = source["name"];
 	        this.version = source["version"];
 	        this.website = source["website"];
+	        this.os = source["os"];
+	    }
+	}
+	export class MsSapi4 {
+	    location: string;
+	    pitch: number;
+	    speed: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MsSapi4(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.location = source["location"];
+	        this.pitch = source["pitch"];
+	        this.speed = source["speed"];
 	    }
 	}
 	export class Piper {
-	    directory: string;
+	    location: string;
 	    modelsDirectory: string;
 	
 	    static createFrom(source: any = {}) {
@@ -86,12 +104,13 @@ export namespace config {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.directory = source["directory"];
+	        this.location = source["location"];
 	        this.modelsDirectory = source["modelsDirectory"];
 	    }
 	}
 	export class Local {
 	    piper: Piper;
+	    msSapi4: MsSapi4;
 	
 	    static createFrom(source: any = {}) {
 	        return new Local(source);
@@ -100,6 +119,7 @@ export namespace config {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.piper = this.convertValues(source["piper"], Piper);
+	        this.msSapi4 = this.convertValues(source["msSapi4"], MsSapi4);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -204,6 +224,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 	
 	
 	

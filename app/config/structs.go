@@ -32,12 +32,19 @@ type Engine struct {
 }
 
 type Local struct {
-	Piper Piper `json:"piper"`
+	Piper   Piper   `json:"piper"`
+	MsSapi4 MsSapi4 `json:"msSapi4"`
 }
 
 type Piper struct {
-	Path       string `json:"directory"`
-	ModelsPath string `json:"modelsDirectory"`
+	Location        string `json:"location"`
+	ModelsDirectory string `json:"modelsDirectory"`
+}
+
+type MsSapi4 struct {
+	Location string `json:"location"`
+	Pitch    int    `json:"pitch"`
+	Speed    int    `json:"speed"`
 }
 
 type Api struct {
@@ -59,6 +66,7 @@ type Info struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	Website string `json:"website"`
+	OS      string `json:"os"`
 }
 
 //</Config File>

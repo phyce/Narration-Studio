@@ -48,7 +48,7 @@ const reloadModels = async () => {
 };
 
 const handleCheckboxToggle = async () => {
-	const payload = new configBase;
+	const payload = await GetSettings();
 	payload.modelToggles = modelToggles;
 
 	await SaveSettings(payload).then(() => {

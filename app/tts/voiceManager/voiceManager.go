@@ -119,7 +119,7 @@ func RefreshModels() {
 					err := manager.Engines[engine].Engine.Start(model)
 					if err != nil {
 						issue.Trace(err)
-						response.Debug(response.Data{
+						response.Error(response.Data{
 							Summary: "Failed to start piper model:" + model,
 							Detail:  err.Error(),
 						})
@@ -129,7 +129,7 @@ func RefreshModels() {
 					err := manager.Engines[engine].Engine.Stop(model)
 					if err != nil {
 						issue.Trace(err)
-						response.Debug(response.Data{
+						response.Error(response.Data{
 							Summary: "Failed to stop piper model:" + model,
 							Detail:  err.Error(),
 						})

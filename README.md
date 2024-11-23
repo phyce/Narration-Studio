@@ -5,12 +5,12 @@
 ## About
 
 Give a voice to everyone & everything! Games, software, videos.
-A tool that unifies many different text-to-speech engines into one graphical user interace. Create scripts, try out tts engines, and more coming soon.
+A tool that unifies many different text-to-speech engines into one graphical user interace. Create scripts, try out TTS engines, and more coming soon.
 At the moment only basic capabilities are enabled for each engine, but the plan is to integrate all of the features available for each.
 
 ![demo.png](demo.png)
 
-The objective of this project is to provide a nice interface to use many tts engines simultaneously. The next step will be providing an easy way to enable TTS in any game or software,
+The objective of this project is to provide a nice interface to use many TTS engines simultaneously. The next step will be providing an easy way to enable TTS in any game or software,
 and if it's feasible to provide OCR capabilities to enable it in games that aren't easily moddable.
 
 Built in Go using [wails.io](https://wails.io), Vue + Typescript.

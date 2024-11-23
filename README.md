@@ -2,6 +2,8 @@
 
 <img height="250" src="https://raw.githubusercontent.com/phyce/Narration-Studio/refs/heads/main/frontend/src/assets/images/logo.png" width="250"/>
 
+## About
+
 Give a voice to everyone & everything! Games, software, videos.
 A tool that unifies many different text-to-speech engines into one graphical user interace. Create scripts, try out tts engines, and more coming soon.
 At the moment only basic capabilities are enabled for each engine, but the plan is to integrate all of the features available for each.
@@ -10,6 +12,8 @@ At the moment only basic capabilities are enabled for each engine, but the plan 
 
 The objective of this project is to provide a nice interface to use many tts engines simultaneously. The next step will be providing an easy way to enable TTS in any game or software,
 and if it's feasible to provide OCR capabilities to enable it in games that aren't easily moddable.
+
+Built in Go using [wails.io](https://wails.io), Vue + Typescript.
 
 ## Features
 
@@ -30,12 +34,6 @@ and if it's feasible to provide OCR capabilities to enable it in games that aren
 * Twitch, Kick integration for streaming
 * OCR to TTS
 * TBA
-
-
-## Building
-## About
-
-Built in Go using [wails.io](https://wails.io), Vue + Typescript.
 
 ## Live Development
 

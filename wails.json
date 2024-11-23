@@ -11,5 +11,12 @@
   "author": {
     "name": "phyce",
     "email": "contact@mechanic.ink"
+  },
+  "Info": {
+    "companyName": "phyce.dev",
+    "productName": "Narration Studio",
+    "productVersion": "0.12.0",
+    "copyright": "Copyright phyce.dev",
+    "comments": "Built using Wails (https://wails.io)"
   }
 }

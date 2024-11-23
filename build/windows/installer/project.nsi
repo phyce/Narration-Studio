@@ -57,6 +57,7 @@ ManifestDPIAware true
 !define MUI_ABORTWARNING # This will warn the user if they exit from the installer.
 
 !insertmacro MUI_PAGE_WELCOME # Welcome to the installer page.
+!insertmacro MUI_PAGE_COMPONENTS    ; Components selection page.
 # !insertmacro MUI_PAGE_LICENSE "resources\eula.txt" # Adds a EULA page to the installer
 !insertmacro MUI_PAGE_DIRECTORY # In which folder install page.
 !insertmacro MUI_PAGE_INSTFILES # Installing page.
@@ -72,14 +73,19 @@ ManifestDPIAware true
 
 Name "${INFO_PRODUCTNAME}"
 OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.
-InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}" # Default installing folder ($PROGRAMFILES is Program Files folder).
+InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}" # Default installing folder ($PROGRAMFILES is Program Files folder).
 ShowInstDetails show # This will always show the installation details.
 
 Function .onInit
    !insertmacro wails.checkArchitecture
 FunctionEnd
 
-Section
+; Define the text displayed on the Components page.
+ComponentText "Select components to install:" "Select the components you want to install." ""
+
+; Define required and optional sections.
+
+Section "Main Application" SEC_MAIN
     !insertmacro wails.setShellContext
 
     !insertmacro wails.webview2runtime
@@ -89,7 +95,7 @@ Section
     !insertmacro wails.files
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
-    CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    CreateShortcut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
@@ -97,7 +103,48 @@ Section
     !insertmacro wails.writeUninstaller
 SectionEnd
 
-Section "uninstall"
+Section "Piper" SEC_PIPER
+    DetailPrint "Installing Piper..."
+
+    ; Set the output path to the 'engines\piper' directory within the installation directory.
+    SetOutPath "$INSTDIR\engines\piper"
+
+    ; Include the 'piper' folder and its contents.
+    File /r "engines\piper\*"
+SectionEnd
+
+Section "Microsoft Speech API 4" SEC_MSAPI4
+    DetailPrint "Installing Microsoft Speech API 4..."
+
+    InitPluginsDir
+
+    ; Include the installer files in the installer package.
+    File /oname=$PLUGINSDIR\SAPI4SDK.exe "engines\mssapi4\SAPI4SDK.exe"
+    File /oname=$PLUGINSDIR\spchapi.exe "engines\mssapi4\spchapi.exe"
+    File /oname=$PLUGINSDIR\msttsl.exe "engines\mssapi4\msttsl.exe"
+    File /oname=$PLUGINSDIR\tv_enua.exe "engines\mssapi4\tv_enua.exe"
+
+    ; Execute the installers in order, waiting for each to complete.
+    DetailPrint "Installing SAPI4 SDK..."
+    ExecWait '"$PLUGINSDIR\SAPI4SDK.exe"'
+
+    DetailPrint "Installing spchapi..."
+    ExecWait '"$PLUGINSDIR\spchapi.exe"'
+
+    DetailPrint "Installing msttsl..."
+    ExecWait '"$PLUGINSDIR\msttsl.exe"'
+
+    DetailPrint "Installing tv_enua..."
+    ExecWait '"$PLUGINSDIR\tv_enua.exe"'
+
+    ; Clean up the installer files from the temporary directory.
+    Delete "$PLUGINSDIR\SAPI4SDK.exe"
+    Delete "$PLUGINSDIR\spchapi.exe"
+    Delete "$PLUGINSDIR\msttsl.exe"
+    Delete "$PLUGINSDIR\tv_enua.exe"
+SectionEnd
+
+Section "Uninstall"
     !insertmacro wails.setShellContext
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath

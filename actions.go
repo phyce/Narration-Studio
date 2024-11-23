@@ -338,6 +338,55 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 	return directory
 }
 
+func (app *App) SelectFile(defaultFile string) string {
+	status.Set(status.Loading, "Selecting file")
+	err, fullPath := util.ExpandPath(defaultFile)
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to expand provided file path",
+		})
+
+		fullPath, err = os.UserHomeDir()
+		if err != nil {
+			response.Error(response.Data{
+				Summary: "Failed to retrieve user's home directory.",
+			})
+			return ""
+		}
+	}
+
+	file, err := wailsRuntime.OpenFileDialog(
+		app.context,
+		wailsRuntime.OpenDialogOptions{
+			DefaultDirectory: filepath.Dir(fullPath),
+			Title:            "Select File",
+			Filters: []wailsRuntime.FileFilter{
+				{
+					DisplayName: "All Files",
+					Pattern:     "*",
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		response.Error(response.Data{
+			Summary: "Failed to select file",
+			Detail:  err.Error(),
+		})
+	} else {
+		if file != "" {
+			response.Success(response.Data{
+				Summary: "File selected",
+			})
+		} else {
+			file = defaultFile
+		}
+	}
+	status.Set(status.Ready, "")
+	return file
+}
+
 func (app *App) RefreshModels() {
 	clearConsole()
 	status.Set(status.Loading, "Refreshing models")

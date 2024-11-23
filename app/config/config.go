@@ -59,7 +59,7 @@ func GetConfigPath() string {
 		issue.Panic("Failed to get user config directory", err)
 	}
 
-	return filepath.Join(configDir, manager.config.Info.Title)
+	return filepath.Join(configDir, manager.config.Info.Name)
 }
 
 func Export() (string, error) {

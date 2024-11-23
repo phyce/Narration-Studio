@@ -60,6 +60,22 @@ export namespace config {
 		    return a;
 		}
 	}
+	export class Info {
+	    name: string;
+	    version: string;
+	    website: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Info(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.website = source["website"];
+	    }
+	}
 	export class Piper {
 	    directory: string;
 	    modelsDirectory: string;
@@ -156,6 +172,7 @@ export namespace config {
 	    settings: Settings;
 	    engine: Engine;
 	    modelToggles: {[key: string]: boolean};
+	    info: Info;
 	
 	    static createFrom(source: any = {}) {
 	        return new Base(source);
@@ -166,6 +183,7 @@ export namespace config {
 	        this.settings = this.convertValues(source["settings"], Settings);
 	        this.engine = this.convertValues(source["engine"], Engine);
 	        this.modelToggles = source["modelToggles"];
+	        this.info = this.convertValues(source["info"], Info);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -188,20 +206,7 @@ export namespace config {
 	}
 	
 	
-	export class Info {
-	    name: string;
-	    version: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new Info(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.version = source["version"];
-	    }
-	}
 	
 	
 	

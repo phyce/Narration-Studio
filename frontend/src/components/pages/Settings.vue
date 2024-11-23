@@ -8,7 +8,7 @@ import InputGroupAddon from "primevue/inputgroupaddon";
 import Button from "primevue/button";
 import Dropdown from "primevue/dropdown";
 import {onBeforeMount, onMounted, reactive, ref} from "vue";
-import { GetSettings, SaveSettings } from "../../../wailsjs/go/main/App";
+import {GetSettings, SaveSettings, SelectDirectory, SelectFile} from "../../../wailsjs/go/main/App";
 import { OutputTypeOptions } from "../enums/outputType";
 import {config as configuration} from "../../../wailsjs/go/models";
 import configBase = configuration.Base;
@@ -18,6 +18,20 @@ const loading = ref<boolean>(true);
 
 function handleSaveSettings() {
 	SaveSettings(config);
+}
+
+const handlePiperEngineLocationSelect = async () => {
+	const result = await SelectFile(config.engine.local.piper.directory as string);
+	if (result.length > 0 && config.engine.local.piper.directory != result) {
+		config.engine.local.piper.directory =  result;
+	}
+};
+
+const handlePiperModelLocationSelect = async () => {
+	const result = await SelectDirectory(config.engine.local.piper.modelsDirectory as string);
+	if (result.length > 0 && config.engine.local.piper.modelsDirectory != result) {
+		config.engine.local.piper.modelsDirectory =  result;
+	}
 }
 
 onBeforeMount( async () => {
@@ -56,7 +70,11 @@ onBeforeMount( async () => {
 						   placeholder="Select a directory"
 						   disabled
 				/>
-				<Button class="input-group__button" title="Browse" aria-label="Browse" >
+				<Button class="input-group__button"
+						title="Browse"
+						aria-label="Browse"
+						@click="handlePiperEngineLocationSelect"
+				>
 					<i class="pi pi-folder-open"/>
 				</Button>
 			</InputGroup>
@@ -67,7 +85,11 @@ onBeforeMount( async () => {
 						   placeholder="Output Path"
 						   disabled
 				/>
-				<Button class="input-group__button" title="Browse" aria-label="Browse">
+				<Button class="input-group__button"
+						title="Browse"
+						aria-label="Browse"
+						@click="handlePiperModelLocationSelect"
+				>
 					<i class="pi pi-folder-open"/>
 				</Button>
 			</InputGroup>

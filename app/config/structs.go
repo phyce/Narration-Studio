@@ -17,7 +17,7 @@ type Base struct {
 	Settings     Settings        `json:"settings"`
 	Engine       Engine          `json:"engine"`
 	ModelToggles map[string]bool `json:"modelToggles"`
-	Info         Info
+	Info         Info            `json:"info"`
 }
 
 type Settings struct {
@@ -56,8 +56,9 @@ type ElevenLabs struct {
 }
 
 type Info struct {
-	Title   string `json:"name"`
+	Name    string `json:"name"`
 	Version string `json:"version"`
+	Website string `json:"website"`
 }
 
 //</Config File>

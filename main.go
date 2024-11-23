@@ -33,7 +33,7 @@ func main() {
 	app := NewApp()
 
 	err = wails.Run(&options.App{
-		Title:            config.GetInfo().Title + " v" + config.GetInfo().Version,
+		Title:            config.GetInfo().Name + " v" + config.GetInfo().Version,
 		Width:            1024,
 		Height:           768,
 		WindowStartState: options.Minimised,

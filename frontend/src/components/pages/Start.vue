@@ -1,10 +1,23 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import {config as configuration} from "../../../wailsjs/go/models";
+import configBase = configuration.Base;
+import {onMounted, reactive, ref} from "vue";
+import {GetSettings} from "../../../wailsjs/go/main/App";
+
+const config = reactive<configBase>({} as configBase);
+const loading = ref<boolean>(true);
+
+onMounted(async () => {
+	Object.assign(config, await GetSettings());
+	loading.value = false;
+});
+</script>
 
 <template>
-	<div class="start">
-		<h1 class="start__header">Narrator Studio v0.11.0</h1>
+	<div class="start" v-if="!loading">
+		<h1 class="start__header">{{ config.info.name }} v{{config.info.version}}</h1>
 		<img class="start__logo" id="logo" alt="Wails logo" src="../../assets/images/logo.png"/>
-		Made by <a class="link" href="https://phyce.dev" target="_blank">Phyce</a>
+		<a target="_blank" class="link" :href="config.info.website">{{config.info.website}}</a>
 	</div>
 </template>
 

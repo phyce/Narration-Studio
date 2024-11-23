@@ -33,3 +33,5 @@ export function SaveCharacterVoices(arg1:string):Promise<void>;
 export function SaveSettings(arg1:config.Base):Promise<void>;
 
 export function SelectDirectory(arg1:string):Promise<string>;
+
+export function SelectFile(arg1:string):Promise<string>;

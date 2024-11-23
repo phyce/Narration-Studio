@@ -1,8 +1,9 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Narration Studio",
-  "version": "0.11.0",
-  "outputfilename": "narrator_studio",
+  "version": "0.12.0",
+  "website": "https://narration.studio",
+  "outputfilename": "narration_studio",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",

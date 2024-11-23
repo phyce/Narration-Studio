@@ -106,6 +106,10 @@ func (piper *Piper) Start(modelName string) error {
 
 	command := exec.Command(piper.piperPath, commandArguments...)
 
+	if !config.Debug() {
+		process.HideCommandLine(command)
+	}
+
 	response.Debug(response.Data{
 		Summary: fmt.Sprintf("Preparing command: %s %s",
 			command.Path,

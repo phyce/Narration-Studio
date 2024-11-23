@@ -4,7 +4,9 @@
 package process
 
 import (
+	"golang.org/x/sys/windows"
 	"os"
+	"os/exec"
 	"syscall"
 )
 
@@ -31,4 +33,10 @@ func IsRunning(p *os.Process) bool {
 	}
 
 	return exitCode == STILL_ACTIVE
+}
+
+func HideCommandLine(command *exec.Cmd) {
+	command.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: windows.CREATE_NO_WINDOW,
+	}
 }

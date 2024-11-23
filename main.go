@@ -32,11 +32,18 @@ func main() {
 
 	app := NewApp()
 
+	var startMode options.WindowStartState
+	if config.Debug() {
+		startMode = options.Minimised
+	} else {
+		startMode = options.Normal
+	}
+
 	err = wails.Run(&options.App{
 		Title:            config.GetInfo().Name + " v" + config.GetInfo().Version,
 		Width:            1024,
 		Height:           768,
-		WindowStartState: options.Minimised,
+		WindowStartState: startMode,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

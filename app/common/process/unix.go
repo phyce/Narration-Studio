@@ -8,7 +8,6 @@ import (
 	"syscall"
 )
 
-// isProcessRunning checks if a process is running on Unix-based systems.
 func IsRunning(process *os.Process) bool {
 	if process == nil {
 		return false
@@ -18,4 +17,10 @@ func IsRunning(process *os.Process) bool {
 	// If the process does not exist, an issue will be returned.
 	err := process.Signal(syscall.Signal(0))
 	return err == nil
+}
+
+func HideCommandLine(command *exec.Cmd) {
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true,
+	}
 }

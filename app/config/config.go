@@ -21,6 +21,7 @@ func init() {
 }
 
 func Initialize(info Info) error {
+	manager.config.Info = info
 	manager.filePath = filepath.Join(GetConfigPath(), "config.json")
 
 	configFile, err := ioutil.ReadFile(manager.filePath)
@@ -47,6 +48,10 @@ func Initialize(info Info) error {
 	err = json.Unmarshal(configFile, &manager.config)
 	//TODO remove Info from being saved into config file
 	manager.config.Info = info
+
+	if Debug() {
+		fmt.Println("Config file location", manager.filePath)
+	}
 
 	if err != nil {
 		return issue.Trace(err)

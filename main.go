@@ -25,7 +25,7 @@ func main() {
 
 	err := config.Initialize(Info())
 	if err != nil {
-		issue.Panic("Failed to initialize config", err)
+		issue.Panic("Failed to initialize defaults", err)
 	}
 
 	voiceManager.Initialize()

@@ -26,7 +26,7 @@ var voices = []engine.Voice{
 
 // <editor-fold desc="Engine Interface">
 func (openAI *OpenAI) Initialize() error {
-	//openAI.outputType = config.GetEngine().Api.OpenAI.OutputType
+	//openAI.outputType = defaults.GetEngine().Api.OpenAI.OutputType
 	openAI.outputType = "flac"
 
 	//TODO add api key check

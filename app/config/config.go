@@ -1,6 +1,7 @@
 package config
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +13,12 @@ import (
 	"strings"
 )
 
+//go:embed defaults/config-windows-default.json
+var configWindowsDefault []byte
+
+//go:embed defaults/config-darwin-default.json
+var configDarwinDefault []byte
+
 var manager *ConfigManager
 
 func init() {
@@ -22,16 +29,15 @@ func init() {
 
 func Initialize(info Info) error {
 	manager.config.Info = info
-	manager.filePath = filepath.Join(GetConfigPath(), "config.json")
+	manager.filePath = filepath.Join(GetConfigPath(), "defaults.json")
 
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			defaultConfigPath := filepath.Join(".", "config", fmt.Sprintf("config-%s-default.json", runtime.GOOS))
-
-			configFile, err = ioutil.ReadFile(defaultConfigPath)
-			if err != nil {
-				return issue.Trace(err)
+			if runtime.GOOS == "windows" {
+				configFile = configWindowsDefault
+			} else {
+				configFile = configDarwinDefault
 			}
 
 			configPath := filepath.Dir(manager.filePath)
@@ -46,7 +52,7 @@ func Initialize(info Info) error {
 	}
 
 	err = json.Unmarshal(configFile, &manager.config)
-	//TODO remove Info from being saved into config file
+	//TODO remove Info from being saved into defaults file
 	manager.config.Info = info
 
 	if Debug() {
@@ -63,7 +69,7 @@ func Initialize(info Info) error {
 func GetConfigPath() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		issue.Panic("Failed to get user config directory", err)
+		issue.Panic("Failed to get user defaults directory", err)
 	}
 
 	return filepath.Join(configDir, manager.config.Info.Name)

@@ -61,18 +61,18 @@ func LoadCharacterVoices() {
 		if os.IsNotExist(err) {
 			err = os.WriteFile(voiceConfigPath, []byte("{}"), 0644)
 			if err != nil {
-				issue.Panic("Failed to create voice config file", err)
+				issue.Panic("Failed to create voice defaults file", err)
 			}
 			file = []byte("{}")
 		} else {
-			issue.Panic("Failed to open voice  config file: ", err)
+			issue.Panic("Failed to open voice  defaults file: ", err)
 		}
 	}
 
 	var voices map[string]util.CharacterVoice
 	err = json.Unmarshal(file, &voices)
 	if err != nil {
-		issue.Panic("Failed to unmarshal voice config: ", err)
+		issue.Panic("Failed to unmarshal voice defaults: ", err)
 	}
 
 	for _, voice := range voices {

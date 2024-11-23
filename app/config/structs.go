@@ -7,8 +7,8 @@ import (
 
 // <Config File>
 type ConfigManager struct {
-	//config map[string]Value `json:"config"`
-	config   Base       `json:"config"`
+	//defaults map[string]Value `json:"defaults"`
+	config   Base       `json:"defaults"`
 	filePath string     `json:"filePath"`
 	lock     sync.Mutex `json:"lock"`
 }

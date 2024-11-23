@@ -147,7 +147,7 @@ func GetInfo() Info {
 func GetValueFromPath(path string) (interface{}, error) {
 	parts := strings.Split(path, ".")
 	if len(parts) == 0 {
-		return nil, issue.Trace(fmt.Errorf("invalid path"))
+		return nil, issue.Trace(fmt.Errorf("Invalid path"))
 	}
 
 	current := reflect.ValueOf(manager.config)
@@ -158,12 +158,12 @@ func GetValueFromPath(path string) (interface{}, error) {
 		}
 
 		if current.Kind() != reflect.Struct {
-			return nil, issue.Trace(fmt.Errorf("path segment '%s' is not a struct", part))
+			return nil, issue.Trace(fmt.Errorf("Path segment '%s' is not a struct", part))
 		}
 
 		field, found := findFieldByJSONTag(current, part)
 		if !found {
-			return nil, issue.Trace(fmt.Errorf("field '%s' not found", part))
+			return nil, issue.Trace(fmt.Errorf("Field '%s' not found", part))
 		}
 
 		current = field
@@ -189,7 +189,7 @@ func Set(newConfig Base) error {
 func SetValueToPath(path string, value string) error {
 	parts := strings.Split(path, ".")
 	if len(parts) == 0 {
-		return issue.Trace(fmt.Errorf("invalid path"))
+		return issue.Trace(fmt.Errorf("Invalid path"))
 	}
 
 	manager.lock.Lock()
@@ -207,18 +207,18 @@ func SetValueToPath(path string, value string) error {
 		}
 
 		if current.Kind() != reflect.Struct {
-			return issue.Trace(fmt.Errorf("path segment '%s' is not a struct", part))
+			return issue.Trace(fmt.Errorf("Path segment '%s' is not a struct", part))
 		}
 
 		field, found := findFieldByJSONTag(current, part)
 		if !found {
-			return issue.Trace(fmt.Errorf("field '%s' not found", part))
+			return issue.Trace(fmt.Errorf("Field '%s' not found", part))
 		}
 
 		if i == len(parts)-1 {
 			// This is the target field to set
 			if !field.CanSet() {
-				return issue.Trace(fmt.Errorf("cannot set field '%s'", part))
+				return issue.Trace(fmt.Errorf("Cannot set field '%s'", part))
 			}
 
 			// Determine the type of the field
@@ -230,7 +230,7 @@ func SetValueToPath(path string, value string) error {
 			// Unmarshal the JSON value into the new instance
 			err := json.Unmarshal([]byte(value), newValuePtr.Interface())
 			if err != nil {
-				return issue.Trace(fmt.Errorf("failed to unmarshal value: %w", err))
+				return issue.Trace(fmt.Errorf("Failed to unmarshal value: %w", err))
 			}
 
 			// Set the field to the new value (dereference the pointer)
@@ -242,5 +242,5 @@ func SetValueToPath(path string, value string) error {
 		}
 	}
 
-	return issue.Trace(fmt.Errorf("path '%s' did not reach a field", path))
+	return issue.Trace(fmt.Errorf("Path '%s' did not reach a field", path))
 }

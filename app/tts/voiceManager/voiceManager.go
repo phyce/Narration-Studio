@@ -241,7 +241,7 @@ func GetVoice(name string, save bool) (util.CharacterVoice, error) {
 			return characterVoice, nil
 		} else {
 			return util.CharacterVoice{}, issue.Trace(
-				fmt.Errorf("invalid line could not be processed: " + name),
+				fmt.Errorf("Invalid line could not be processed: " + name),
 			)
 		}
 	}

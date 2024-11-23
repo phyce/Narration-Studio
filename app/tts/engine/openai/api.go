@@ -19,12 +19,12 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to marshal httpRequest body: %v", err))
+		return nil, issue.Trace(fmt.Errorf("Failed to marshal httpRequest body: %v", err))
 	}
 
 	httpRequest, err := http.NewRequest("POST", "https://api.openai.com/v1/audio/speech", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to create HTTP httpRequest: %v", err))
+		return nil, issue.Trace(fmt.Errorf("Failed to create HTTP httpRequest: %v", err))
 	}
 
 	httpRequest.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
@@ -35,18 +35,18 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to send HTTP httpRequest: %v", err))
+		return nil, issue.Trace(fmt.Errorf("Failed to send HTTP httpRequest: %v", err))
 	}
 	defer httpResponse.Body.Close()
 
 	if httpResponse.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(httpResponse.Body)
-		return nil, issue.Trace(fmt.Errorf("httpRequest failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes)))
+		return nil, issue.Trace(fmt.Errorf("HttpRequest failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes)))
 	}
 
 	responseData, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to read response body: %v", err))
+		return nil, issue.Trace(fmt.Errorf("Failed to read response body: %v", err))
 	}
 
 	response.Success(response.Data{

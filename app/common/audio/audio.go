@@ -22,10 +22,10 @@ import (
 func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate, channelCount, bitDepth int) error {
 	wavFiles, err := filepath.Glob(filepath.Join(dirPath, "*.wav"))
 	if err != nil {
-		return issue.Trace(fmt.Errorf("failed to list WAV files: %v", err))
+		return issue.Trace(fmt.Errorf("Failed to list WAV files: %v", err))
 	}
 	if len(wavFiles) == 0 {
-		return issue.Trace(fmt.Errorf("no WAV files found in the directory"))
+		return issue.Trace(fmt.Errorf("No WAV files found in the directory"))
 	}
 
 	sort.Strings(wavFiles)
@@ -52,7 +52,7 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 
 		decoder := wav.NewDecoder(file)
 		if !decoder.IsValidFile() {
-			return issue.Trace(fmt.Errorf("invalid WAV file: " + wavPath))
+			return issue.Trace(fmt.Errorf("Invalid WAV file: " + wavPath))
 		}
 
 		pcmBuffer, err := decoder.FullPCMBuffer()
@@ -173,7 +173,7 @@ func ChangeChannelCount(buffer *audio.IntBuffer, targetChannelCount int) (*audio
 			}
 		}
 	} else {
-		return nil, issue.Trace(fmt.Errorf("unsupported channel conversion"))
+		return nil, issue.Trace(fmt.Errorf("Unsupported channel conversion"))
 	}
 
 	convertedBuf := &audio.IntBuffer{

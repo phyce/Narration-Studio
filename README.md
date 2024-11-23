@@ -1,11 +1,41 @@
-# README
+# Narration Studio
 
+<img height="250" src="https://raw.githubusercontent.com/phyce/Narration-Studio/refs/heads/main/frontend/src/assets/images/logo.png" width="250"/>
+
+Give a voice to everyone & everything! Games, software, videos.
+A tool that unifies many different text-to-speech engines into one graphical user interace. Create scripts, try out tts engines, and more coming soon.
+At the moment only basic capabilities are enabled for each engine, but the plan is to integrate all of the features available for each.
+
+![demo.png](demo.png)
+
+The objective of this project is to provide a nice interface to use many tts engines simultaneously. The next step will be providing an easy way to enable TTS in any game or software,
+and if it's feasible to provide OCR capabilities to enable it in games that aren't easily moddable.
+
+## Features
+
+* Local & API TTS engines
+* Create & Modify audio scripts 
+* Preview TTS engines and their available voices
+
+## Currently Supported TTS Engines:
+
+* [Piper](https://github.com/rhasspy/piper)
+* [Microsoft Speech Api 4 (Windows Only)](https://en.wikipedia.org/wiki/Microsoft_Speech_API)
+* [ElevenLabs](https://elevenlabs.io/docs/api-reference/text-to-speech)
+* [OpenAI TTS](https://platform.openai.com/docs/guides/text-to-speech)
+
+### _Upcoming Features:_
+* Server mode to provide TTS through http
+* Command line mode to provide TTS through stdio
+* Twitch, Kick integration for streaming
+* OCR to TTS
+* TBA
+
+
+## Building
 ## About
 
-This is the official Wails Vue-TS template.
-
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+Built in Go using [wails.io](https://wails.io), Vue + Typescript.
 
 ## Live Development
 

@@ -15,7 +15,7 @@ import (
 func FetchModels() (map[string]engine.Model, error) {
 	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
 	if apiKey == "" {
-		return make(map[string]engine.Model, 0), issue.Trace(fmt.Errorf("api key is empty"))
+		return make(map[string]engine.Model, 0), issue.Trace(fmt.Errorf("Api key is empty"))
 	}
 
 	modelsMap := make(map[string]engine.Model)

@@ -168,7 +168,7 @@ func (piper *Piper) Stop(modelName string) error {
 
 	if err := instance.command.Process.Signal(os.Interrupt); err != nil {
 		if killErr := instance.command.Process.Kill(); killErr != nil {
-			return issue.Trace(fmt.Errorf("failed to kill process for model %s: %v, original issue: %v", modelName, killErr, err))
+			return issue.Trace(fmt.Errorf("Failed to kill process for model %s: %v, original issue: %v", modelName, killErr, err))
 		}
 	}
 
@@ -178,27 +178,27 @@ func (piper *Piper) Stop(modelName string) error {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
 				if !(status.Signaled() && status.Signal() == os.Interrupt) {
-					return issue.Trace(fmt.Errorf("process for model %s exited with signal: %v", modelName, status.Signal()))
+					return issue.Trace(fmt.Errorf("Process for model %s exited with signal: %v", modelName, status.Signal()))
 				}
 			}
 		}
 
-		return issue.Trace(fmt.Errorf("process for model %s exited with issue: %v", modelName, err))
+		return issue.Trace(fmt.Errorf("Process for model %s exited with issue: %v", modelName, err))
 	}
 
 	if instance.stdin != nil {
 		if err := instance.stdin.Close(); err != nil {
-			return issue.Trace(fmt.Errorf("failed to close stdin for model %s: %v", modelName, err))
+			return issue.Trace(fmt.Errorf("Failed to close stdin for model %s: %v", modelName, err))
 		}
 	}
 	if instance.stdout != nil {
 		if err := instance.stdout.Close(); err != nil {
-			return issue.Trace(fmt.Errorf("failed to close stdout for model %s: %v", modelName, err))
+			return issue.Trace(fmt.Errorf("Failed to close stdout for model %s: %v", modelName, err))
 		}
 	}
 	if instance.stderr != nil {
 		if err := instance.stderr.Close(); err != nil {
-			return issue.Trace(fmt.Errorf("failed to close stderr for model %s: %v", modelName, err))
+			return issue.Trace(fmt.Errorf("Failed to close stderr for model %s: %v", modelName, err))
 		}
 	}
 
@@ -301,7 +301,7 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	}
 
 	if !utf8.Valid(payload) {
-		return nil, issue.Trace(fmt.Errorf("input JSON is not valid UTF-8"))
+		return nil, issue.Trace(fmt.Errorf("Input JSON is not valid UTF-8"))
 	}
 
 	response.Debug(response.Data{
@@ -337,7 +337,7 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	modelData, exists := piper.models[model]
 	if !exists {
-		return nil, issue.Trace(fmt.Errorf("model %s is not initialized", model))
+		return nil, issue.Trace(fmt.Errorf("Model %s is not initialized", model))
 	}
 	return modelData.Voices, nil
 }

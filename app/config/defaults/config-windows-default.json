@@ -1,7 +1,7 @@
 {
 	"settings": {
 		"outputType" : 0,
-		"outputPath" : "%USERPROFILE%\\Narrator Studio\\output",
+		"outputPath" : "%USERPROFILE%\\Narration Studio\\output",
 		"debug": false
 	},
 	"engine": {

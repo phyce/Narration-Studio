@@ -390,11 +390,16 @@ func (app *App) SelectFile(defaultFile string) string {
 func (app *App) RefreshModels() {
 	clearConsole()
 	status.Set(status.Loading, "Refreshing models")
-	voiceManager.RefreshModels()
-	response.Success(response.Data{
-		Summary: "Models refreshed",
-	})
-	status.Set(status.Ready, "")
+	err := voiceManager.RefreshModels()
+	if err == nil {
+		response.Success(response.Data{
+			Summary: "Models refreshed",
+		})
+		status.Set(status.Ready, "")
+	} else {
+		status.Set(status.Warning, "Some of your enabled engines didn't start")
+	}
+
 }
 
 //</editor-fold>

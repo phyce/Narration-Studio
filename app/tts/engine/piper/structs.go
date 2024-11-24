@@ -28,8 +28,6 @@ type PiperInputLite struct {
 }
 
 type Piper struct {
-	models    map[string]PiperInstance
-	piperPath string
-	modelPath string
-	initOnce  sync.Once
+	models   map[string]PiperInstance
+	initOnce sync.Once
 }

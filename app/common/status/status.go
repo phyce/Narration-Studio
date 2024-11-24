@@ -14,6 +14,7 @@ const (
 	Generating
 	Playing
 	Error
+	Warning
 )
 
 type StatusEvent struct {

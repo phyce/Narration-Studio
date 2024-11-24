@@ -6,6 +6,7 @@ export enum Status {
 	Generating	= 4,
 	Playing		= 5,
 	Error		= 6,
+	Warning     = 7,
 }
 
 export const StatusDisplayNames = {
@@ -16,4 +17,5 @@ export const StatusDisplayNames = {
 	[Status.Generating]:	"🔵 Generating",
 	[Status.Playing]:		"▶️ Playing",
 	[Status.Error]:			"🔴 Error",
+	[Status.Warning]:       "⚠️ Warning",
 };

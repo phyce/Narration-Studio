@@ -59,27 +59,31 @@ func (piper *Piper) Initialize() error {
 		return issue.Trace(fmt.Errorf("Piper executable location is not set"))
 	}
 
-	err, piper.piperPath = util.ExpandPath(settings.Location)
-	if err != nil {
-		return issue.Trace(err)
-	}
-
 	if settings.ModelsDirectory == "" {
 		return issue.Trace(fmt.Errorf("Piper model location is not set"))
 	}
 
-	err, piper.modelPath = util.ExpandPath(settings.ModelsDirectory)
-	if err != nil {
-		return issue.Trace(err)
+	if piper.models == nil {
+		piper.models = make(map[string]PiperInstance)
 	}
-
-	piper.models = make(map[string]PiperInstance)
 
 	return err
 }
 
 func (piper *Piper) Start(modelName string) error {
 	var err error
+	err = piper.Initialize()
+	if err != nil {
+		configuration := config.Get()
+		configuration.ModelToggles[fmt.Sprintf("piper:%s", modelName)] = false
+
+		err := config.Set(configuration)
+		if err != nil {
+			return err
+		}
+		return issue.Trace(err)
+	}
+
 	modelProcessID := piper.GetProcessID(modelName)
 	if modelProcessID > 0 {
 		response.Debug(response.Data{
@@ -89,7 +93,12 @@ func (piper *Piper) Start(modelName string) error {
 		return nil
 	}
 
-	metadataPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
+	err, modelPath := util.ExpandPath(config.GetEngine().Local.Piper.ModelsDirectory)
+	if err != nil {
+		return issue.Trace(err)
+	}
+
+	metadataPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
 	response.Debug(response.Data{
 		Summary: "Metadata for Model:" + modelName,
 		Detail:  metadataPath,
@@ -105,11 +114,16 @@ func (piper *Piper) Start(modelName string) error {
 		return issue.Trace(err)
 	}
 
-	onnxPath := filepath.Join(piper.modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
+	onnxPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
 
 	commandArguments := []string{"--model", onnxPath, "--json-input", "--output-raw"}
 
-	command := exec.Command(piper.piperPath, commandArguments...)
+	err, piperPath := util.ExpandPath(config.GetEngine().Local.Piper.Location)
+	if err != nil {
+		return issue.Trace(err)
+	}
+
+	command := exec.Command(piperPath, commandArguments...)
 
 	if !config.Debug() {
 		process.HideCommandLine(command)
@@ -149,6 +163,10 @@ func (piper *Piper) Start(modelName string) error {
 	}
 
 	piper.StartAudioCapture(instance)
+
+	if piper.models == nil {
+		piper.models = make(map[string]PiperInstance)
+	}
 
 	piper.models[modelName] = instance
 

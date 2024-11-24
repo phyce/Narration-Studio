@@ -108,7 +108,7 @@ func ResetAllocatedVoices() {
 	manager.AllocatedVoices = make(map[string]util.CharacterVoice)
 }
 
-func RefreshModels() {
+func RefreshModels() error {
 	toggles := config.GetEngineToggles()
 
 	enabledModels := 0
@@ -129,7 +129,7 @@ func RefreshModels() {
 					err := manager.Engines[engine].Engine.Stop(model)
 					if err != nil {
 						issue.Trace(err)
-						response.Error(response.Data{
+						response.Debug(response.Data{
 							Summary: "Failed to stop piper model:" + model,
 							Detail:  err.Error(),
 						})
@@ -141,9 +141,12 @@ func RefreshModels() {
 
 	if enabledModels > 0 {
 		status.Set(status.Ready, "")
-	} else {
-		status.Set(status.Error, "No models enabled")
+		return issue.Trace(fmt.Errorf("No models enabled"))
 	}
+
+	status.Set(status.Error, "No models enabled")
+
+	return nil
 }
 
 func ReloadModels() {

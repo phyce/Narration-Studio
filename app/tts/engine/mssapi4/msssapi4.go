@@ -22,6 +22,14 @@ func (sapi *MsSapi4) Initialize() error {
 }
 
 func (sapi *MsSapi4) Start(modelName string) error {
+	configuration := config.Get()
+	configuration.ModelToggles[modelName] = false
+
+	err := config.Set(configuration)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -30,7 +38,6 @@ func (sapi *MsSapi4) Stop(modelName string) error {
 }
 
 func (sapi *MsSapi4) Play(message util.CharacterMessage) error {
-	//Just Generate() , play audio and then delete
 	response.Debug(response.Data{
 		Summary: "Ms Sapi 4 playing:" + message.Character,
 		Detail:  message.Text,
@@ -101,16 +108,27 @@ func (sapi *MsSapi4) Generate(voice string, payload []byte) ([]byte, error) {
 	if !config.Debug() {
 		process.HideCommandLine(command)
 	}
+	var err error
 
-	command.Dir = config.Get().Settings.OutputPath
+	err, outputPath := util.ExpandPath(config.Get().Settings.OutputPath)
+	if err != nil {
+		return nil, issue.Trace(err)
+	}
+
+	err = os.MkdirAll(outputPath, os.ModePerm)
+	if err != nil {
+		return nil, issue.Trace(fmt.Errorf("Failed to create directory %s: %w", outputPath, err))
+	}
+
+	command.Dir = outputPath
 
 	stdoutPipe, err := command.StdoutPipe()
 	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to get stdout pipe: %w", err))
+		return nil, issue.Trace(fmt.Errorf("Failed to get stdout pipe: %w", err))
 	}
 
 	if err := command.Start(); err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to start sapi4out.exe: %w", err))
+		return nil, issue.Trace(fmt.Errorf("Failed to start sapi4out.exe: %w", err))
 	}
 
 	scanner := bufio.NewScanner(stdoutPipe)
@@ -121,7 +139,7 @@ func (sapi *MsSapi4) Generate(voice string, payload []byte) ([]byte, error) {
 		if err := scanner.Err(); err != nil {
 			return nil, issue.Trace(err)
 		}
-		return nil, issue.Trace(fmt.Errorf("no output received from sapi4out.exe"))
+		return nil, issue.Trace(fmt.Errorf("No output received from sapi4out.exe"))
 	}
 
 	filename = scanner.Text()
@@ -131,7 +149,7 @@ func (sapi *MsSapi4) Generate(voice string, payload []byte) ([]byte, error) {
 	})
 
 	if err := command.Wait(); err != nil {
-		return nil, issue.Trace(fmt.Errorf("sapi4out.exe execution failed: %w", err))
+		return nil, issue.Trace(fmt.Errorf("Execution failed - sapi4out.exe: %w", err))
 	}
 
 	audioFilePath := filepath.Join(command.Dir, filename)

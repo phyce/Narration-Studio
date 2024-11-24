@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -49,7 +50,12 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 }
 
 func ExpandPath(path string) (error, string) {
-	if InArray(runtime.GOOS, []string{"darwin", "linux"}) {
+	switch runtime.GOOS {
+	case "windows":
+		//$WINDIR is %WINDIR%
+		path = os.ExpandEnv(convertPercentVars(path))
+		break
+	case "darwin", "linux":
 		if strings.HasPrefix(path, "~") {
 			usr, err := user.Current()
 			if err != nil {
@@ -57,7 +63,9 @@ func ExpandPath(path string) (error, string) {
 			}
 			path = filepath.Join(usr.HomeDir, path[1:])
 		}
+		break
 	}
+
 	return nil, path
 }
 
@@ -83,4 +91,9 @@ func TruncateString(str string, maxLength int) string {
 		return str[:maxLength]
 	}
 	return str
+}
+
+func convertPercentVars(path string) string {
+	re := regexp.MustCompile(`%([^%]+)%`)
+	return re.ReplaceAllString(path, "${$1}")
 }

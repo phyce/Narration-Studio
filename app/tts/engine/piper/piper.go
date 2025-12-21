@@ -361,6 +361,7 @@ func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	if !exists {
 		return nil, response.Err(fmt.Errorf("Model %s is not initialized", model))
 	}
+
 	return modelData.Voices, nil
 }
 

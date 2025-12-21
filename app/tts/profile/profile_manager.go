@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"nstudio/app/common/util"
+
+	"github.com/charmbracelet/log"
 )
 
 var (

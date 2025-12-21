@@ -23,22 +23,23 @@ func calculateEngine(name string) (engine.Engine, error) {
 	setRandSeed(name)
 
 	managerEngines := modelManager.GetEngines()
+	var enabledEngines []engine.Engine
 
 	for _, managerEngine := range managerEngines {
 		for _, enabled := range config.GetEngineToggles()[managerEngine.ID] {
 			if enabled {
-				managerEngines = append(managerEngines, managerEngine)
+				enabledEngines = append(enabledEngines, managerEngine)
 				break
 			}
 		}
 	}
 
-	if len(managerEngines) == 0 {
-		return engine.Engine{}, response.NewWarn("No engines found")
-	} else if len(managerEngines) == 1 {
-		return managerEngines[0], nil
+	if len(enabledEngines) == 0 {
+		return engine.Engine{}, response.NewWarn("No enabled engines found")
+	} else if len(enabledEngines) == 1 {
+		return enabledEngines[0], nil
 	} else {
-		selectedEngine := managerEngines[rand.Intn(len(managerEngines)-1)]
+		selectedEngine := enabledEngines[rand.Intn(len(enabledEngines)-1)]
 		return selectedEngine, nil
 	}
 }
@@ -63,7 +64,6 @@ func calculateVoice(engine engine.Engine, name string) (string, string, error) {
 			models = append(models, modelID)
 		}
 	}
-
 	var selectedModel string
 
 	if len(models) == 0 {
@@ -74,8 +74,9 @@ func calculateVoice(engine engine.Engine, name string) (string, string, error) {
 		selectedModel = models[rand.Intn(len(models)-1)]
 	}
 
-	voices, _ := engine.Engine.GetVoices(selectedModel)
-	if len(voices) == 0 {
+	voices, err := modelManager.GetModelVoices(engine.ID, selectedModel)
+
+	if err != nil || len(voices) == 0 {
 		return "", "", response.Err(
 			fmt.Errorf("No voices found for engine: %s", engine.Name),
 		)

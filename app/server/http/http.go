@@ -74,7 +74,7 @@ func setupRoutes(server *echo.Echo) {
 	api.Use(customMiddleware.AuthMiddleware)
 
 	// TTS endpoints
-	api.POST("/tts", handleUnifiedTTS)
+	api.POST("/tts", handleProfileTTSRequest)
 	api.POST("/tts/:engineId/:modelId/:voiceId", handleSimpleTTS)
 
 	// Engine endpoints

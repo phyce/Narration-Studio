@@ -127,7 +127,22 @@ func RegisterEngine(baseEngine tts.Engine) error {
 		Models: make(map[string]*ModelPool),
 	}
 
+	toggles := config.GetEngineToggles()
+
 	for modelID := range baseEngine.Models {
+		modelEnabled := false
+		if engineToggles, exists := toggles[engineID]; exists {
+			if enabled, modelExists := engineToggles[modelID]; modelExists {
+				modelEnabled = enabled
+			}
+		}
+
+		if !modelEnabled {
+			//response.Debug
+			//log.Debug(fmt.Sprintf("Skipping instance creation for disabled model: %s/%s", engineID, modelID))
+			continue
+		}
+
 		instanceCount := 1 // Default for GUI mode
 
 		if !manager.IsGUIMode {

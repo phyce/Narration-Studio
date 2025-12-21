@@ -2,7 +2,7 @@ package stats
 
 import (
 	"nstudio/app/common/daemon"
-	"nstudio/app/common/version"
+	"nstudio/app/config"
 	"os"
 	"sync/atomic"
 	"time"
@@ -34,7 +34,7 @@ func IncrementMessages() {
 func updateDaemonStatusFile() {
 	status := daemon.DaemonStatusInfo{
 		PID:               os.Getpid(),
-		Version:           version.Get(),
+		Version:           config.GetInfo().Version,
 		StartTime:         startTime,
 		ProcessedMessages: atomic.LoadInt64(&processedMessages),
 	}

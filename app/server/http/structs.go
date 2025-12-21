@@ -1,6 +1,6 @@
 package http
 
-type UnifiedTTSRequest struct {
+type ProfileTTSRequest struct {
 	Profile   string                 `json:"profile" validate:"required"`
 	Character string                 `json:"character" validate:"required"`
 	Text      string                 `json:"text" validate:"required,min=1,max=10000"`

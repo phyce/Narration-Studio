@@ -5,7 +5,6 @@ import (
 	"nstudio/app/server/http/responses"
 	"time"
 
-	"nstudio/app/common/version"
 	"nstudio/app/config"
 	"nstudio/app/tts/modelManager"
 
@@ -77,7 +76,7 @@ func handleHealth(context echo.Context) error {
 
 	healthResponse := responses.HealthResponse{
 		Status:         "healthy",
-		Version:        version.Get(),
+		Version:        config.GetInfo().Version,
 		Uptime:         time.Since(serverStartTime).String(),
 		EnabledEngines: enabledEngines,
 		TotalModels:    totalModels,
@@ -90,27 +89,23 @@ func handleHealth(context echo.Context) error {
 func handleInfo(context echo.Context) error {
 	return context.JSON(http.StatusOK, map[string]interface{}{
 		"name":        "Narration Studio API",
-		"version":     version.Get(),
+		"version":     config.GetInfo().Version,
 		"description": "Text-to-Speech API Server",
 		"endpoints": map[string]interface{}{
-			"health":  "/health",
-			"info":    "/info",
-			"tts":     "/tts",
-			"engines": "/engines",
-			"voices":  "/voices",
+			"health":              "/health",
+			"info":                "/info",
+			"profile-tts":         "/tts",
+			"simple-tts":          "/tts/:engineId/:modelId/:voiceId",
+			"engines":             "/engines",
+			"engine-models":       "/engines/:engineId/models",
+			"engine-model-voices": "/engines/:engineId/models/:modelId/voices",
+			"voices":              "/voices",
 			"profiles": map[string]string{
 				"list":   "/profiles",
 				"get":    "/profiles/:profileId",
 				"create": "/profiles",
 				"delete": "/profiles/:profileId",
 				"voices": "/profiles/:profileId/voices",
-			},
-			"config": map[string]string{
-				"get":       "/config",
-				"update":    "/config",
-				"patch":     "/config",
-				"getValue":  "/config/value",
-				"getSchema": "/config/schema",
 			},
 		},
 	})

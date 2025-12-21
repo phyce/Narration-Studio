@@ -14,11 +14,12 @@ import (
 	"nstudio/app/tts"
 	"nstudio/app/tts/profile"
 
+	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 )
 
-func handleUnifiedTTS(context echo.Context) error {
-	var request UnifiedTTSRequest
+func handleProfileTTSRequest(context echo.Context) error {
+	var request ProfileTTSRequest
 
 	if err := context.Bind(&request); err != nil {
 		return context.JSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -84,6 +85,7 @@ func handleUnifiedTTS(context echo.Context) error {
 	//		Code:    400,
 	//	})
 	//}
+	log.Info("about to get manager")
 
 	manager := profile.GetManager()
 	voice, err := manager.GetOrAllocateVoice(request.Profile, request.Character)

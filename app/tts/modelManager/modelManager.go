@@ -260,7 +260,7 @@ func GetEngineInstance(engineID, modelID string) (tts.Base, func(), bool) {
 	return instance, releaseFunc, true
 }
 
-func GetEngines() []tts.Engine {
+func GetAllEngines() []tts.Engine {
 	toggles := config.GetEngineToggles()
 	var availableEngines []tts.Engine
 
@@ -296,6 +296,40 @@ func GetEngines() []tts.Engine {
 	}
 
 	return availableEngines
+}
+
+func GetActiveEngines() []tts.Engine {
+	manager.RLock()
+	defer manager.RUnlock()
+
+	var activeEngines []tts.Engine
+
+	for engineID, entry := range manager.Engines {
+		activeEngine := tts.Engine{
+			ID:     engineID,
+			Name:   entry.Engine.Name,
+			Models: make(map[string]tts.Model),
+		}
+
+		for modelID, modelPool := range entry.Models {
+			if len(modelPool.Instances) > 0 {
+				if model, exists := entry.Engine.Models[modelID]; exists {
+					activeEngine.Models[modelID] = tts.Model{
+						ID:       model.ID,
+						Name:     model.Name,
+						Engine:   model.Engine,
+						Download: model.Download,
+					}
+				}
+			}
+		}
+
+		if len(activeEngine.Models) > 0 {
+			activeEngines = append(activeEngines, activeEngine)
+		}
+	}
+
+	return activeEngines
 }
 
 func GetAllModels() map[string]tts.Model {

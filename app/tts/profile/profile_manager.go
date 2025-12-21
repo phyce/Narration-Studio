@@ -3,12 +3,9 @@ package profile
 import (
 	"fmt"
 	"nstudio/app/common/response"
+	"nstudio/app/common/util"
 	"strings"
 	"sync"
-
-	"nstudio/app/common/util"
-
-	"github.com/charmbracelet/log"
 )
 
 var (

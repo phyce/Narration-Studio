@@ -14,7 +14,7 @@ import (
 var serverStartTime = time.Now()
 
 func handleHealth(context echo.Context) error {
-	engines := modelManager.GetEngines()
+	engines := modelManager.GetAllEngines()
 
 	toggles := config.GetEngineToggles()
 

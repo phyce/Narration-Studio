@@ -22,7 +22,7 @@ func setRandSeed(name string) {
 func calculateEngine(name string) (engine.Engine, error) {
 	setRandSeed(name)
 
-	managerEngines := modelManager.GetEngines()
+	managerEngines := modelManager.GetAllEngines()
 	var enabledEngines []engine.Engine
 
 	for _, managerEngine := range managerEngines {

@@ -11,7 +11,7 @@ import (
 )
 
 func GetEngines(context echo.Context) error {
-	engines := modelManager.GetEngines()
+	engines := modelManager.GetActiveEngines()
 	engineList := make([]map[string]interface{}, 0, len(engines))
 
 	for _, engine := range engines {
@@ -39,7 +39,7 @@ func GetModels(context echo.Context) error {
 		})
 	}
 
-	engines := modelManager.GetEngines()
+	engines := modelManager.GetAllEngines()
 
 	var targetEngine *engine.Engine
 	for _, eng := range engines {
@@ -106,7 +106,7 @@ func GetVoices(context echo.Context) error {
 }
 
 func GetAllVoices(context echo.Context) error {
-	engines := modelManager.GetEngines()
+	engines := modelManager.GetAllEngines()
 
 	type ModelWithVoices struct {
 		ID     string         `json:"id"`

@@ -570,7 +570,7 @@ func (app *App) GetConfigSchema() string {
 
 // <editor-fold desc="Common">
 func (app *App) GetEngines() string {
-	engines := modelManager.GetEngines()
+	engines := modelManager.GetAllEngines()
 
 	jsonData, err := json.Marshal(engines)
 	if err != nil {

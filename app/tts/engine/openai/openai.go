@@ -2,7 +2,6 @@ package openai
 
 import (
 	"nstudio/app/common/audio"
-	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 	"nstudio/app/common/util/fileIndex"
@@ -42,7 +41,7 @@ func (openAI *OpenAI) Stop(modelName string) error {
 }
 
 func (openAI *OpenAI) Play(message util.CharacterMessage) error {
-	response.Debug(response.Data{
+	response.Debug(util.MessageData{
 		Summary: "OpenAI playing:" + message.Character,
 		Detail:  message.Text,
 	})
@@ -57,27 +56,27 @@ func (openAI *OpenAI) Play(message util.CharacterMessage) error {
 
 	audioClip, err := openAI.sendRequest(input)
 	if err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 
 	err = audio.PlayFLACAudioBytes(audioClip)
 	if err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 
-	return response.Success(response.Data{
+	return response.Success(util.MessageData{
 		Summary: "OpenAI finished playing flac",
 	})
 }
 
 func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
-	response.Debug(response.Data{
+	response.Debug(util.MessageData{
 		Summary: "Openai saving messages",
 	})
 
 	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 
 	for _, message := range messages {
@@ -91,7 +90,7 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 
 		audioClip, err := openAI.sendRequest(input)
 		if err != nil {
-			return issue.Trace(err)
+			return response.Err(err)
 		}
 
 		filename := util.GenerateFilename(
@@ -102,13 +101,13 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 
 		err = audio.SaveFLACAsWAV(audioClip, filename)
 		if err != nil {
-			return issue.Trace(err)
+			return response.Err(err)
 		}
 
 		if play {
 			err = audio.PlayFLACAudioBytes(audioClip)
 			if err != nil {
-				return issue.Trace(err)
+				return response.Err(err)
 			}
 		}
 	}

@@ -5,7 +5,6 @@ import (
 	"sync"
 )
 
-// <Config File>
 type ConfigManager struct {
 	//defaults map[string]Value `json:"defaults"`
 	config   Base       `json:"defaults"`
@@ -21,9 +20,36 @@ type Base struct {
 }
 
 type Settings struct {
-	OutputType OutputType.Option `json:"outputType"`
-	OutputPath string            `json:"outputPath"`
-	Debug      bool              `json:"debug"`
+	OutputType OutputType.Option  `json:"outputType"`
+	OutputPath string             `json:"outputPath"`
+	Debug      bool               `json:"debug"`
+	AudioCache AudioCacheSettings `json:"audioCache,omitempty"`
+	Server     ServerSettings     `json:"server,omitempty"`
+}
+
+type AudioCacheSettings struct {
+	Enabled  bool   `json:"enabled"`
+	Location string `json:"location"`
+}
+
+type ServerSettings struct {
+	Auth    AuthSettings          `json:"auth,omitempty"`
+	Engines ServerSettingsEngines `json:"engines, omitempty"`
+}
+type ServerSettingsEngines struct {
+	Piper      map[string]ModelInstances `json:"piper,omitempty"`
+	OpenAI     map[string]ModelInstances `json:"openai,omitempty"`
+	ElevenLabs map[string]ModelInstances `json:"elevenlabs,omitempty"`
+	MsSapi4    map[string]ModelInstances `json:"mssapi4,omitempty"`
+}
+
+type AuthSettings struct {
+	Key      string `json:"key"`
+	AdminKey string `json:"adminKey"`
+}
+
+type ModelInstances struct {
+	Instances int `json:"instances"`
 }
 
 type Engine struct {
@@ -68,5 +94,3 @@ type Info struct {
 	Website string `json:"website"`
 	OS      string `json:"os"`
 }
-
-//</Config File>

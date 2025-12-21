@@ -2,11 +2,12 @@ package eventManager
 
 import (
 	"context"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"sync"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-/* Events
+/* Currently used Events
 notification.send - send a notification to the user
 notification.enabled - enable/disable notifications
 app.refresh - reload current view

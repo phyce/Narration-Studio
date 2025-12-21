@@ -2,9 +2,9 @@ package mssapi4
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"nstudio/app/common/audio"
-	"nstudio/app/common/issue"
 	"nstudio/app/common/process"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
@@ -15,6 +15,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	//"time"
+
+	"github.com/charmbracelet/log"
 )
 
 func (sapi *MsSapi4) Initialize() error {
@@ -38,18 +41,27 @@ func (sapi *MsSapi4) Stop(modelName string) error {
 }
 
 func (sapi *MsSapi4) Play(message util.CharacterMessage) error {
-	response.Debug(response.Data{
+	response.Debug(util.MessageData{
 		Summary: "Ms Sapi 4 playing:" + message.Character,
 		Detail:  message.Text,
 	})
 
-	audioClip, err := sapi.Generate(message.Voice.Voice, []byte(message.Text))
+	payload := MsSapi4Request{
+		Text:  message.Text,
+		Voice: message.Voice.Voice,
+	}
+	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
+	}
+
+	audioClip, err := sapi.Generate(message.Voice.Model, jsonPayload)
+	if err != nil {
+		return response.Err(err)
 	}
 
 	audio.PlayRawAudioBytes(audioClip)
-	response.Debug(response.Data{
+	response.Debug(util.MessageData{
 		Summary: "Finshed playing audio for:" + message.Character,
 		Detail:  message.Text,
 	})
@@ -57,17 +69,17 @@ func (sapi *MsSapi4) Play(message util.CharacterMessage) error {
 }
 
 func (sapi *MsSapi4) Save(messages []util.CharacterMessage, play bool) error {
-	response.Debug(response.Data{
+	response.Debug(util.MessageData{
 		Summary: "Ms Sapi 4 saving messages",
 	})
 
 	err, outputPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 
 	if err := os.MkdirAll(outputPath, os.ModePerm); err != nil {
-		return issue.Trace(fmt.Errorf("Failed to create output directory: %w", err))
+		return response.Err(fmt.Errorf("Failed to create output directory: %w", err))
 	}
 
 	for _, message := range messages {
@@ -77,14 +89,23 @@ func (sapi *MsSapi4) Save(messages []util.CharacterMessage, play bool) error {
 			outputPath,
 		)
 
-		audioClip, err := sapi.Generate(message.Voice.Voice, []byte(message.Text))
+		payload := MsSapi4Request{
+			Text:  message.Text,
+			Voice: message.Voice.Voice,
+		}
+		jsonPayload, err := json.Marshal(payload)
 		if err != nil {
-			return issue.Trace(err)
+			return response.Err(err)
+		}
+
+		audioClip, err := sapi.Generate(message.Voice.Model, jsonPayload)
+		if err != nil {
+			return response.Err(err)
 		}
 
 		err = os.WriteFile(outputFilename, audioClip, 0644)
 		if err != nil {
-			return issue.Trace(fmt.Errorf("Failed to write audio to file '%s': %w", outputFilename, err))
+			return response.Err(fmt.Errorf("Failed to write audio to file '%s': %w", outputFilename, err))
 		}
 
 		if play {
@@ -95,40 +116,77 @@ func (sapi *MsSapi4) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
-func (sapi *MsSapi4) Generate(voice string, payload []byte) ([]byte, error) {
+func (sapi *MsSapi4) Generate(model string, payload []byte) ([]byte, error) {
+	log.Info("GENERATE CALLED")
+	log.Info(string(payload))
+	var ttsPayload MsSapi4Request
+	if err := json.Unmarshal(payload, &ttsPayload); err != nil {
+		return nil, response.Err(fmt.Errorf("failed to unmarshal payload: %w", err))
+	}
+
+	voiceID := ttsPayload.Voice
+	if voiceID == "" {
+		return nil, response.Err(fmt.Errorf("voice field is required in payload"))
+	}
+
+	voices, err := sapi.GetVoices(model)
+	if err != nil {
+		return nil, response.Err(fmt.Errorf("failed to get voices: %w", err))
+	}
+
+	var voiceName string
+	found := false
+	for _, voice := range voices {
+		if voice.ID == voiceID {
+			voiceName = voice.Name
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return nil, response.Err(fmt.Errorf("voice id '%s' not found", voiceID))
+	}
+
+	text := ttsPayload.Text
+	if text == "" {
+		return nil, response.Err(fmt.Errorf("text field is required in payload"))
+	}
 
 	command := exec.Command(
 		config.GetEngine().Local.MsSapi4.Location,
-		voice,
+		voiceName,
 		strconv.Itoa(config.GetEngine().Local.MsSapi4.Pitch),
 		strconv.Itoa(config.GetEngine().Local.MsSapi4.Speed),
-		string(payload),
+		text,
 	)
 
-	if !config.Debug() {
-		process.HideCommandLine(command)
-	}
-	var err error
+	log.Info("COMMAND:")
+	log.Info(command.String())
+	log.Info(config.GetEngine().Local.MsSapi4.Location)
+	log.Info(voiceName)
+	log.Info(strconv.Itoa(config.GetEngine().Local.MsSapi4.Pitch))
+	log.Info(strconv.Itoa(config.GetEngine().Local.MsSapi4.Speed))
+	log.Info(text)
 
-	err, outputPath := util.ExpandPath(config.Get().Settings.OutputPath)
+	process.HideCommandLine(command)
+
+	// Create unique temp directory for this request to avoid file system contention
+	tempDir, err := os.MkdirTemp("", "mssapi4-*")
 	if err != nil {
-		return nil, issue.Trace(err)
+		return nil, response.Err(fmt.Errorf("Failed to create temp directory: %w", err))
 	}
+	//defer os.RemoveAll(tempDir)
 
-	err = os.MkdirAll(outputPath, os.ModePerm)
-	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("Failed to create directory %s: %w", outputPath, err))
-	}
-
-	command.Dir = outputPath
+	command.Dir = tempDir
 
 	stdoutPipe, err := command.StdoutPipe()
 	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("Failed to get stdout pipe: %w", err))
+		return nil, response.Err(fmt.Errorf("Failed to get stdout pipe: %w", err))
 	}
 
 	if err := command.Start(); err != nil {
-		return nil, issue.Trace(fmt.Errorf("Failed to start sapi4out.exe: %w", err))
+		return nil, response.Err(fmt.Errorf("Failed to start sapi4out.exe: %w", err))
 	}
 
 	scanner := bufio.NewScanner(stdoutPipe)
@@ -137,19 +195,19 @@ func (sapi *MsSapi4) Generate(voice string, payload []byte) ([]byte, error) {
 
 	if !scanner.Scan() {
 		if err := scanner.Err(); err != nil {
-			return nil, issue.Trace(err)
+			return nil, response.Err(err)
 		}
-		return nil, issue.Trace(fmt.Errorf("No output received from sapi4out.exe"))
+		return nil, response.Err(fmt.Errorf("No output received from sapi4out.exe"))
 	}
 
 	filename = scanner.Text()
-	response.Debug(response.Data{
+	response.Debug(util.MessageData{
 		Summary: "Ms Sapi 4 generated:" + filename,
-		Detail:  string(payload),
+		Detail:  text,
 	})
 
 	if err := command.Wait(); err != nil {
-		return nil, issue.Trace(fmt.Errorf("Execution failed - sapi4out.exe: %w", err))
+		return nil, response.Err(fmt.Errorf("Execution failed - sapi4out.exe: %w", err))
 	}
 
 	audioFilePath := filepath.Join(command.Dir, filename)
@@ -157,11 +215,7 @@ func (sapi *MsSapi4) Generate(voice string, payload []byte) ([]byte, error) {
 
 	audioBytes, err := os.ReadFile(audioFilePath)
 	if err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to read audio file: %w", err))
-	}
-
-	if err := os.Remove(audioFilePath); err != nil {
-		return nil, issue.Trace(fmt.Errorf("failed to delete audio file: %w", err))
+		return nil, response.Err(fmt.Errorf("failed to read audio file: %w", err))
 	}
 
 	return audioBytes, nil
@@ -208,6 +262,10 @@ func (sapi *MsSapi4) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (sapi *MsSapi4) FetchModels() map[string]engine.Model {
+	return FetchModels()
+}
+
+func FetchModels() map[string]engine.Model {
 	return map[string]engine.Model{
 		"mssapi4": {
 			ID:     "mssapi4",

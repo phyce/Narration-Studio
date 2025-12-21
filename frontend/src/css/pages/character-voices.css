@@ -1,87 +1,87 @@
 .voices {
-    @apply flex flex-col w-full h-full;
+	@apply flex flex-col w-full h-full;
 }
 
 .voices__actions {
-    @apply w-full px-2 mb-1 flex;
+	@apply w-full px-2 mb-1 flex;
 }
 
 .voices__actions__save {
-    @apply mt-2 mr-2;
+	@apply mt-2 mr-2;
 }
 
 .voices__entry {
-    @apply flex ml-1 mr-2;
+	@apply flex ml-1 mr-2;
 }
 
 .voices__entry__name {
-    @apply flex-grow p-1;
+	@apply flex-grow p-1;
 }
 
 .voices__entry__name__input {
-    @apply w-full;
+	@apply w-full;
 }
 
 .voices__entry__model {
-    @apply
-        flex-initial
-        p-1
-        w-1/4
-        flex
-        items-center
-    ;
+	@apply
+	flex-initial
+	p-1
+	w-1/4
+	flex
+	items-center
+	;
 }
 
 .voices__entry__model__tree {
-    @apply w-full pt-0;
+	@apply w-full pt-0;
 }
 
 .voices__entry__voice {
-    @apply
-        flex-initial
-        p-1
-        w-1/4
-        flex
-        items-center
-    ;
+	@apply
+	flex-initial
+	p-1
+	w-1/4
+	flex
+	items-center
+	;
 }
 
 .voices__entry__voice__dropdown {
-    @apply w-full;
+	@apply w-full;
 }
 
 .voices__entry__actions {
-     @apply
-        flex-none
-        pl-2
-        flex
-        flex-col
-        items-start
-     ;
+	@apply
+	flex-none
+	pl-2
+	flex
+	flex-col
+	items-start
+	;
 }
 
 .voices__entry__actions__container {
-     @apply flex justify-end w-full;
+	@apply flex justify-end w-full;
 }
 
 .button-start {
-    @apply mt-1 mr-2 inline-block;
-    background-color: #3A9E8B;
-    border-color: #3A9E8B;
+	@apply mt-1 mr-2 inline-block;
+	background-color: #3A9E8B;
+	border-color: #3A9E8B;
 }
 
 .button-start:hover {
-    background-color: #276a5c !important;
-    border-color: #276a5c !important;
+	background-color: #276a5c !important;
+	border-color: #276a5c !important;
 }
 
 .button-stop {
-    @apply mt-1 inline-block;
-    background-color: #B03A2E;
-    border-color: #B03A2E;
+	@apply mt-1 inline-block;
+	background-color: #B03A2E;
+	border-color: #B03A2E;
 }
 
 .button-stop:hover {
-    background-color: #8a2d24 !important;
-    border-color: #8a2d24 !important;
+	background-color: #8a2d24 !important;
+	border-color: #8a2d24 !important;
 }

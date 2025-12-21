@@ -16,6 +16,7 @@ import {useToast} from "primevue/usetoast";
 const toast = useToast();
 
 const activePage = ref<string>('start');
+
 function handleUpdateActivePage(newPage: string) {
 	activePage.value = newPage;
 }
@@ -23,6 +24,7 @@ function handleUpdateActivePage(newPage: string) {
 interface pageComponent {
 	[key: string]: any;
 }
+
 const pageComponents: pageComponent = {
 	'start': Start,
 	'sandbox': Sandbox,
@@ -38,8 +40,8 @@ function showNotification(data: ToastMessageOptions) {
 	const detail = data.detail || '';
 	const life = data.life || 5000;
 
-	if (life) toast.add({ severity, summary, detail, life });
-	else toast.add({ severity, summary, detail });
+	if (life) toast.add({severity, summary, detail, life});
+	else toast.add({severity, summary, detail});
 }
 
 let unsubscribeNotification: () => void;
@@ -59,9 +61,9 @@ onUnmounted(() => {
 				@updateActivePage="handleUpdateActivePage"
 		/>
 		<main class="app__main">
-			<component :is="pageComponents[activePage]" />
+			<component :is="pageComponents[activePage]"/>
 		</main>
-		<Footer class="app__footer" />
-		<Toast position="bottom-center" />
+		<Footer class="app__footer"/>
+		<Toast position="bottom-center"/>
 	</div>
 </template>

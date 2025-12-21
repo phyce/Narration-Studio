@@ -42,3 +42,14 @@ func (characterVoice CharacterVoice) MarshalJSON() ([]byte, error) {
 		Alias: (Alias)(characterVoice),
 	})
 }
+
+func (characterVoice *CharacterVoice) Key() string {
+	return fmt.Sprintf("%s:%s:%s", characterVoice.Engine, characterVoice.Model, characterVoice.Voice)
+}
+
+type MessageData struct {
+	Summary  string `json:"summary"`
+	Detail   string `json:"detail"`
+	Severity string `json:"severity"`
+	Life     uint   `json:"life"`
+}

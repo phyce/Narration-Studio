@@ -1,35 +1,35 @@
 .sandbox {
-    @apply flex w-full h-full;
+	@apply flex w-full h-full;
 }
 
 .sandbox__panel {
-    @apply w-1/5 p-2;
+	@apply w-1/5 p-2;
 }
 
 .sandbox__panel__generate {
-    @apply w-full;
+	@apply w-full;
 }
 
 .sandbox__panel__model-tree {
-    @apply w-full mt-2 bg-blue-200;
+	@apply w-full mt-2 bg-blue-200;
 }
 
 .sandbox__panel__voice-dropdown {
-    @apply w-full mt-2 text-left;
+	@apply w-full mt-2 text-left;
 }
 
 .sandbox__panel__checkbox {
-    @apply
-        flex
-        items-center
-        justify-start
-        w-full
-        pt-1
-    ;
+	@apply
+	flex
+	items-center
+	justify-start
+	w-full
+	pt-1
+	;
 }
 
 .sandbox__editor {
-    @apply w-4/5;
+	@apply w-4/5;
 }
 
 .checkbox {
@@ -37,5 +37,5 @@
 }
 
 .checkbox-label {
-    @apply ml-2 cursor-pointer select-none;
+	@apply ml-2 cursor-pointer select-none;
 }

@@ -4,28 +4,29 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"nstudio/app/common/response"
+	"nstudio/app/common/util"
+	"os"
+	"path/filepath"
+	"sort"
+	"time"
+
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/gopxl/beep"
 	beepFlac "github.com/gopxl/beep/flac"
 	"github.com/gopxl/beep/speaker"
 	"github.com/mewkiz/flac"
-	"io"
-	"nstudio/app/common/issue"
-	"nstudio/app/common/response"
-	"os"
-	"path/filepath"
-	"sort"
-	"time"
 )
 
 func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate, channelCount, bitDepth int) error {
 	wavFiles, err := filepath.Glob(filepath.Join(dirPath, "*.wav"))
 	if err != nil {
-		return issue.Trace(fmt.Errorf("Failed to list WAV files: %v", err))
+		return response.Err(fmt.Errorf("Failed to list WAV files: %v", err))
 	}
 	if len(wavFiles) == 0 {
-		return issue.Trace(fmt.Errorf("No WAV files found in the directory"))
+		return response.Err(fmt.Errorf("No WAV files found in the directory"))
 	}
 
 	sort.Strings(wavFiles)
@@ -52,32 +53,32 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 
 		decoder := wav.NewDecoder(file)
 		if !decoder.IsValidFile() {
-			return issue.Trace(fmt.Errorf("Invalid WAV file: " + wavPath))
+			return response.Err(fmt.Errorf("Invalid WAV file: " + wavPath))
 		}
 
 		pcmBuffer, err := decoder.FullPCMBuffer()
 		if err != nil {
-			return issue.Trace(err)
+			return response.Err(err)
 		}
 
 		if pcmBuffer.Format.SampleRate != sampleRate {
 			pcmBuffer, err = ResampleBuffer(pcmBuffer, sampleRate)
 			if err != nil {
-				issue.Trace(err)
+				response.Err(err)
 			}
 		}
 
 		if pcmBuffer.Format.NumChannels != channelCount {
 			pcmBuffer, err = ChangeChannelCount(pcmBuffer, channelCount)
 			if err != nil {
-				issue.Trace(err)
+				response.Err(err)
 			}
 		}
 
 		if pcmBuffer.SourceBitDepth != bitDepth {
 			pcmBuffer, err = ChangeBitDepth(pcmBuffer, bitDepth)
 			if err != nil {
-				issue.Trace(err)
+				response.Err(err)
 			}
 		}
 
@@ -99,19 +100,19 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 	outputPath := filepath.Join(dirPath, outputFilename)
 	combinedFile, err := os.Create(outputPath)
 	if err != nil {
-		issue.Trace(err)
+		response.Err(err)
 	}
 	defer combinedFile.Close()
 
 	encoder := wav.NewEncoder(combinedFile, sampleRate, bitDepth, channelCount, 1)
 	err = encoder.Write(combinedBuffer)
 	if err != nil {
-		issue.Trace(err)
+		response.Err(err)
 	}
 
 	err = encoder.Close()
 	if err != nil {
-		issue.Trace(err)
+		response.Err(err)
 	}
 
 	return nil
@@ -173,7 +174,7 @@ func ChangeChannelCount(buffer *audio.IntBuffer, targetChannelCount int) (*audio
 			}
 		}
 	} else {
-		return nil, issue.Trace(fmt.Errorf("Unsupported channel conversion"))
+		return nil, response.Err(fmt.Errorf("Unsupported channel conversion"))
 	}
 
 	convertedBuf := &audio.IntBuffer{
@@ -228,7 +229,7 @@ func PlayPCMAudioBytes(audioClip []byte) error {
 			var sample int16
 			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
 			if err != nil {
-				response.Error(response.Data{
+				response.Error(util.MessageData{
 					Summary: "Error reading PCM data",
 					Detail:  err.Error(),
 				})
@@ -309,7 +310,7 @@ func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
 
 	stream, err := flac.New(reader)
 	if err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 
 	var buffer audio.IntBuffer
@@ -324,7 +325,7 @@ func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
 			break
 		}
 		if err != nil {
-			return issue.Trace(err)
+			return response.Err(err)
 		}
 		for _, subframe := range frame.Subframes {
 			for _, sample := range subframe.Samples {
@@ -335,16 +336,16 @@ func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
 
 	outputFile, err := os.Create(filename)
 	if err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 	defer outputFile.Close()
 
 	encoder := wav.NewEncoder(outputFile, buffer.Format.SampleRate, int(stream.Info.BitsPerSample), buffer.Format.NumChannels, 1)
 	if err := encoder.Write(&buffer); err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 	if err := encoder.Close(); err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 
 	return nil

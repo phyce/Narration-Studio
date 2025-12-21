@@ -1,56 +1,56 @@
 .settings {
-    @apply flex flex-col w-full h-full;
+	@apply flex flex-col w-full h-full;
 }
 
 .settings__actions {
-    @apply w-full px-2 mb-2 flex;
+	@apply w-full px-2 mb-2 flex;
 }
 
 .settings__actions__save {
-    @apply
-        mt-2
-        mr-2
-        w-52
-    ;
+	@apply
+	mt-2
+	mr-2
+	w-52
+	;
 }
 
 .settings_actions_debug {
-    @apply
-        flex
-        items-center
-        justify-start
-        w-full
-        pt-1
-    ;
+	@apply
+	flex
+	items-center
+	justify-start
+	w-full
+	pt-1
+	;
 }
 
 .settings__container {
-    @apply
-        flex-grow
-        flex
-        flex-col
-        p-2
-    ;
+	@apply
+	flex-grow
+	flex
+	flex-col
+	p-2
+	;
 
-    background-color: #1e1e1e;
+	background-color: #1e1e1e;
 }
 
 .input-group {
-    @apply mb-2 flex;
+	@apply mb-2 flex;
 }
 
 .input-group__addon {
-    @apply w-1/6;
+	@apply w-1/6;
 }
 
 .input-group__input {
-    @apply flex-grow disabled:bg-neutral-800;
+	@apply flex-grow disabled:bg-neutral-800;
 }
 
 .input-group__button {
-    @apply w-1/6;
+	@apply w-1/6;
 }
 
 .input-group__dropdown {
-    @apply flex-grow;
+	@apply flex-grow;
 }

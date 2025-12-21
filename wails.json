@@ -1,22 +1,22 @@
 {
-  "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "Narration Studio",
-  "version": "0.12.2",
-  "website": "https://narration.studio",
-  "outputfilename": "narration_studio",
-  "frontend:install": "npm install",
-  "frontend:build": "npm run build",
-  "frontend:dev:watcher": "npm run dev",
-  "frontend:dev:serverUrl": "auto",
-  "author": {
-    "name": "phyce",
-    "email": "contact@mechanic.ink"
-  },
-  "Info": {
-    "companyName": "phyce.dev",
-    "productName": "Narration Studio",
-    "productVersion": "0.12.2",
-    "copyright": "Copyright phyce.dev",
-    "comments": "Built using Wails (https://wails.io)"
-  }
+	"$schema": "https://wails.io/schemas/config.v2.json",
+	"name": "Narration Studio",
+	"version": "0.13.0",
+	"website": "https://narration.studio",
+	"outputfilename": "narration_studio",
+	"frontend:install": "npm install",
+	"frontend:build": "npm run build",
+	"frontend:dev:watcher": "npm run dev",
+	"frontend:dev:serverUrl": "auto",
+	"author": {
+		"name": "phyce",
+		"email": "contact@mechanic.ink"
+	},
+	"Info": {
+		"companyName": "phyce.dev",
+		"productName": "Narration Studio",
+		"productVersion": "0.13.0",
+		"copyright": "Copyright phyce.dev",
+		"comments": "Built using Wails (https://wails.io)"
+	}
 }

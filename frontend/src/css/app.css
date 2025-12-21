@@ -1,13 +1,13 @@
 .app {
-    @apply flex flex-col h-full;
+	@apply flex flex-col h-full;
 }
 
 .app__header {
-    @apply bg-neutral-800;
+	@apply bg-neutral-800;
 }
 
 .app__main {
-    @apply flex-grow bg-neutral-700 overflow-y-auto;
+	@apply flex-grow bg-neutral-700 overflow-y-auto;
 }
 
 .app__footer {
@@ -15,13 +15,13 @@
 }
 
 #logo {
-  display: block;
-  width: 50%;
-  height: 50%;
-  margin: auto;
-  padding: 10% 0 0;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-origin: content-box;
+	display: block;
+	width: 50%;
+	height: 50%;
+	margin: auto;
+	padding: 10% 0 0;
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: 100% 100%;
+	background-origin: content-box;
 }

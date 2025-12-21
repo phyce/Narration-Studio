@@ -13,8 +13,6 @@ import {
 	ReloadVoicePacks,
 	SaveSettings,
 } from '../../../wailsjs/go/main/App';
-import {config as configuration} from "../../../wailsjs/go/models";
-import configBase = configuration.Base;
 
 const models = ref<Record<string, Model>>({});
 const modelToggles = reactive<Record<string, boolean>>({});
@@ -71,12 +69,12 @@ const handleCheckboxToggle = async () => {
 				Reload Packs
 			</Button>
 		</div>
-		<div  class="voice-packs__container"
-			  :key="key"
-			  v-for="(model, key) in models"
+		<div class="voice-packs__container"
+			 :key="key"
+			 v-for="(model, key) in models"
 		>
 			<Card class="voice-pack">
-				<template #title>{{ model.name }} {{model.key}}</template>
+				<template #title>{{ model.name }} {{ model.key }}</template>
 				<template #content>
 					<div class="voice-pack__container">
 						<div class="voice-pack__container__info" :title="model.engine + ':' + model.id">

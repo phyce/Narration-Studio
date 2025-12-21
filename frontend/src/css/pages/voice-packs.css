@@ -24,10 +24,10 @@
 
 .voice-pack__container__info {
 	@apply
-		flex-grow
-		whitespace-nowrap
-		overflow-hidden
-		text-ellipsis
+	flex-grow
+	whitespace-nowrap
+	overflow-hidden
+	text-ellipsis
 	;
 }
 

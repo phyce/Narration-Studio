@@ -60,6 +60,34 @@ export namespace config {
 		    return a;
 		}
 	}
+	export class AudioCacheSettings {
+	    enabled: boolean;
+	    location: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AudioCacheSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.location = source["location"];
+	    }
+	}
+	export class AuthSettings {
+	    key: string;
+	    adminKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.adminKey = source["adminKey"];
+	    }
+	}
 	export class Info {
 	    name: string;
 	    version: string;
@@ -172,10 +200,92 @@ export namespace config {
 		    return a;
 		}
 	}
+	export class ModelInstances {
+	    instances: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelInstances(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.instances = source["instances"];
+	    }
+	}
+	export class ServerSettingsEngines {
+	    piper?: Record<string, ModelInstances>;
+	    openai?: Record<string, ModelInstances>;
+	    elevenlabs?: Record<string, ModelInstances>;
+	    mssapi4?: Record<string, ModelInstances>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerSettingsEngines(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.piper = this.convertValues(source["piper"], ModelInstances, true);
+	        this.openai = this.convertValues(source["openai"], ModelInstances, true);
+	        this.elevenlabs = this.convertValues(source["elevenlabs"], ModelInstances, true);
+	        this.mssapi4 = this.convertValues(source["mssapi4"], ModelInstances, true);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ServerSettings {
+	    auth?: AuthSettings;
+	    engines: ServerSettingsEngines;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.auth = this.convertValues(source["auth"], AuthSettings);
+	        this.engines = this.convertValues(source["engines"], ServerSettingsEngines);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Settings {
 	    outputType: number;
 	    outputPath: string;
 	    debug: boolean;
+	    audioCache?: AudioCacheSettings;
+	    server?: ServerSettings;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -186,12 +296,32 @@ export namespace config {
 	        this.outputType = source["outputType"];
 	        this.outputPath = source["outputPath"];
 	        this.debug = source["debug"];
+	        this.audioCache = this.convertValues(source["audioCache"], AudioCacheSettings);
+	        this.server = this.convertValues(source["server"], ServerSettings);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Base {
 	    settings: Settings;
 	    engine: Engine;
-	    modelToggles: {[key: string]: boolean};
+	    modelToggles: Record<string, boolean>;
 	    info: Info;
 	
 	    static createFrom(source: any = {}) {
@@ -224,6 +354,9 @@ export namespace config {
 		    return a;
 		}
 	}
+	
+	
+	
 	
 	
 	

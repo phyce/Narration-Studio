@@ -3,7 +3,7 @@ package engine
 import (
 	"encoding/json"
 	"fmt"
-	"nstudio/app/common/issue"
+	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 )
 
@@ -67,7 +67,7 @@ func (voice *Voice) UnmarshalJSON(data []byte) error {
 
 	var tempStruct tempVoice
 	if err := json.Unmarshal(data, &tempStruct); err != nil {
-		return issue.Trace(err)
+		return response.Err(err)
 	}
 
 	voice.ID = fmt.Sprintf("%d", tempStruct.VoiceID+tempStruct.PiperVoiceID)

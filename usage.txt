@@ -1,0 +1,41 @@
+Narration Studio - TTS Server
+
+Usage:
+  --mode string
+        Server mode: gui, http, websocket, grpc, tcp, namedpipe, filesystem, library (default "gui")
+  --port int
+        Server port (for applicable modes) (default 8080)
+  --host string
+        Server host (for applicable modes) (default "localhost")
+  --config string
+        Path to custom config JSON file
+  --background
+        Run server in background mode
+  --status
+        Check status of background server
+  --stop
+        Stop background server
+  --help
+        Show help
+
+Available modes:
+  gui        - Launch GUI application (default)
+  http       - Start HTTP REST API server
+  websocket  - Start WebSocket server (not implemented)
+  grpc       - Start gRPC server (not implemented)
+  tcp        - Start TCP socket server (not implemented)
+  namedpipe  - Start named pipe server (not implemented)
+  filesystem - Start file-based server (not implemented)
+  library    - Shared library mode (not implemented)
+
+Process Management:
+  --background   - Run server in background mode
+  --status       - Check status of background server
+  --stop         - Stop background server
+
+Examples:
+  ./narration-studio --mode=http --port=8080 --config=/path/to/config.json
+  ./narration-studio --mode=http --background --port=8080
+  ./narration-studio --status
+  ./narration-studio --stop
+  ./narration-studio --config=/path/to/my-config.json

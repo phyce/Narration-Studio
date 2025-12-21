@@ -13,7 +13,7 @@
 
 <script lang="ts" setup>
 import * as monaco from 'monaco-editor';
-import { ref, shallowRef, onUnmounted, watch, defineProps, defineEmits } from 'vue';
+import {defineEmits, defineProps, onUnmounted, ref, shallowRef, watch} from 'vue';
 
 const props = defineProps<{
 	regexes: Array<{ regex: RegExp, className: string }>,
@@ -52,7 +52,7 @@ onUnmounted(() => {
 
 watch(props.regexes, () => {
 	applyRegexHighlighting();
-}, { deep: true });
+}, {deep: true});
 
 watch(() => props.text, (newValue) => {
 	internalText.value = newValue;
@@ -67,7 +67,7 @@ function applyRegexHighlighting() {
 	if (!model) return;
 
 	let newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
-	props.regexes.forEach(({ regex, className }) => {
+	props.regexes.forEach(({regex, className}) => {
 		let match;
 		while ((match = regex.exec(model.getValue())) !== null) {
 			const start = model.getPositionAt(match.index);

@@ -1,24 +1,44 @@
 {
 	"settings": {
-		"outputType" : 0,
-		"outputPath" : "~/Desktop/Narration Studio/output",
-		"debug": false
+		"outputType": 0,
+		"outputPath": "~/Desktop/Narration Studio/output",
+		"debug": false,
+		"audioCache": {
+			"enabled": true,
+			"location": "~/Desktop/Narration Studio/cache"
+		},
+		"server": {
+			"auth": {
+				"key": "",
+				"adminKey": ""
+			},
+			"engines": {
+				"piper": {
+					"libritts": {
+						"instances": 2
+					}
+				}
+			}
+		}
 	},
 	"engine": {
 		"local": {
 			"piper": {
 				"directory": "~/piper/piper",
-				"modelsDirectory": "~/piper/models"
+				"modelsDirectory": "~/piper/models",
+				"cacheAudioClips": true
 			}
 		},
 		"api": {
 			"openAi": {
 				"apiKey": "",
-				"outputType": "flac"
+				"outputType": "flac",
+				"cacheAudioClips": true
 			},
 			"elevenLabs": {
 				"apiKey": "",
-				"outputType": "pcm_24000"
+				"outputType": "pcm_24000",
+				"cacheAudioClips": true
 			}
 		}
 	},

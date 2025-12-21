@@ -1,4 +1,4 @@
-import {Engine, Model, Voice } from '../components/interfaces/engine';
+import {Engine} from '../components/interfaces/engine';
 // import {GetEngines} from "../../wailsjs/go/main/App";
 // import {useToast} from "primevue/usetoast";
 // const toast = useToast();

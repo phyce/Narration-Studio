@@ -28,8 +28,17 @@ func init() {
 }
 
 func Initialize(info Info) error {
+	return InitializeWithPath(info, "")
+}
+
+func InitializeWithPath(info Info, customPath string) error {
 	manager.config.Info = info
-	manager.filePath = filepath.Join(GetConfigPath(), "defaults.json")
+
+	if customPath != "" {
+		manager.filePath = customPath
+	} else {
+		manager.filePath = filepath.Join(GetDefaultConfigPath(), "config.json")
+	}
 
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
@@ -42,7 +51,7 @@ func Initialize(info Info) error {
 
 			configPath := filepath.Dir(manager.filePath)
 			if err := os.MkdirAll(configPath, 0755); err != nil {
-				return issue.Trace(err)
+				return err
 			}
 
 			err = ioutil.WriteFile(manager.filePath, configFile, 0644)
@@ -59,14 +68,14 @@ func Initialize(info Info) error {
 		fmt.Println("Config file location", manager.filePath)
 	}
 
-	if err != nil {
-		return issue.Trace(err)
-	}
-
 	return err
 }
 
-func GetConfigPath() string {
+func GetCurrentConfigPath() string {
+	return filepath.Dir(manager.filePath)
+}
+
+func GetDefaultConfigPath() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		issue.Panic("Failed to get user defaults directory", err)
@@ -81,7 +90,7 @@ func Export() (string, error) {
 
 	settingsJSON, err := json.Marshal(manager.config)
 	if err != nil {
-		return "", issue.Trace(err)
+		return "", err
 	}
 
 	return string(settingsJSON), nil
@@ -91,19 +100,19 @@ func Import(jsonString string) error {
 	var newConfig Base
 	err := json.Unmarshal([]byte(jsonString), &newConfig)
 	if err != nil {
-		return issue.Trace(err)
+		return err
 	}
 
 	manager.config = newConfig
 
-	updatedConfigs, err := json.Marshal(manager.config)
+	updatedConfigs, err := json.MarshalIndent(manager.config, "", "\t")
 	if err != nil {
-		return issue.Trace(err)
+		return err
 	}
 
 	err = ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 	if err != nil {
-		return issue.Trace(err)
+		return err
 	}
 
 	return nil
@@ -153,7 +162,7 @@ func GetInfo() Info {
 func GetValueFromPath(path string) (interface{}, error) {
 	parts := strings.Split(path, ".")
 	if len(parts) == 0 {
-		return nil, issue.Trace(fmt.Errorf("Invalid path"))
+		return nil, fmt.Errorf("Invalid path")
 	}
 
 	current := reflect.ValueOf(manager.config)
@@ -164,12 +173,12 @@ func GetValueFromPath(path string) (interface{}, error) {
 		}
 
 		if current.Kind() != reflect.Struct {
-			return nil, issue.Trace(fmt.Errorf("Path segment '%s' is not a struct", part))
+			return nil, fmt.Errorf("Path segment '%s' is not a struct", part)
 		}
 
 		field, found := findFieldByJSONTag(current, part)
 		if !found {
-			return nil, issue.Trace(fmt.Errorf("Field '%s' not found", part))
+			return nil, fmt.Errorf("Field '%s' not found", part)
 		}
 
 		current = field
@@ -184,7 +193,7 @@ func Set(newConfig Base) error {
 
 	manager.config = newConfig
 
-	updatedConfigs, err := json.Marshal(manager.config)
+	updatedConfigs, err := json.MarshalIndent(manager.config, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -195,13 +204,13 @@ func Set(newConfig Base) error {
 func SetValueToPath(path string, value string) error {
 	parts := strings.Split(path, ".")
 	if len(parts) == 0 {
-		return issue.Trace(fmt.Errorf("Invalid path"))
+		return fmt.Errorf("Invalid path")
 	}
 
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
-	current := reflect.ValueOf(&manager.config).Elem() // Get a reflect.Value of the Base struct
+	current := reflect.ValueOf(&manager.config).Elem()
 
 	for i, part := range parts {
 		if current.Kind() == reflect.Ptr {
@@ -213,40 +222,43 @@ func SetValueToPath(path string, value string) error {
 		}
 
 		if current.Kind() != reflect.Struct {
-			return issue.Trace(fmt.Errorf("Path segment '%s' is not a struct", part))
+			return fmt.Errorf("Path segment '%s' is not a struct", part)
 		}
 
 		field, found := findFieldByJSONTag(current, part)
 		if !found {
-			return issue.Trace(fmt.Errorf("Field '%s' not found", part))
+			return fmt.Errorf("Field '%s' not found", part)
 		}
 
 		if i == len(parts)-1 {
 			// This is the target field to set
 			if !field.CanSet() {
-				return issue.Trace(fmt.Errorf("Cannot set field '%s'", part))
+				return fmt.Errorf("Cannot set field '%s'", part)
 			}
 
-			// Determine the type of the field
-			fieldType := field.Type()
-
-			// Create a new instance of the field's type
-			newValuePtr := reflect.New(fieldType)
+			newValuePtr := reflect.New(field.Type())
 
 			// Unmarshal the JSON value into the new instance
 			err := json.Unmarshal([]byte(value), newValuePtr.Interface())
 			if err != nil {
-				return issue.Trace(fmt.Errorf("Failed to unmarshal value: %w", err))
+				return fmt.Errorf("Failed to unmarshal value: %w", err)
 			}
 
 			// Set the field to the new value (dereference the pointer)
 			field.Set(newValuePtr.Elem())
-			return nil
+
+			// Save the updated config to disk
+			updatedConfigs, err := json.MarshalIndent(manager.config, "", "\t")
+			if err != nil {
+				return err
+			}
+
+			return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
 		} else {
 			// Traverse to the next nested struct
 			current = field
 		}
 	}
 
-	return issue.Trace(fmt.Errorf("Path '%s' did not reach a field", path))
+	return fmt.Errorf("Path '%s' did not reach a field", path)
 }

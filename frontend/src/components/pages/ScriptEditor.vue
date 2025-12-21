@@ -5,32 +5,34 @@ import Button from 'primevue/button';
 import InputGroup from 'primevue/inputgroup';
 import InputText from 'primevue/inputtext';
 import Editor from "../common/Editor.vue";
-import { SelectDirectory, GetSettings, SaveSettings, ProcessScript } from '../../../wailsjs/go/main/App';
-import { useLocalStorage } from "@vueuse/core";
-import { onMounted, ref } from "vue";
+import ProfileSelector from '../common/ProfileSelector.vue';
+import {GetSettings, ProcessScript, SaveSettings, SelectDirectory} from '../../../wailsjs/go/main/App';
+import {useLocalStorage} from "@vueuse/core";
+import {onMounted, ref} from "vue";
 import {config as configuration} from "../../../wailsjs/go/models";
 import configBase = configuration.Base;
 
 const text = useLocalStorage<string>('scriptText', 'user: hello world');
+const selectedProfile = useLocalStorage<string>('scriptProfile', 'default');
 const config = ref<configBase>({} as configBase);
 const loading = ref<boolean>(true);
 
 const regexes = [
-	{ regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence' },
-	{ regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character' },
+	{regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence'},
+	{regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character'},
 ];
 
 const handleBrowseClick = async () => {
 	const result = await SelectDirectory(config.value.settings.outputPath as string);
 	if (result.length > 0 && config.value.settings.outputPath != result) {
-		config.value.settings.outputPath =  result;
+		config.value.settings.outputPath = result;
 
 		await SaveSettings(config.value);
 	}
 }
 
 const processScript = () => {
-	ProcessScript(text.value)
+	ProcessScript(text.value, selectedProfile.value)
 }
 
 onMounted(async () => {
@@ -42,7 +44,8 @@ onMounted(async () => {
 <template>
 	<div class="script" v-if="!loading">
 		<div class="script__panel">
-			<InputGroup v-if="!loading" :title="config.settings.outputPath">
+			<ProfileSelector v-model="selectedProfile"/>
+			<InputGroup v-if="!loading" :title="config.settings.outputPath" class="mt-2">
 				<InputText class="script__panel__input"
 						   :value="config.settings.outputPath"
 						   placeholder="Output Path"

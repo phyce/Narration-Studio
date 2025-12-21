@@ -1,36 +1,36 @@
 .header {
-    @apply bg-neutral-800;
+	@apply bg-neutral-800;
 }
 
 .header__list {
-    @apply
-        flex
-        flex-wrap
-        justify-center
-        text-center
-        text-sm
-        font-medium
-        text-gray-400
-        border-b
-        border-gray-200
-    ;
+	@apply
+	flex
+	flex-wrap
+	justify-center
+	text-center
+	text-sm
+	font-medium
+	text-gray-400
+	border-b
+	border-gray-200
+	;
 }
 
 .header__list__item {
-    @apply mr-2;
+	@apply mr-2;
 }
 
 .header__list__item__button {
-    @apply
-        inline-block
-        p-4
-        border-b-2
-        rounded-t-lg
-        border-transparent
-        hover:border-gray-300
-    ;
+	@apply
+	inline-block
+	p-4
+	border-b-2
+	rounded-t-lg
+	border-transparent
+	hover:border-gray-300
+	;
 }
 
 .button--active {
-    @apply border-orange-600 text-orange-600;
+	@apply border-orange-600 text-orange-600;
 }

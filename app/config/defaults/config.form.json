@@ -1,0 +1,225 @@
+{
+	"settings": {
+		"label": "Settings",
+		"description": "Application settings",
+		"children": {
+			"outputType": {
+				"label": "Output Mode",
+				"type": "dropdown",
+				"options": [
+					{"value": 0, "label": "Individual Files"},
+					{"value": 1, "label": "Combined File"},
+					{"value": 2, "label": "Both Individual and Combined"}
+				],
+				"description": "How to save generated audio files"
+			},
+			"outputPath": {
+				"label": "Output Directory",
+				"type": "path",
+				"pathType": "directory",
+				"description": "Where to save generated audio files"
+			},
+			"debug": {
+				"label": "Debug Mode",
+				"description": "Enable debug logging and minimized startup"
+			},
+			"audioCache": {
+				"label": "Audio Cache",
+				"description": "Cache generated audio",
+				"children": {
+					"enabled": {
+						"label": "Enable Cache",
+						"description": "Cache generated audio files for reuse"
+					},
+					"location": {
+						"label": "Cache Directory",
+						"type": "path",
+						"pathType": "directory",
+						"description": "Where to store cached audio files"
+					}
+				}
+			},
+			"server": {
+				"label": "Server Settings",
+				"description": "Configure server-specific settings",
+				"children": {
+					"auth": {
+						"label": "Authentication",
+						"description": "Authentication settings for server mode",
+						"children": {
+							"key": {
+								"label": "Access Key",
+								"type": "password",
+								"description": "Key for authenticating server requests (e.g., via header or query param)"
+							},
+							"adminKey": {
+								"label": "Admin Key",
+								"type": "password",
+								"description": "This key allows you to change settings via API"
+							}
+						}
+					},
+					"engines": {
+						"label": "Engine Pool Settings",
+						"description": "Configure engine instance pools for server mode",
+						"children": {
+							"piper": {
+								"label": "Piper",
+								"description": "Piper engine pool settings",
+								"children": {
+									"libritts": {
+										"label": "LibriTTS",
+										"description": "Model Settings",
+										"children": {
+											"instances": {
+												"label": "Instances",
+												"type": "number",
+												"min": 1,
+												"max": 50,
+												"description": "Instance count"
+											}
+										}
+									}
+								}
+							},
+							"mssapi4": {
+								"label": "",
+								"description": "",
+								"children": {
+									"mssapi4": {
+										"label": "Microsoft Speech Api 4",
+										"description": "Model Settings",
+										"children": {
+											"instances": {
+												"label": "Instances",
+												"type": "number",
+												"min": 1,
+												"max": 50,
+												"description": "Instance count"
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"engine": {
+		"label": "Engine Configuration",
+		"description": "TTS engine settings",
+		"children": {
+			"local": {
+				"label": "Local Engines",
+				"description": "Local TTS engine configuration",
+				"children": {
+					"piper": {
+						"label": "Piper",
+						"description": "Piper TTS engine settings",
+						"children": {
+							"location": {
+								"label": "Piper Executable",
+								"type": "path",
+								"pathType": "file",
+								"description": "Path to piper executable"
+							},
+							"modelsDirectory": {
+								"label": "Models Directory",
+								"type": "path",
+								"pathType": "directory",
+								"description": "Directory containing piper voice models"
+							}
+						}
+					},
+					"msSapi4": {
+						"label": "Microsoft SAPI4",
+						"description": "Microsoft SAPI4 TTS engine settings (Windows only)",
+						"children": {
+							"location": {
+								"label": "SAPI4 Executable",
+								"type": "path",
+								"pathType": "file",
+								"description": "Path to SAPI4 executable"
+							},
+							"pitch": {
+								"label": "Voice Pitch",
+								"type": "number",
+								"min": 0,
+								"max": 300,
+								"description": "Voice pitch (default: 150)"
+							},
+							"speed": {
+								"label": "Speech Speed",
+								"type": "number",
+								"min": 50,
+								"max": 200,
+								"description": "Speech speed (default: 100)"
+							}
+						}
+					}
+				}
+			},
+			"api": {
+				"label": "API Engines",
+				"description": "Cloud-based TTS engine configuration",
+				"children": {
+					"openAI": {
+						"label": "OpenAI",
+						"description": "OpenAI TTS settings",
+						"children": {
+							"apiKey": {
+								"label": "API Key",
+								"type": "password",
+								"description": "Your OpenAI API key"
+							},
+							"outputType": {
+								"label": "Output Format",
+								"type": "dropdown",
+								"options": [
+									{"value": "wav", "label": "WAV"},
+									{"value": "mp3", "label": "MP3"},
+									{"value": "opus", "label": "Opus"},
+									{"value": "aac", "label": "AAC"},
+									{"value": "flac", "label": "FLAC"},
+									{"value": "pcm", "label": "Raw PCM"}
+								],
+								"description": "Audio format for OpenAI TTS"
+							}
+						}
+					},
+					"elevenLabs": {
+						"label": "ElevenLabs",
+						"description": "ElevenLabs TTS settings",
+						"children": {
+							"apiKey": {
+								"label": "API Key",
+								"type": "password",
+								"description": "Your ElevenLabs API key"
+							},
+							"outputType": {
+								"label": "Output Format",
+								"type": "dropdown",
+								"options": [
+									{"value": "pcm_16000", "label": "PCM 16kHz"},
+									{"value": "pcm_22050", "label": "PCM 22.05kHz"},
+									{"value": "pcm_24000", "label": "PCM 24kHz"},
+									{"value": "pcm_44100", "label": "PCM 44.1kHz"}
+								],
+								"description": "Audio format for ElevenLabs TTS"
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"modelToggles": {
+		"label": "Model Toggles",
+		"description": "Enable or disable specific voice models",
+		"dynamic": true,
+		"valueType": "checkbox",
+		"hidden": true
+	}
+}

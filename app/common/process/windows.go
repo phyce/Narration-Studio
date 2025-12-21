@@ -4,10 +4,11 @@
 package process
 
 import (
-	"golang.org/x/sys/windows"
 	"os"
 	"os/exec"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 const (

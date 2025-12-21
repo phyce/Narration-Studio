@@ -1,38 +1,39 @@
+//go:build !cli
+
 package main
 
 import (
 	"embed"
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"fmt"
 	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
-	"nstudio/app/tts/engine"
-	"nstudio/app/tts/engine/elevenlabs"
-	"nstudio/app/tts/engine/mssapi4"
-	"nstudio/app/tts/engine/openai"
-	"nstudio/app/tts/engine/piper"
-	"nstudio/app/tts/voiceManager"
-	"runtime"
+	"nstudio/app/tts/modelManager"
+
+	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	response.Initialize()
+	SetupSignalHandler(func() {
+		fmt.Println("\nShutting down...")
+	})
 
-	err := config.Initialize(Info())
-	if err != nil {
-		issue.Panic("Failed to initialize defaults", err)
+	if err := initializeApp(""); err != nil {
+		issue.Panic("Failed to initialize app", err)
 	}
 
-	voiceManager.Initialize()
+	modelManager.Initialize(true)
 
 	registerEngines()
 
 	app := NewApp()
+
+	response.Initialize()
 
 	var startMode options.WindowStartState
 	if config.Debug() {
@@ -41,7 +42,7 @@ func main() {
 		startMode = options.Normal
 	}
 
-	err = wails.Run(&options.App{
+	err := wails.Run(&options.App{
 		Title:            config.GetInfo().Name + " v" + config.GetInfo().Version,
 		Width:            1024,
 		Height:           768,
@@ -59,59 +60,4 @@ func main() {
 	if err != nil {
 		issue.Panic("Failed to start app", err)
 	}
-}
-
-func registerEngines() {
-	//TODO: Load Models from file
-	piperEngine := engine.Engine{
-		ID:     "piper",
-		Name:   "Piper",
-		Engine: &piper.Piper{},
-		Models: piper.FetchModels(),
-	}
-	err := voiceManager.RegisterEngine(piperEngine)
-	if err != nil {
-		issue.Trace(err)
-	}
-
-	openAIEngine := engine.Engine{
-		ID:     "openai",
-		Name:   "OpenAI",
-		Engine: &openai.OpenAI{},
-		Models: openai.FetchModels(),
-	}
-	err = voiceManager.RegisterEngine(openAIEngine)
-	if err != nil {
-		issue.Trace(err)
-	}
-
-	models, err := elevenlabs.FetchModels()
-	if err != nil {
-		models = make(map[string]engine.Model)
-	}
-
-	elevenLabsEngine := engine.Engine{
-		ID:     "elevenlabs",
-		Name:   "ElevenLabs",
-		Engine: &elevenlabs.ElevenLabs{},
-		Models: models,
-	}
-	err = voiceManager.RegisterEngine(elevenLabsEngine)
-	if err != nil {
-		issue.Trace(err)
-	}
-
-	if runtime.GOOS == "windows" {
-		msSapi4Engine := engine.Engine{
-			ID:     "mssapi4",
-			Name:   "Microsoft SAPI4",
-			Engine: &mssapi4.MsSapi4{},
-		}
-		err = voiceManager.RegisterEngine(msSapi4Engine)
-		if err != nil {
-			issue.Trace(err)
-		}
-	}
-
-	voiceManager.ReloadModels()
 }

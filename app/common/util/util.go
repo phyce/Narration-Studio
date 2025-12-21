@@ -1,9 +1,9 @@
 package util
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
-	"nstudio/app/common/issue"
-	"nstudio/app/common/response"
 	"nstudio/app/common/util/fileIndex"
 	"os"
 	"os/user"
@@ -40,10 +40,7 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 
 	err := PrepareDirectory(outputPath)
 	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to prepare directory: " + outputPath,
-			Detail:  err.Error(),
-		})
+		fmt.Println(err)
 	}
 
 	return fullPath
@@ -59,7 +56,7 @@ func ExpandPath(path string) (error, string) {
 		if strings.HasPrefix(path, "~") {
 			usr, err := user.Current()
 			if err != nil {
-				return issue.Trace(err), ""
+				return err, ""
 			}
 			path = filepath.Join(usr.HomeDir, path[1:])
 		}
@@ -72,7 +69,7 @@ func ExpandPath(path string) (error, string) {
 func PrepareDirectory(filePath string) error {
 	err := os.MkdirAll(filePath, 0755)
 	if err != nil {
-		return issue.Trace(err)
+		return err
 	}
 	return nil
 }
@@ -96,4 +93,52 @@ func TruncateString(str string, maxLength int) string {
 func convertPercentVars(path string) string {
 	re := regexp.MustCompile(`%([^%]+)%`)
 	return re.ReplaceAllString(path, "${$1}")
+}
+
+func HashText(text string) string {
+	normalized := strings.ToLower(strings.TrimSpace(text))
+	hash := sha256.Sum256([]byte(normalized))
+	return hex.EncodeToString(hash[:])
+}
+
+func SanitizeFilename(text string) string {
+	parts := strings.SplitN(text, ":", 2)
+	if len(parts) == 2 {
+		text = strings.TrimSpace(parts[1])
+	}
+
+	invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"}
+	sanitized := text
+	for _, char := range invalid {
+		sanitized = strings.ReplaceAll(sanitized, char, "_")
+	}
+
+	sanitized = strings.Join(strings.Fields(sanitized), " ")
+
+	maxLen := 50
+	if len(sanitized) > maxLen {
+		sanitized = sanitized[:maxLen]
+	}
+
+	sanitized = strings.TrimRight(sanitized, " .,!?-_")
+
+	return sanitized
+}
+
+func GetCurrentTimestamp() string {
+	return time.Now().UTC().Format(time.RFC3339)
+}
+
+func FormatDuration(duration time.Duration) string {
+	if duration < time.Minute {
+		return fmt.Sprintf("%.0fs", duration.Seconds())
+	} else if duration < time.Hour {
+		return fmt.Sprintf("%.0fm %.0fs", duration.Minutes(), int(duration.Seconds())%60)
+	} else if duration < 24*time.Hour {
+		return fmt.Sprintf("%.0fh %.0fm", duration.Hours(), int(duration.Minutes())%60)
+	} else {
+		days := int(duration.Hours()) / 24
+		hours := int(duration.Hours()) % 24
+		return fmt.Sprintf("%dd %dh", days, hours)
+	}
 }

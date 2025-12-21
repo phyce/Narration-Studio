@@ -6,7 +6,7 @@ import Aura from './components/prime/aura';
 import ToastService from 'primevue/toastservice';
 import Tooltip from 'primevue/tooltip';
 //@ts-ignore
-import { install as VueMonacoEditorPlugin } from '@guolao/vue-monaco-editor'
+import {install as VueMonacoEditorPlugin} from '@guolao/vue-monaco-editor'
 
 const app = createApp(App);
 app.use(PrimeVue, {

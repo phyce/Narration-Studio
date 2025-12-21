@@ -4,25 +4,46 @@ import '../../css/pages/character-voices.css';
 import InputText from 'primevue/inputtext';
 import Button from "primevue/button";
 import Dropdown, {DropdownChangeEvent} from "primevue/dropdown";
+import Dialog from 'primevue/dialog';
 import {nextTick, onMounted, onUnmounted, reactive, ref} from "vue";
 import {
-	GetVoices,
-	GetEngines,
-	Play,
-	GetCharacterVoices,
-	SaveCharacterVoices,
+	CreateProfile,
+	DeleteProfile,
 	EventTrigger,
-	ReloadVoicePacks
+	GetEngines,
+	GetModelVoices,
+	GetProfiles,
+	GetProfileVoices,
+	Play,
+	SaveProfileVoices
 } from '../../../wailsjs/go/main/App';
 import {CharacterVoice, Engine, Voice} from '../interfaces/engine';
 import TreeSelect from "primevue/treeselect";
 import {TreeNode} from "primevue/treenode";
+import {useLocalStorage} from '@vueuse/core';
+
+interface Profile {
+	id: string;
+	name: string;
+	description?: string;
+	created_at?: string;
+	updated_at?: string;
+	voice_count?: number;
+}
 
 const engineModelNodes = ref<any[]>([]);
 const engines = ref<{ [key: string]: Engine }>({});
 const voiceOptions = ref<Record<string, Record<string, Voice>>>({});
 const voiceOptionsMap = ref<Record<string, Voice[]>>({});
 const characterVoices = ref<Record<string, CharacterVoice>>({});
+const selectedProfile = useLocalStorage<string>('characterVoicesProfile', 'default');
+const profileOptions = ref<Profile[]>([]);
+const selectedProfileObj = ref<Profile | null>(null);
+const showCreateDialog = ref(false);
+const showDeleteDialog = ref(false);
+const newProfileId = ref('');
+const newProfileName = ref('');
+const newProfileDescription = ref('');
 
 const selectedModels: Record<string, any> = reactive({});
 const selectedVoices: Record<string, any> = reactive({});
@@ -34,10 +55,10 @@ async function getEngines() {
 	for (const engine of engineList) {
 		engines.value[engine.id] = engine;
 
-		for(const index in engine.models) {
+		for (const index in engine.models) {
 			if (engine.models.hasOwnProperty(index)) {
 				const model = engine.models[index];
-				await getVoices(engine.id, model.id);
+				await getModelVoices(engine.id, model.id);
 			}
 		}
 	}
@@ -45,15 +66,15 @@ async function getEngines() {
 	return engines;
 }
 
-async function getVoices(engine: string, model: string) {
-	const result = await GetVoices(engine, model);
+async function getModelVoices(engine: string, model: string) {
+	const result = await GetModelVoices(engine, model);
 
 	const voicesList: Voice[] = JSON.parse(result);
 	const key = `${engine}:${model}`;
 	const voicesMap: Record<string, Voice> = voicesList.reduce((acc, voice) => {
-      acc[voice.voiceID] = voice;
-      return acc;
-    }, {} as Record<string, Voice>);
+		acc[voice.voiceID] = voice;
+		return acc;
+	}, {} as Record<string, Voice>);
 	if (voicesMap != null) {
 		voiceOptions.value[key] = voicesMap;
 	} else {
@@ -62,34 +83,129 @@ async function getVoices(engine: string, model: string) {
 }
 
 async function getCharacterVoices() {
-    const result = await GetCharacterVoices();
-    const characterVoiceData = JSON.parse(result);
+	const result = await GetProfileVoices(selectedProfile.value);
 
-    characterVoices.value = characterVoiceData;
+	const characterVoiceData = JSON.parse(result);
 
-    for (const name in characterVoiceData) {
-        const data = characterVoiceData[name];
-        const { key, voice } = data;
+	characterVoices.value = characterVoiceData;
 
-        selectedModels[name] = { [key]: true };
+	for (const name in characterVoiceData) {
+		const data = characterVoiceData[name];
+		const {key, voice} = data;
 
-        const voiceOption = voiceOptions.value[key];
-        if (voiceOption && voiceOption[voice]) {
-            selectedVoices[name] = voiceOption[voice];
-        } else {
-            data.engine = "";
-            data.model = "";
-            data.voice = "";
-            selectedModels[name] = {};
-            selectedVoices[name] = null;
-        }
+		selectedModels[name] = {[key]: true};
 
-        const engineModelKey = data.engine + ":" + data.model;
-        const voiceOptionsRecord = voiceOptions.value[engineModelKey] || {};
-        voiceOptionsMap.value[name] = Object.values(voiceOptionsRecord);
-    }
+		const voiceOption = voiceOptions.value[key];
+		if (voiceOption && voiceOption[voice]) {
+			selectedVoices[name] = voiceOption[voice];
+		} else {
+			data.engine = "";
+			data.model = "";
+			data.voice = "";
+			selectedModels[name] = {};
+			selectedVoices[name] = null;
+		}
 
-    addEmptyCharacterVoice();
+		const engineModelKey = data.engine + ":" + data.model;
+		const voiceOptionsRecord = voiceOptions.value[engineModelKey] || {};
+		voiceOptionsMap.value[name] = Object.values(voiceOptionsRecord);
+	}
+
+	addEmptyCharacterVoice();
+}
+
+async function loadProfiles() {
+	try {
+		const result = await GetProfiles();
+		profileOptions.value = JSON.parse(result);
+
+		// Find selected profile object
+		if (selectedProfile.value) {
+			const profile = profileOptions.value.find(p => p.id === selectedProfile.value);
+			if (profile) {
+				selectedProfileObj.value = profile;
+			}
+		} else if (profileOptions.value.length > 0) {
+			const defaultProfile = profileOptions.value.find(p => p.id === 'default');
+			selectedProfileObj.value = defaultProfile || profileOptions.value[0];
+			selectedProfile.value = selectedProfileObj.value.id;
+		}
+	} catch (error) {
+		console.error('Failed to load profiles:', error);
+	}
+}
+
+function openCreateDialog() {
+	newProfileId.value = '';
+	newProfileName.value = '';
+	newProfileDescription.value = '';
+	showCreateDialog.value = true;
+}
+
+async function createNewProfile() {
+	if (!newProfileId.value.trim()) {
+		return;
+	}
+
+	try {
+		const result = await CreateProfile(
+			newProfileId.value.trim(),
+			newProfileName.value.trim() || newProfileId.value.trim(),
+			newProfileDescription.value.trim()
+		);
+
+		if (result) {
+			await loadProfiles();
+			const newProfile = profileOptions.value.find(p => p.id === newProfileId.value);
+			if (newProfile) {
+				selectedProfileObj.value = newProfile;
+				selectedProfile.value = newProfile.id;
+				await onProfileChange();
+			}
+		}
+
+		showCreateDialog.value = false;
+	} catch (error) {
+		console.error('Failed to create profile:', error);
+	}
+}
+
+function openDeleteDialog() {
+	if (selectedProfileObj.value && selectedProfileObj.value.id !== 'default') {
+		showDeleteDialog.value = true;
+	}
+}
+
+async function deleteCurrentProfile() {
+	if (!selectedProfileObj.value || selectedProfileObj.value.id === 'default') {
+		return;
+	}
+
+	try {
+		await DeleteProfile(selectedProfileObj.value.id);
+		await loadProfiles();
+		showDeleteDialog.value = false;
+	} catch (error) {
+		console.error('Failed to delete profile:', error);
+	}
+}
+
+async function onProfileDropdownChange() {
+	if (selectedProfileObj.value) {
+		selectedProfile.value = selectedProfileObj.value.id;
+		await onProfileChange();
+	}
+}
+
+async function onProfileChange() {
+	// Clear current voices
+	characterVoices.value = {};
+	Object.keys(selectedModels).forEach(key => delete selectedModels[key]);
+	Object.keys(selectedVoices).forEach(key => delete selectedVoices[key]);
+	voiceOptionsMap.value = {};
+
+	// Load voices for new profile
+	await getCharacterVoices();
 }
 
 function onModelSelect(nodeKey: TreeNode, characterKey: string) {
@@ -101,11 +217,11 @@ function onModelSelect(nodeKey: TreeNode, characterKey: string) {
 	voiceOptionsMap.value[characterKey] = Object.values(voiceOptions.value[`${engineId}:${modelId}`]) || [];
 }
 
-async function onVoiceSelect(key: string ,event: DropdownChangeEvent) {
+async function onVoiceSelect(key: string, event: DropdownChangeEvent) {
 	await previewVoice(key);
 }
 
-const saveCharacterVoices = () => {
+const saveProfileVoices = () => {
 	const dataToSave = Object.entries(characterVoices.value)
 		.filter(([key, voice]) => {
 			const hasName = voice.name && voice.name.trim() !== '';
@@ -135,7 +251,7 @@ const saveCharacterVoices = () => {
 
 	const dataString = JSON.stringify(dataToSave);
 
-	SaveCharacterVoices(dataString);
+	SaveProfileVoices(selectedProfile.value, dataString);
 };
 
 async function previewVoice(key: string) {
@@ -144,23 +260,23 @@ async function previewVoice(key: string) {
 	const modelVoiceID = "::" + Object.keys(selectedModels[key])[0] + ":" + selectedVoices[key].voiceID;
 
 	await EventTrigger('notification.enabled', false);
-	await Play(voice.name + ": " + voice.name, false, modelVoiceID);
+	await Play(voice.name + ": " + voice.name, false, modelVoiceID, selectedProfile.value);
 	await EventTrigger('notification.enabled', true);
 }
 
 async function removeVoice(key: string) {
-	if(key == "_" + (Object.keys(characterVoices.value).length - 1))return;
+	if (key == "_" + (Object.keys(characterVoices.value).length - 1)) return;
 
-	if(key in characterVoices.value) delete characterVoices.value[key];
+	if (key in characterVoices.value) delete characterVoices.value[key];
 }
 
 function onNameInput(voice: any, key: string) {
 	const keys = Object.keys(characterVoices.value);
 	const lastKey = keys[keys.length - 1];
 	if (key === lastKey) {
-        if (voice.name && voice.name.trim() !== '') {
+		if (voice.name && voice.name.trim() !== '') {
 			addEmptyCharacterVoice();
-        }
+		}
 	}
 }
 
@@ -176,12 +292,13 @@ function addEmptyCharacterVoice() {
 
 	selectedModels[key] = {};
 
-  	selectedVoices[key] = null;
+	selectedVoices[key] = null;
 
-  	voiceOptionsMap.value[key] = [];
+	voiceOptionsMap.value[key] = [];
 }
 
 onMounted(async () => {
+	await loadProfiles();
 	await getEngines();
 	await getCharacterVoices();
 	await nextTick();
@@ -198,7 +315,7 @@ onMounted(async () => {
 	}));
 });
 
-onUnmounted( () => {
+onUnmounted(() => {
 	EventTrigger('notification.enabled', true);
 })
 
@@ -206,10 +323,36 @@ onUnmounted( () => {
 <template>
 	<div class="voices">
 		<div class="voices__actions">
+			<div class="flex items-center gap-2 mt-2 mr-2">
+				<label class="font-semibold whitespace-nowrap">Profile</label>
+				<Dropdown
+					v-model="selectedProfileObj"
+					:options="profileOptions"
+					optionLabel="name"
+					placeholder="Select Profile"
+					class="w-64"
+					@change="onProfileDropdownChange"
+				/>
+				<div class="flex border border-gray-600 rounded overflow-hidden">
+					<Button
+						icon="pi pi-plus"
+						title="Create New Profile"
+						class="voices__action-button"
+						@click="openCreateDialog"
+					/>
+					<Button
+						icon="pi pi-trash"
+						title="Delete Profile"
+						class="voices__action-button"
+						:disabled="!selectedProfileObj || selectedProfileObj.id === 'default'"
+						@click="openDeleteDialog"
+					/>
+				</div>
+			</div>
 			<Button class="voices__actions__save"
 					title="Save All"
 					aria-label="Save All"
-					@click="saveCharacterVoices()"
+					@click="saveProfileVoices()"
 			>
 				<i class="pi pi-save"/>&nbsp;
 				Save All
@@ -237,14 +380,14 @@ onUnmounted( () => {
 				/>
 			</div>
 			<div class="voices__entry__voice">
-				 <Dropdown class="voices__entry__voice__dropdown"
-						   @change="(event) => onVoiceSelect(key, event)"
-						   v-model="selectedVoices[key]"
-						   :options="voiceOptionsMap[key]"
-						   filter
-						   optionLabel="name"
-						   placeholder="Select a voice"
-				 />
+				<Dropdown class="voices__entry__voice__dropdown"
+						  @change="(event) => onVoiceSelect(key, event)"
+						  v-model="selectedVoices[key]"
+						  :options="voiceOptionsMap[key]"
+						  filter
+						  optionLabel="name"
+						  placeholder="Select a voice"
+				/>
 			</div>
 			<div class="voices__entry__actions">
 				<div class="voices__entry__actions__container">
@@ -263,5 +406,105 @@ onUnmounted( () => {
 				</div>
 			</div>
 		</div>
+
+		<!-- Create Profile Dialog -->
+		<Dialog
+			v-model:visible="showCreateDialog"
+			header="Create New Profile"
+			:modal="true"
+			:style="{ width: '400px' }"
+		>
+			<div class="profile-dialog">
+				<div class="profile-dialog__field">
+					<label for="profile-id">Profile ID*</label>
+					<InputText
+						id="profile-id"
+						v-model="newProfileId"
+						placeholder="appname"
+						class="profile-dialog__input"
+					/>
+					<small>Unique identifier (no spaces or special characters)</small>
+				</div>
+				<div class="profile-dialog__field">
+					<label for="profile-name">Display Name</label>
+					<InputText
+						id="profile-name"
+						v-model="newProfileName"
+						placeholder="App Display Name"
+						class="profile-dialog__input"
+					/>
+					<small>Optional display name (defaults to ID)</small>
+				</div>
+				<div class="profile-dialog__field">
+					<label for="profile-description">Description</label>
+					<InputText
+						id="profile-description"
+						v-model="newProfileDescription"
+						placeholder="Voice profile for My Game"
+						class="profile-dialog__input"
+					/>
+				</div>
+			</div>
+			<template #footer>
+				<Button label="Cancel" @click="showCreateDialog = false" class="p-button-text"/>
+				<Button
+					label="Create"
+					@click="createNewProfile"
+					:disabled="!newProfileId.trim()"
+				/>
+			</template>
+		</Dialog>
+
+		<!-- Delete Confirmation Dialog -->
+		<Dialog
+			v-model:visible="showDeleteDialog"
+			header="Delete Profile"
+			:modal="true"
+			:style="{ width: '400px' }"
+		>
+			<p>Are you sure you want to delete the profile "{{ selectedProfileObj?.name }}"?</p>
+			<p>This action cannot be undone.</p>
+			<template #footer>
+				<Button label="Cancel" @click="showDeleteDialog = false" class="p-button-text"/>
+				<Button
+					label="Delete"
+					@click="deleteCurrentProfile"
+					class="p-button-danger"
+				/>
+			</template>
+		</Dialog>
 	</div>
 </template>
+
+<style scoped>
+.voices__action-button {
+	border: 0 !important;
+	border-radius: 0 !important;
+}
+
+.profile-dialog {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+	padding: 1rem 0;
+}
+
+.profile-dialog__field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.profile-dialog__field label {
+	font-weight: 600;
+}
+
+.profile-dialog__input {
+	width: 100%;
+}
+
+.profile-dialog__field small {
+	color: var(--text-color-secondary);
+	font-size: 0.75rem;
+}
+</style>

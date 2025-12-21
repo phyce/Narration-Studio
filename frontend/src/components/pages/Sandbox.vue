@@ -2,13 +2,14 @@
 import '../../css/pages/sandbox.css';
 
 import Editor from '../common/Editor.vue';
+import ProfileSelector from '../common/ProfileSelector.vue';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
-import { computed, onMounted, ref } from "vue"
-import { Engine, Model, Voice } from '../interfaces/engine';
-import { useLocalStorage } from '@vueuse/core';
-import { GetVoices, GetEngines, Play } from '../../../wailsjs/go/main/App';
-import { formatToTreeSelectData } from "../../util/util";
+import {computed, onMounted, ref} from "vue"
+import {Engine, Model, Voice} from '../interfaces/engine';
+import {useLocalStorage} from '@vueuse/core';
+import {GetEngines, GetModelVoices, Play} from '../../../wailsjs/go/main/App';
+import {formatToTreeSelectData} from "../../util/util";
 import TreeSelect from "primevue/treeselect";
 import Dropdown from "primevue/dropdown";
 
@@ -17,13 +18,14 @@ const engines = ref<Engine[]>([]);
 const voices = ref<Voice[]>([]);
 const selectedModel = ref<Model>();
 const selectedVoice = ref<Voice>();
+const selectedProfile = useLocalStorage<string>('sandboxProfile', 'default');
 const text = useLocalStorage<string>('sandboxText', 'user: hello world');
 const overrideVoices = ref<boolean>(false);
 const saveNewCharacters = ref<boolean>(false);
 
 const regexes = [
-	{ regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence' },
-	{ regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character' }
+	{regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence'},
+	{regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character'}
 ];
 
 const isDisabled = computed(() => {
@@ -32,13 +34,13 @@ const isDisabled = computed(() => {
 
 async function generateSpeech() {
 	let voiceID = "";
-	if(overrideVoices.value) {
+	if (overrideVoices.value) {
 		if (selectedModel.value === undefined || selectedVoice.value === undefined) return;
 
 		voiceID = "::" + Object.keys(selectedModel.value)[0] + ":" + selectedVoice.value.voiceID;
 	}
 
-	await Play(text.value, (!!saveNewCharacters.value), voiceID);
+	await Play(text.value, (!!saveNewCharacters.value), voiceID, selectedProfile.value);
 }
 
 async function getEngines() {
@@ -48,15 +50,15 @@ async function getEngines() {
 	return engines;
 }
 
-async function getVoices(engine: string, model: string) {
-	const result = await GetVoices(engine, model);
+async function getModelVoices(engine: string, model: string) {
+	const result = await GetModelVoices(engine, model);
 	const voices: Voice[] = JSON.parse(result);
 
 	return voices;
 }
 
 async function onModelSelect(node: any) {
-	voices.value = await getVoices(node.engine, node.id) ?? [];
+	voices.value = await getModelVoices(node.engine, node.id) ?? [];
 }
 
 onMounted(async () => {
@@ -69,7 +71,8 @@ onMounted(async () => {
 <template>
 	<div class="sandbox">
 		<div class="sandbox__panel">
-			<Button class="sandbox__panel__generate"
+			<ProfileSelector v-model="selectedProfile"/>
+			<Button class="sandbox__panel__generate mt-2"
 					title="Play All"
 					aria-label="Play"
 					:disabled="isDisabled"

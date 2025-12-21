@@ -2,7 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"fmt"
+	"nstudio/app/cache"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/issue"
@@ -13,14 +14,15 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/enums/OutputType"
 	"nstudio/app/tts"
-	"nstudio/app/tts/voiceManager"
+	"nstudio/app/tts/modelManager"
+	"nstudio/app/tts/profile"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
+
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //This is the entry point for all actions coming from the frontend
@@ -31,9 +33,15 @@ func (app *App) Play(
 	script string,
 	saveNewCharacters bool,
 	overrideVoices string,
+	profileID string,
 ) {
 	clearConsole()
 	status.Set(status.Loading, "Playing")
+
+	if profileID == "" {
+		profileID = "default"
+	}
+
 	lines := strings.Split(script, "\n")
 	var messages []util.CharacterMessage
 
@@ -52,21 +60,22 @@ func (app *App) Play(
 				Text:      text,
 				Save:      saveNewCharacters,
 			})
-			response.Debug(response.Data{
+			response.Debug(util.MessageData{
 				Summary: "added message by character: " + character,
 				Detail:  text,
 			})
 		}
 	}
 
-	err := tts.GenerateSpeech(messages, false)
+	fileIndex.Reset()
+	err := tts.GenerateSpeech(messages, false, profileID)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to play script",
 			Detail:  err.Error(),
 		})
 	} else {
-		response.Success(response.Data{
+		response.Success(util.MessageData{
 			Summary: "Success",
 			Detail:  "Generation completed",
 		})
@@ -79,10 +88,14 @@ func (app *App) Play(
 
 // <editor-fold desc="Script Editor">
 
-func (app *App) ProcessScript(script string) {
+func (app *App) ProcessScript(script string, profileID string) {
 	clearConsole()
 	status.Set(status.Loading, "Processing Script")
 	defer status.Set(status.Ready, "")
+
+	if profileID == "" {
+		profileID = "default"
+	}
 
 	lines := strings.Split(script, "\n")
 	var messages []util.CharacterMessage
@@ -101,14 +114,15 @@ func (app *App) ProcessScript(script string) {
 		}
 	}
 
-	response.Debug(response.Data{
+	response.Debug(util.MessageData{
 		Summary: "About to generate speech",
 	})
 
 	status.Set(status.Generating, "")
-	err := tts.GenerateSpeech(messages, true)
+	fileIndex.Reset()
+	err := tts.GenerateSpeech(messages, true, profileID)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to process script",
 			Detail:  err.Error(),
 		})
@@ -123,7 +137,7 @@ func (app *App) ProcessScript(script string) {
 
 		err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 		if err != nil {
-			response.Error(response.Data{
+			response.Error(util.MessageData{
 				Summary: "Failed to expand path",
 				Detail:  err.Error(),
 			})
@@ -145,7 +159,7 @@ func (app *App) ProcessScript(script string) {
 			16,
 		)
 		if err != nil {
-			response.Error(response.Data{
+			response.Error(util.MessageData{
 				Summary: "Failed to combine wav files",
 				Detail:  err.Error(),
 			})
@@ -155,7 +169,7 @@ func (app *App) ProcessScript(script string) {
 		if outputType == OutputType.CombinedFile {
 			files, err := os.ReadDir(outputPath)
 			if err != nil {
-				response.Error(response.Data{
+				response.Error(util.MessageData{
 					Summary: "Failed to read directory",
 					Detail:  err.Error(),
 				})
@@ -166,7 +180,7 @@ func (app *App) ProcessScript(script string) {
 				if !file.IsDir() && file.Name() != "combined.wav" {
 					err = os.Remove(filepath.Join(outputPath, file.Name()))
 					if err != nil {
-						response.Error(response.Data{
+						response.Error(util.MessageData{
 							Summary: "Failed to delete file",
 							Detail:  err.Error(),
 						})
@@ -177,7 +191,7 @@ func (app *App) ProcessScript(script string) {
 		}
 	}
 
-	response.Success(response.Data{
+	response.Success(util.MessageData{
 		Summary: "Success",
 		Detail:  "Script processed successfully",
 	})
@@ -186,45 +200,14 @@ func (app *App) ProcessScript(script string) {
 //</editor-fold>
 
 // <editor-fold desc="Character Voices">
-func (app *App) GetCharacterVoices() string {
-	status.Set(status.Loading, "Getting character voices")
-	voices := voiceManager.GetCharacterVoices()
-
-	voicesJSON, err := json.Marshal(voices)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to get character voices",
-			Detail:  err.Error(),
-		})
-	}
-
-	status.Set(status.Ready, "")
-	return string(voicesJSON)
-}
-
-func (app *App) SaveCharacterVoices(voices string) {
-	status.Set(status.Loading, "Saving character voices")
-	err := voiceManager.SaveCharacterVoices(voices)
-	if err != nil {
-		response.Error(response.Data{
-			Summary: "Failed to save character voices",
-			Detail:  err.Error(),
-		})
-	} else {
-		response.Success(response.Data{
-			Summary: "Successfully saved character voices",
-		})
-	}
-	status.Set(status.Ready, "")
-}
 
 func (app *App) GetAvailableModels() string {
 	status.Set(status.Loading, "Getting available models")
-	models := voiceManager.GetAllModels()
+	models := modelManager.GetAllModels()
 
 	modelsJSON, err := json.Marshal(models)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to get available models",
 			Detail:  err.Error(),
 		})
@@ -239,9 +222,9 @@ func (app *App) GetAvailableModels() string {
 func (app *App) ReloadVoicePacks() {
 	status.Set(status.Loading, "Reloading Voice Packs")
 
-	voiceManager.ReloadModels()
+	modelManager.ReloadModels()
 
-	response.Success(response.Data{
+	response.Success(util.MessageData{
 		Summary: "Success",
 		Detail:  "Voice Packs reloaded successfully",
 	})
@@ -258,7 +241,7 @@ func (app *App) GetSettings() config.Base {
 func (app *App) GetSetting(name string) interface{} {
 	value, err := config.GetValueFromPath(name)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to get setting",
 			Detail:  err.Error(),
 		})
@@ -267,7 +250,7 @@ func (app *App) GetSetting(name string) interface{} {
 
 	data, err := json.Marshal(value)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to marshal setting",
 			Detail:  err.Error(),
 		})
@@ -282,15 +265,22 @@ func (app *App) SaveSettings(settings config.Base) {
 
 	err := config.Set(settings)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to save settings",
 			Detail:  err.Error(),
 		})
 	} else {
-		response.Success(response.Data{
-			Summary: "Success",
-			Detail:  "Settings have been saved",
-		})
+		if err := cache.Initialize(); err != nil {
+			response.Error(util.MessageData{
+				Summary: "Cache initialization error",
+				Detail:  err.Error(),
+			})
+		} else {
+			response.Success(util.MessageData{
+				Summary: "Success",
+				Detail:  "Settings have been saved",
+			})
+		}
 	}
 	status.Set(status.Ready, "")
 }
@@ -299,13 +289,13 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 	status.Set(status.Loading, "Selecting directory")
 	err, fullPath := util.ExpandPath(defaultDirectory)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to expand provided directory",
 		})
 
 		fullPath, err = os.UserHomeDir()
 		if err != nil {
-			response.Error(response.Data{
+			response.Error(util.MessageData{
 				Summary: "Failed to retrieve user's home directory.",
 			})
 			return ""
@@ -321,13 +311,13 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 	)
 
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to select directory",
 			Detail:  err.Error(),
 		})
 	} else {
 		if directory != "" {
-			response.Success(response.Data{
+			response.Success(util.MessageData{
 				Summary: "Location changed",
 			})
 		} else {
@@ -340,15 +330,17 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 
 func (app *App) SelectFile(defaultFile string) string {
 	status.Set(status.Loading, "Selecting file")
+	defer status.Set(status.Ready, "")
+
 	err, fullPath := util.ExpandPath(defaultFile)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to expand provided file path",
 		})
 
 		fullPath, err = os.UserHomeDir()
 		if err != nil {
-			response.Error(response.Data{
+			response.Error(util.MessageData{
 				Summary: "Failed to retrieve user's home directory.",
 			})
 			return ""
@@ -370,47 +362,219 @@ func (app *App) SelectFile(defaultFile string) string {
 	)
 
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to select file",
 			Detail:  err.Error(),
 		})
 	} else {
 		if file != "" {
-			response.Success(response.Data{
+			response.Success(util.MessageData{
 				Summary: "File selected",
 			})
 		} else {
 			file = defaultFile
 		}
 	}
-	status.Set(status.Ready, "")
 	return file
 }
 
 func (app *App) RefreshModels() {
 	clearConsole()
 	status.Set(status.Loading, "Refreshing models")
-	err := voiceManager.RefreshModels()
+	err := modelManager.RefreshModels()
 	if err == nil {
-		response.Success(response.Data{
+		response.Success(util.MessageData{
 			Summary: "Models refreshed",
 		})
 		status.Set(status.Ready, "")
 	} else {
-		status.Set(status.Warning, "Some of your enabled engines didn't start")
+		status.Set(status.Warning, "Some of the selected engines didn't start")
 	}
 
 }
 
 //</editor-fold>
 
+// <editor-fold desc="Profiles">
+
+func (app *App) GetProfiles() string {
+	manager := profile.GetManager()
+
+	profiles, err := manager.GetAllProfiles()
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profiles",
+			Detail:  err.Error(),
+		})
+		return "[]"
+	}
+
+	profilesJSON, err := json.Marshal(profiles)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to serialize profiles",
+			Detail:  err.Error(),
+		})
+		return "[]"
+	}
+
+	return string(profilesJSON)
+}
+
+func (app *App) GetProfile(profileID string) string {
+	manager := profile.GetManager()
+
+	prof, err := manager.GetProfile(profileID)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profile",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	profileJSON, err := json.Marshal(prof)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to serialize profile",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	return string(profileJSON)
+}
+
+func (app *App) CreateProfile(id, name, description string) string {
+	manager := profile.GetManager()
+
+	prof, err := manager.CreateProfile(id, name, description)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to create profile",
+			Detail:  err.Error(),
+		})
+		return ""
+	}
+
+	response.Success(util.MessageData{
+		Summary: "Profile created successfully",
+		Detail:  fmt.Sprintf("Profile '%s' has been created", name),
+	})
+
+	profileJSON, _ := json.Marshal(prof)
+	return string(profileJSON)
+}
+
+func (app *App) DeleteProfile(profileID string) {
+	manager := profile.GetManager()
+
+	err := manager.DeleteProfile(profileID)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to delete profile",
+			Detail:  err.Error(),
+		})
+	} else {
+		response.Success(util.MessageData{
+			Summary: "Profile deleted successfully",
+		})
+	}
+}
+
+func (app *App) GetProfileVoices(profileID string) string {
+	manager := profile.GetManager()
+
+	voiceProfile, err := manager.GetProfile(profileID)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profile",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	voicesJSON, err := json.Marshal(voiceProfile.Voices)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profile voices",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	return string(voicesJSON)
+}
+
+func (app *App) SaveProfileVoices(profileID string, voices string) {
+	manager := profile.GetManager()
+
+	voiceProfile, err := manager.GetProfile(profileID)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profile",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	var voicesMap map[string]*util.CharacterVoice
+	err = json.Unmarshal([]byte(voices), &voicesMap)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to parse voices",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	voiceProfile.Voices = voicesMap
+
+	err = manager.SaveProfile(voiceProfile)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to save profile voices",
+			Detail:  err.Error(),
+		})
+	} else {
+		response.Success(util.MessageData{
+			Summary: "Successfully saved profile voices",
+		})
+	}
+
+}
+
+func (app *App) GetConfigSchema() string {
+	schema, err := config.GetConfigSchema()
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get config schema",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to serialize config schema",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	return string(schemaJSON)
+}
+
+// </editor-fold>
+
 // <editor-fold desc="Common">
 func (app *App) GetEngines() string {
-	engines := voiceManager.GetEngines()
+	engines := modelManager.GetEngines()
 
 	jsonData, err := json.Marshal(engines)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to get engines",
 			Detail:  err.Error(),
 		})
@@ -420,10 +584,10 @@ func (app *App) GetEngines() string {
 	return string(jsonData)
 }
 
-func (app *App) GetVoices(engine string, model string) string {
-	voices, err := voiceManager.GetVoices(engine, model)
+func (app *App) GetModelVoices(engine string, model string) string {
+	voices, err := modelManager.GetModelVoices(engine, model)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to get voices",
 			Detail:  err.Error(),
 		})
@@ -431,7 +595,7 @@ func (app *App) GetVoices(engine string, model string) string {
 
 	jsonData, err := json.Marshal(voices)
 	if err != nil {
-		response.Error(response.Data{
+		response.Error(util.MessageData{
 			Summary: "Failed to get voices",
 			Detail:  err.Error(),
 		})
@@ -463,14 +627,3 @@ func (a *App) EventTrigger(eventName string, data interface{}) {
 }
 
 // </editor-fold>
-
-func clearConsole() error {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "cls") // Clear console command for Windows
-	} else {
-		cmd = exec.Command("clear") // Clear console command for Linux and MacOS
-	}
-	cmd.Stdout = os.Stdout
-	return cmd.Run()
-}

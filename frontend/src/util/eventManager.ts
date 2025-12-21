@@ -1,12 +1,12 @@
-import { EventsOn, EventsEmit } from '../../wailsjs/runtime';
+import {EventsEmit, EventsOn} from '../../wailsjs/runtime';
 
 class EventManager {
 	private static instance: EventManager;
 	private subscriptions: { [key: string]: ((data?: any) => void)[] } = {};
 
 	private constructor() {
-        this.subscriptions = {};
-    }
+		this.subscriptions = {};
+	}
 
 	public static getInstance(): EventManager {
 		if (!EventManager.instance) {
@@ -16,33 +16,33 @@ class EventManager {
 	}
 
 	subscribe(eventName: string, callback: (...data: any[]) => void): () => void {
-        const unsubscribe = EventsOn(eventName, callback);
+		const unsubscribe = EventsOn(eventName, callback);
 
-        if (!this.subscriptions[eventName]) {
-            this.subscriptions[eventName] = [];
-        }
+		if (!this.subscriptions[eventName]) {
+			this.subscriptions[eventName] = [];
+		}
 
-        this.subscriptions[eventName].push(unsubscribe);
+		this.subscriptions[eventName].push(unsubscribe);
 
-        return () => {
-            const index = this.subscriptions[eventName].indexOf(unsubscribe);
-            if (index !== -1) {
-                unsubscribe();
-                this.subscriptions[eventName].splice(index, 1);
-            }
+		return () => {
+			const index = this.subscriptions[eventName].indexOf(unsubscribe);
+			if (index !== -1) {
+				unsubscribe();
+				this.subscriptions[eventName].splice(index, 1);
+			}
 
-            if (this.subscriptions[eventName].length === 0) {
-                delete this.subscriptions[eventName];
-            }
-        };
-    }
+			if (this.subscriptions[eventName].length === 0) {
+				delete this.subscriptions[eventName];
+			}
+		};
+	}
 
-    disableEvent(eventName: string): void {
-        if (this.subscriptions[eventName]) {
-            this.subscriptions[eventName].forEach(unsubscribe => unsubscribe());
-            delete this.subscriptions[eventName];
-        }
-    }
+	disableEvent(eventName: string): void {
+		if (this.subscriptions[eventName]) {
+			this.subscriptions[eventName].forEach(unsubscribe => unsubscribe());
+			delete this.subscriptions[eventName];
+		}
+	}
 
 	emit(eventName: string, data?: any): void {
 		EventsEmit(eventName, data);

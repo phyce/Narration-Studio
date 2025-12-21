@@ -1,8 +1,30 @@
 {
 	"settings": {
-		"outputType" : 0,
-		"outputPath" : "%USERPROFILE%\\Narration Studio\\output",
-		"debug": false
+		"outputType": 0,
+		"outputPath": "%USERPROFILE%\\Narration Studio\\output",
+		"debug": false,
+		"audioCache": {
+			"enabled": true,
+			"location": "%USERPROFILE%\\Narration Studio\\cache"
+		},
+		"server": {
+			"auth": {
+				"key": "",
+				"adminKey": ""
+			},
+			"engines": {
+				"piper": {
+					"libritts": {
+						"instances": 2
+					}
+				},
+				"mssapi4": {
+					"mssapi4": {
+						"instances": 2
+					}
+				}
+			}
+		}
 	},
 	"engine": {
 		"local": {

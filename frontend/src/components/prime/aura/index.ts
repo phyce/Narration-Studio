@@ -21,7 +21,7 @@ import checkbox from './checkbox';
 // import dataview from './dataview';
 // import dataviewlayoutoptions from './dataviewlayoutoptions';
 // import deferred from './deferred';
-// import dialog from './dialog';
+import dialog from './dialog';
 // import divider from './divider';
 // import dock from './dock';
 import dropdown from './dropdown';
@@ -37,7 +37,7 @@ import global from './global';
 import inputgroup from './inputgroup';
 import inputgroupaddon from './inputgroupaddon';
 // import inputmask from './inputmask';
-// import inputnumber from './inputnumber';
+import inputnumber from './inputnumber';
 // import inputotp from './inputotp';
 import inputswitch from './inputswitch';
 import inputtext from './inputtext';
@@ -53,9 +53,9 @@ import inputtext from './inputtext';
 // import organizationchart from './organizationchart';
 // import overlaypanel from './overlaypanel';
 // import paginator from './paginator';
-// import panel from './panel';
+import panel from './panel';
 // import panelmenu from './panelmenu';
-// import password from './password';
+import password from './password';
 // import picklist from './picklist';
 // import progressbar from './progressbar';
 // import progressspinner from './progressspinner';
@@ -91,117 +91,117 @@ import treeselect from './treeselect';
 // import tristatecheckbox from './tristatecheckbox';
 
 export default {
-    global,
-    directives: {
-        badge: badgedirective,
-        ripple,
-        tooltip
-    },
+	global,
+	directives: {
+		badge: badgedirective,
+		ripple,
+		tooltip
+	},
 
-    //forms
-    // autocomplete,
-    dropdown,
-    // inputnumber,
-    inputtext,
-    // calendar,
-    checkbox,
-    radiobutton,
-    inputswitch,
-    // selectbutton,
-    // slider,
-    // chips,
-    // rating,
-    // multiselect,
-    // togglebutton,
-    cascadeselect,
-    // listbox,
-    // colorpicker,
-    inputgroup,
-    inputgroupaddon,
-    // inputmask,
-    // knob,
-    treeselect,
-    // tristatecheckbox,
-    // textarea,
-    // password,
-    // iconfield,
-    floatlabel,
-    // inputotp,
-    //
-    // //buttons
-    button,
-    // splitbutton,
-    // speeddial,
-    //
-    // //data
-    // paginator,
-    // datatable,
-    // tree,
-    // dataview,
-    // dataviewlayoutoptions,
-    // organizationchart,
-    // orderlist,
-    // picklist,
-    // treetable,
-    // timeline,
-    //
-    // //panels
-    // accordion,
-    // panel,
-    // fieldset,
-    card,
-    // tabview,
-    // divider,
-    // toolbar,
-    // scrollpanel,
-    // splitter,
-    // splitterpanel,
-    // stepper,
-    // deferred,
-    //
-    // //file
-    // fileupload,
-    //
-    // //menu
-    // contextmenu,
-    // menu,
-    // menubar,
-    // steps,
-    // tieredmenu,
-    // breadcrumb,
-    // panelmenu,
-    // megamenu,
-    // dock,
-    // tabmenu,
-    //
-    // //overlays
-    // dialog,
-    // overlaypanel,
-    // sidebar,
-    // confirmpopup,
-    //
-    // //messages
-    // message,
-    // inlinemessage,
-    toast,
-    //
-    // //media
-    // carousel,
-    // galleria,
-    // image,
-    //
-    // //misc
-    // badge,
-    // avatar,
-    // avatargroup,
-    // tag,
-    // chip,
-    // progressbar,
-    // skeleton,
-    // scrolltop,
-    // terminal,
-    // blockui,
-    // metergroup,
-    // inplace,
-    // progressspinner
+	//forms
+	// autocomplete,
+	dropdown,
+	inputnumber,
+	inputtext,
+	// calendar,
+	checkbox,
+	radiobutton,
+	inputswitch,
+	// selectbutton,
+	// slider,
+	// chips,
+	// rating,
+	// multiselect,
+	// togglebutton,
+	cascadeselect,
+	// listbox,
+	// colorpicker,
+	inputgroup,
+	inputgroupaddon,
+	// inputmask,
+	// knob,
+	treeselect,
+	// tristatecheckbox,
+	// textarea,
+	password,
+	// iconfield,
+	floatlabel,
+	// inputotp,
+	//
+	// //buttons
+	button,
+	// splitbutton,
+	// speeddial,
+	//
+	// //data
+	// paginator,
+	// datatable,
+	// tree,
+	// dataview,
+	// dataviewlayoutoptions,
+	// organizationchart,
+	// orderlist,
+	// picklist,
+	// treetable,
+	// timeline,
+	//
+	// //panels
+	// accordion,
+	panel,
+	// fieldset,
+	card,
+	// tabview,
+	// divider,
+	// toolbar,
+	// scrollpanel,
+	// splitter,
+	// splitterpanel,
+	// stepper,
+	// deferred,
+	//
+	// //file
+	// fileupload,
+	//
+	// //menu
+	// contextmenu,
+	// menu,
+	// menubar,
+	// steps,
+	// tieredmenu,
+	// breadcrumb,
+	// panelmenu,
+	// megamenu,
+	// dock,
+	// tabmenu,
+	//
+	// //overlays
+	dialog,
+	// overlaypanel,
+	// sidebar,
+	// confirmpopup,
+	//
+	// //messages
+	// message,
+	// inlinemessage,
+	toast,
+	//
+	// //media
+	// carousel,
+	// galleria,
+	// image,
+	//
+	// //misc
+	// badge,
+	// avatar,
+	// avatargroup,
+	// tag,
+	// chip,
+	// progressbar,
+	// skeleton,
+	// scrolltop,
+	// terminal,
+	// blockui,
+	// metergroup,
+	// inplace,
+	// progressspinner
 };

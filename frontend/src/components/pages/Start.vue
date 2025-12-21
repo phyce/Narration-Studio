@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {config as configuration} from "../../../wailsjs/go/models";
-import configBase = configuration.Base;
 import {onMounted, reactive, ref} from "vue";
 import {GetSettings} from "../../../wailsjs/go/main/App";
+import configBase = configuration.Base;
 
 const config = reactive<configBase>({} as configBase);
 const loading = ref<boolean>(true);
@@ -15,9 +15,9 @@ onMounted(async () => {
 
 <template>
 	<div class="start" v-if="!loading">
-		<h1 class="start__header">{{ config.info.name }} v{{config.info.version}}</h1>
+		<h1 class="start__header">{{ config.info.name }} v{{ config.info.version }}</h1>
 		<img class="start__logo" id="logo" alt="Wails logo" src="../../assets/images/logo.png"/>
-		<a target="_blank" class="link" :href="config.info.website">{{config.info.website}}</a>
+		<a target="_blank" class="link" :href="config.info.website">{{ config.info.website }}</a>
 	</div>
 </template>
 

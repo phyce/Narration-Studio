@@ -1,13 +1,13 @@
 .script {
-    @apply flex w-full h-full;
+	@apply flex w-full h-full;
 }
 
 .script__panel {
-    @apply w-1/5 p-2;
+	@apply w-1/5 p-2;
 }
 
 .script__panel__input {
-    @apply disabled:bg-neutral-800;
+	@apply disabled:bg-neutral-800;
 }
 
 .script__panel__browse {
@@ -15,9 +15,9 @@
 }
 
 .script__panel__generate {
-    @apply w-full mt-2;
+	@apply w-full mt-2;
 }
 
 .script__editor {
-    @apply w-4/5;
+	@apply w-4/5;
 }

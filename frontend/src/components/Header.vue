@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '../css/header.css';
-import { ref, defineProps, defineEmits } from 'vue';
+import {defineEmits, defineProps, ref} from 'vue';
 
 const emit = defineEmits(['updateActivePage']);
 
@@ -10,16 +10,16 @@ const props = defineProps({
 
 const views = ref([
 	// { id: 'streaming', display: 'Streaming'},
-	{ id: 'sandbox', display: 'Sandbox'},
-	{ id: 'script-editor', display: 'Script Editor'},
-	{ id: 'character-voices', display: 'Character Voices' },
-	{ id: 'voice-packs', display: 'Voice Packs' },
-	{ id: 'settings', display: 'Settings' },
+	{id: 'sandbox', display: 'Sandbox'},
+	{id: 'script-editor', display: 'Script Editor'},
+	{id: 'character-voices', display: 'Character Voices'},
+	{id: 'voice-packs', display: 'Voice Packs'},
+	{id: 'settings', display: 'Settings'},
 ]);
 
 const currentView = ref(props.activePage);
 
-function setCurrentView(view:string) {
+function setCurrentView(view: string) {
 	currentView.value = view;
 	emit('updateActivePage', view);
 }
@@ -37,7 +37,7 @@ function setCurrentView(view:string) {
 							currentView === view.id && 'button--active'
 						]"
 						@click="setCurrentView(view.id)"
-				   		:aria-current="currentView === view.id ? 'page' : undefined"
+						:aria-current="currentView === view.id ? 'page' : undefined"
 				>
 					{{ view.display }}
 				</button>

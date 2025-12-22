@@ -56,10 +56,10 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 		if !ok {
 			return response.Err(fmt.Errorf("Failed to retrieve engine instance: %s/%s", voice.Engine, voice.Model))
 		}
-		defer releaseFunc()
 
 		if saveOutput {
 			err := selectedEngineInstance.Save([]util.CharacterMessage{message}, false)
+			releaseFunc()
 			if err != nil {
 				return response.Err(err)
 			}
@@ -77,6 +77,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 			}
 
 			rawAudio, err = selectedEngineInstance.Generate(message.Voice.Model, payload)
+			releaseFunc()
 			if err != nil {
 				return response.Err(err)
 			}

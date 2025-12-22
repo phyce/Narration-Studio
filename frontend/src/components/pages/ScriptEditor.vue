@@ -19,7 +19,7 @@ const loading = ref<boolean>(true);
 
 const regexes = [
 	{regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence'},
-	{regex: /^([^\s:]+):\s?(?=\S)/gm, className: 'matching-character'},
+	{regex: /^[^\S\r\n]*([^:\r\n]+?):\s?(?=\S)/gm, className: 'matching-character'},
 ];
 
 const handleBrowseClick = async () => {

@@ -23,6 +23,14 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install NSIS
+        run: |
+          choco install nsis -y
+          # Add NSIS to PATH for current session
+          $env:Path += ";C:\Program Files (x86)\NSIS"
+          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
@@ -60,9 +68,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          Write-Host "Listing all files in build/bin:"
+          Get-ChildItem -Path "build/bin" -Recurse | ForEach-Object { Write-Host $_.FullName }
+
           $installer = Get-ChildItem -Path "build/bin" -Filter "*installer.exe" | Select-Object -First 1
           if ($installer) {
+            Write-Host "Found installer: $($installer.FullName)"
             gh release upload ${{ github.event.release.tag_name }} $installer.FullName
+          } else {
+            Write-Host "ERROR: No installer.exe file found in build/bin"
+            Write-Host "This may indicate the NSIS build failed or the installer has a different name pattern"
+            exit 1
           }
         shell: pwsh
 
@@ -148,7 +164,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest

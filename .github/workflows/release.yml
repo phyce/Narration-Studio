@@ -147,7 +147,7 @@ jobs:
         run: gh release upload ${{ github.event.release.tag_name }} build/bin/nstudio-cli-darwin-universal
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -164,7 +164,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev
+          sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.0-dev libasound2-dev
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest

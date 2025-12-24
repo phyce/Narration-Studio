@@ -179,8 +179,18 @@ jobs:
           mkdir -p build/bin
           go build -tags cli -o build/bin/nstudio-cli-linux-amd64 .
 
+      - name: Save CLI before clean build
+        run: |
+          mkdir -p /tmp/cli-backup
+          cp build/bin/nstudio-cli-linux-amd64 /tmp/cli-backup/
+
       - name: Build GUI application
         run: wails build -clean -platform linux/amd64
+
+      - name: Restore CLI after clean build
+        run: |
+          mkdir -p build/bin
+          cp /tmp/cli-backup/nstudio-cli-linux-amd64 build/bin/
 
       - name: Create GUI .deb package
         run: |

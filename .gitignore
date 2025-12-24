@@ -3,3 +3,5 @@ node_modules
 frontend/dist
 
 *.onnx
+
+.DS_Store

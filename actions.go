@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -347,9 +348,16 @@ func (app *App) SelectFile(defaultFile string) string {
 		}
 	}
 
-	file, err := wailsRuntime.OpenFileDialog(
-		app.context,
-		wailsRuntime.OpenDialogOptions{
+	// On macOS, file filters prevent selecting files without extensions
+	// so we skip filters entirely on darwin
+	var dialogOptions wailsRuntime.OpenDialogOptions
+	if runtime.GOOS == "darwin" {
+		dialogOptions = wailsRuntime.OpenDialogOptions{
+			DefaultDirectory: filepath.Dir(fullPath),
+			Title:            "Select File",
+		}
+	} else {
+		dialogOptions = wailsRuntime.OpenDialogOptions{
 			DefaultDirectory: filepath.Dir(fullPath),
 			Title:            "Select File",
 			Filters: []wailsRuntime.FileFilter{
@@ -358,8 +366,10 @@ func (app *App) SelectFile(defaultFile string) string {
 					Pattern:     "*",
 				},
 			},
-		},
-	)
+		}
+	}
+
+	file, err := wailsRuntime.OpenFileDialog(app.context, dialogOptions)
 
 	if err != nil {
 		response.Error(util.MessageData{

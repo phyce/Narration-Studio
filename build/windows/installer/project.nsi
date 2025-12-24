@@ -111,6 +111,14 @@ Section "Piper" SEC_PIPER
     File /r "engines\piper\*"
 SectionEnd
 
+Section "CLI Tool" SEC_CLI
+    DetailPrint "Installing CLI tool..."
+
+    SetOutPath "$INSTDIR"
+
+    File "nstudio-cli.exe"
+SectionEnd
+
 Section "Microsoft Speech API 4" SEC_MSAPI4
     DetailPrint "Installing Microsoft Speech API 4..."
 

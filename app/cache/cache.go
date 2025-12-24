@@ -32,7 +32,10 @@ func Initialize() error {
 		return nil
 	}
 
-	cacheDir := os.ExpandEnv(settings.AudioCache.Location)
+	err, cacheDir := util.ExpandPath(settings.AudioCache.Location)
+	if err != nil {
+		return response.Warn("failed to expand cache directory path: %v", err)
+	}
 	if cacheDir == "" {
 		response.NewWarn("Cache directory is not configured")
 		return nil

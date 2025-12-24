@@ -1,0 +1,47 @@
+{
+	"engine": {
+		"children": {
+			"local": {
+				"children": {
+					"piper": {
+						"children": {
+							"location": {
+								"label": "Piper Executable",
+								"type": "path",
+								"pathType": "file",
+								"description": "Path to piper executable"
+							},
+							"cacheAudioClips": {
+								"label": "Cache Audio Clips",
+								"description": "Cache generated audio clips"
+							}
+						}
+					},
+					"msSapi4": {
+						"hidden": true
+					}
+				}
+			},
+			"api": {
+				"children": {
+					"openAI": {
+						"children": {
+							"cacheAudioClips": {
+								"label": "Cache Audio Clips",
+								"description": "Cache generated audio clips"
+							}
+						}
+					},
+					"elevenLabs": {
+						"children": {
+							"cacheAudioClips": {
+								"label": "Cache Audio Clips",
+								"description": "Cache generated audio clips"
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

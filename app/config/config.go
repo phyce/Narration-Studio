@@ -19,6 +19,9 @@ var configWindowsDefault []byte
 //go:embed defaults/config-darwin-default.json
 var configDarwinDefault []byte
 
+//go:embed defaults/config-linux-default.json
+var configLinuxDefault []byte
+
 var manager *ConfigManager
 
 func init() {
@@ -43,10 +46,15 @@ func InitializeWithPath(info Info, customPath string) error {
 	configFile, err := ioutil.ReadFile(manager.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if runtime.GOOS == "windows" {
+			switch runtime.GOOS {
+			case "windows":
 				configFile = configWindowsDefault
-			} else {
+			case "linux":
+				configFile = configLinuxDefault
+			case "darwin":
 				configFile = configDarwinDefault
+			default:
+				configFile = configLinuxDefault
 			}
 
 			configPath := filepath.Dir(manager.filePath)

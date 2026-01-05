@@ -61,30 +61,36 @@ func handleProfileTTSRequest(context echo.Context) error {
 		})
 	}
 
-	format := "wav"
-	//if request.Options != nil {
-	//	if formatOption, exists := request.Options["format"]; exists {
-	//		if formatStr, ok := formatOption.(string); ok {
-	//			format = strings.ToLower(formatStr)
-	//		}
-	//	}
-	//}
+	audioOpts, err := request.GetAudioOptions()
+	if err != nil {
+		return context.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			Success: false,
+			Error:   "Invalid audio options: " + err.Error(),
+			Code:    400,
+		})
+	}
 
-	//validFormats := []string{"wav", "flac", "ogg"}
-	//formatValid := false
-	//for _, validFormat := range validFormats {
-	//	if format == validFormat {
-	//		formatValid = true
-	//		break
-	//	}
-	//}
-	//if !formatValid {
-	//	return context.JSON(http.StatusBadRequest, ErrorResponse{
-	//		Success: false,
-	//		Error:   "Invalid format. Supported formats: wav, flac, ogg",
-	//		Code:    400,
-	//	})
-	//}
+	outputFormat := "wav"
+	if audioOpts != nil && audioOpts.Format != "" {
+		outputFormat = strings.ToLower(audioOpts.Format)
+	}
+
+	validFormats := []string{"wav", "flac", "ogg", "pcm", "pcm_s16le", "mp3"}
+	formatValid := false
+	for _, validFormat := range validFormats {
+		if outputFormat == validFormat {
+			formatValid = true
+			break
+		}
+	}
+	if !formatValid {
+		return context.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			Success: false,
+			Error:   "Invalid format. Supported: wav, flac, ogg, pcm, pcm_s16le, mp3",
+			Code:    400,
+		})
+	}
+
 	log.Info("about to get manager")
 
 	manager := profile.GetManager()
@@ -99,17 +105,18 @@ func handleProfileTTSRequest(context echo.Context) error {
 
 	voiceKey := fmt.Sprintf("%s:%s:%s", voice.Engine, voice.Model, voice.Voice)
 
-	var rawAudioData []byte
+	// Check cache - cache stores raw PCM bytes
+	var audioObject *audio.Audio
 	cacheManager := cache.GetManager()
 	if cacheManager.IsEnabled() {
 		cachedAudio, found := cacheManager.GetCachedAudio(request.Profile, request.Character, request.Text)
 		if found {
-			rawAudioData = cachedAudio
+			audioObject = audio.NewAudioFromPCM(cachedAudio, 22050, 1, 16)
 		}
 	}
 
-	if rawAudioData == nil {
-		rawAudioData, err = tts.GenerateRawAudio(voice, request.Text)
+	if audioObject == nil {
+		audioObject, err = tts.GenerateAudio(voice, request.Text)
 		if err != nil {
 			return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 				Success: false,
@@ -119,7 +126,8 @@ func handleProfileTTSRequest(context echo.Context) error {
 		}
 
 		if cacheManager.IsEnabled() {
-			if err := cacheManager.CacheAudio(request.Profile, request.Character, request.Text, voiceKey, rawAudioData); err != nil {
+			pcmData, _ := audioObject.ToPCM()
+			if err := cacheManager.CacheAudio(request.Profile, request.Character, request.Text, voiceKey, pcmData); err != nil {
 				response.Warn("failed to cache audio: %v", err)
 			}
 		}
@@ -127,7 +135,29 @@ func handleProfileTTSRequest(context echo.Context) error {
 
 	stats.IncrementMessages()
 
-	audioData, err := audio.ConvertRawToFormat(rawAudioData, format)
+	if audioOpts != nil {
+		if audioOpts.SampleRate > 0 && audioOpts.SampleRate != audioObject.Metadata.SampleRate {
+			if err := audioObject.Resample(audioOpts.SampleRate); err != nil {
+				return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+					Success: false,
+					Error:   "Failed to resample audio: " + err.Error(),
+					Code:    500,
+				})
+			}
+		}
+
+		if audioOpts.Channels > 0 && audioOpts.Channels != audioObject.Metadata.Channels {
+			if err := audioObject.ChangeChannels(audioOpts.Channels); err != nil {
+				return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+					Success: false,
+					Error:   "Failed to change channels: " + err.Error(),
+					Code:    500,
+				})
+			}
+		}
+	}
+
+	audioData, err := audioObject.ToFormat(outputFormat)
 	if err != nil {
 		return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Success: false,
@@ -136,8 +166,14 @@ func handleProfileTTSRequest(context echo.Context) error {
 		})
 	}
 
-	contentType := audio.GetContentType(format)
-	filename := fmt.Sprintf("tts_%s_%s.%s", request.Profile, request.Character, format)
+	contentType := audio.GetContentType(outputFormat)
+
+	fileExtension := outputFormat
+	if outputFormat == "pcm" || outputFormat == "pcm_s16le" {
+		fileExtension = "pcm"
+	}
+
+	filename := fmt.Sprintf("tts_%s_%s.%s", request.Profile, request.Character, fileExtension)
 
 	context.Response().Header().Set("Content-Type", contentType)
 	context.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
@@ -231,7 +267,7 @@ func handleSimpleTTS(context echo.Context) error {
 		Voice:  voiceId,
 	}
 
-	rawAudioData, err := tts.GenerateRawAudio(voice, request.Text)
+	audioObj, err := tts.GenerateAudio(voice, request.Text)
 	if err != nil {
 		return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Success: false,
@@ -242,7 +278,7 @@ func handleSimpleTTS(context echo.Context) error {
 
 	stats.IncrementMessages()
 
-	audioData, err := audio.ConvertRawToFormat(rawAudioData, format)
+	audioData, err := audioObj.ToFormat(format)
 	if err != nil {
 		return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Success: false,

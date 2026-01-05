@@ -127,6 +127,20 @@ func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
+func (labs *ElevenLabs) GenerateAudio(model string, payload []byte) (*commonAudio.Audio, error) {
+	var request ElevenLabsRequest
+	if err := json.Unmarshal(payload, &request); err != nil {
+		return nil, response.Err(err)
+	}
+
+	pcmData, err := labs.sendRequest(model, request)
+	if err != nil {
+		return nil, response.Err(err)
+	}
+
+	return commonAudio.NewAudioFromPCM(pcmData, 24000, 1, 16), nil
+}
+
 func (labs *ElevenLabs) GetVoices(model string) ([]engine.Voice, error) {
 	return voices, nil
 }

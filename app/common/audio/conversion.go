@@ -107,6 +107,10 @@ func GetContentType(format string) string {
 		return "audio/flac"
 	case "ogg":
 		return "audio/ogg"
+	case "mp3":
+		return "audio/mpeg"
+	case "pcm", "pcm_s16le":
+		return "audio/pcm"
 	default:
 		return "audio/wav"
 	}

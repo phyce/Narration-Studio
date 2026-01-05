@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"encoding/json"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
@@ -117,6 +118,24 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 
 func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
 	return make([]byte, 0), nil
+}
+
+func (openAI *OpenAI) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
+	var request OpenAIRequest
+	if err := json.Unmarshal(payload, &request); err != nil {
+		return nil, response.Err(err)
+	}
+
+	request.Model = model
+	request.ResponseFormat = openAI.outputType
+	request.Speed = 1
+
+	flacData, err := openAI.sendRequest(request)
+	if err != nil {
+		return nil, response.Err(err)
+	}
+
+	return audio.NewAudioFromFLAC(flacData), nil
 }
 
 func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {

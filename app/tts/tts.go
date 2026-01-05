@@ -99,12 +99,12 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 	return nil
 }
 
-func GenerateRawAudio(voice *util.CharacterVoice, text string) ([]byte, error) {
+func GenerateAudio(voice *util.CharacterVoice, text string) (*audio.Audio, error) {
 	engineInstance, releaseFunc, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
 	if !ok {
 		return nil, response.Err(fmt.Errorf("failed to get engine instance: %s/%s", voice.Engine, voice.Model))
 	}
-	defer releaseFunc() // Release instance back to pool when done
+	defer releaseFunc()
 
 	message := util.CharacterMessage{
 		Character: voice.Name,
@@ -118,12 +118,22 @@ func GenerateRawAudio(voice *util.CharacterVoice, text string) ([]byte, error) {
 		return nil, response.Err(err)
 	}
 
-	rawAudio, err := engineInstance.Generate(message.Voice.Model, payload)
+	audioObj, err := engineInstance.GenerateAudio(message.Voice.Model, payload)
 	if err != nil {
 		return nil, response.Err(err)
 	}
 
-	return rawAudio, nil
+	return audioObj, nil
+}
+
+func GenerateRawAudio(voice *util.CharacterVoice, text string) ([]byte, error) {
+	// Use new GenerateAudio function and convert to raw PCM for backward compatibility
+	audioObj, err := GenerateAudio(voice, text)
+	if err != nil {
+		return nil, err
+	}
+
+	return audioObj.ToPCM()
 }
 
 func preparePayload(message util.CharacterMessage) ([]byte, error) {
@@ -160,6 +170,7 @@ func preparePayload(message util.CharacterMessage) ([]byte, error) {
 		payload := elevenlabs.ElevenLabsRequest{
 			Text:    message.Text,
 			ModelID: message.Voice.Model,
+			VoiceID: message.Voice.Voice,
 		}
 		return json.Marshal(payload)
 	}

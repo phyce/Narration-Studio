@@ -3,6 +3,7 @@ package engine
 import (
 	"encoding/json"
 	"fmt"
+	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 )
@@ -16,6 +17,7 @@ type Base interface {
 
 	//TODO Maybe remove Generate() from Base? this is only used by Play and Save
 	Generate(model string, payload []byte) ([]byte, error)
+	GenerateAudio(model string, payload []byte) (*audio.Audio, error)
 	GetVoices(model string) ([]Voice, error)
 	FetchModels() map[string]Model
 }

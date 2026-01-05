@@ -356,6 +356,15 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	return audioClip, nil
 }
 
+func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
+	rawBytes, err := piper.Generate(model, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return audio.NewAudioFromPCM(rawBytes, 22050, 1, 16), nil
+}
+
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	modelData, exists := piper.models[model]
 	if !exists {

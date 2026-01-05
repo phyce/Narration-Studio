@@ -221,6 +221,15 @@ func (sapi *MsSapi4) Generate(model string, payload []byte) ([]byte, error) {
 	return audioBytes, nil
 }
 
+func (sapi *MsSapi4) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
+	wavBytes, err := sapi.Generate(model, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return audio.NewAudioFromWAV(wavBytes)
+}
+
 func (sapi *MsSapi4) GetVoices(model string) ([]engine.Voice, error) {
 	return []engine.Voice{
 		{ID: "sam", Name: "Sam", Gender: "Male"},

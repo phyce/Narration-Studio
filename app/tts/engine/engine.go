@@ -8,6 +8,13 @@ import (
 	"nstudio/app/common/util"
 )
 
+type EngineType int
+
+const (
+	Local EngineType = iota
+	Api
+)
+
 type Base interface {
 	Initialize() error
 	Start(modelName string) error
@@ -26,6 +33,7 @@ type Engine struct {
 	Engine Base             `json:"-"`
 	ID     string           `json:"id"`
 	Name   string           `json:"name"`
+	Type   EngineType       `json:"-"`
 	Models map[string]Model `json:"models"`
 }
 

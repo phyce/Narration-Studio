@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"nstudio/app/common/eventManager"
 	"nstudio/app/common/issue"
 	"os"
 	"path/filepath"
@@ -206,7 +207,17 @@ func Set(newConfig Base) error {
 		return err
 	}
 
-	return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
+	err = ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
+	if err != nil {
+		return err
+	}
+
+	eventManager.GetInstance().TriggerEvent("config.changed", map[string]interface{}{
+		"path":  "",
+		"value": "",
+	})
+
+	return nil
 }
 
 func SetValueToPath(path string, value string) error {
@@ -261,7 +272,17 @@ func SetValueToPath(path string, value string) error {
 				return err
 			}
 
-			return ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
+			err = ioutil.WriteFile(manager.filePath, updatedConfigs, 0644)
+			if err != nil {
+				return err
+			}
+
+			eventManager.GetInstance().TriggerEvent("config.changed", map[string]interface{}{
+				"path":  path,
+				"value": value,
+			})
+
+			return nil
 		} else {
 			// Traverse to the next nested struct
 			current = field

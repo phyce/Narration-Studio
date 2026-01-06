@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"nstudio/app/common/audio"
@@ -194,27 +195,43 @@ func (piper *Piper) Stop(modelName string) error {
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				if !(status.Signaled() && status.Signal() == os.Interrupt) {
-					return response.Err(fmt.Errorf("Process for model %s exited with signal: %v", modelName, status.Signal()))
+				// On Windows, killed processes exit with signal -1
+				// On Unix, they may exit with SIGKILL (9) or SIGINT (2)
+				// We accept these as successful terminations
+				if status.Signaled() {
+					signal := status.Signal()
+					if signal == os.Interrupt || signal == os.Kill || signal == syscall.SIGTERM || signal == syscall.Signal(-1) {
+						err = nil
+					} else {
+						return response.Err(fmt.Errorf("Process for model %s exited with unexpected signal: %v", modelName, signal))
+					}
+				} else {
+					// On Windows, killed processes often exit with status code 1
+					exitCode := exitErr.ExitCode()
+					if exitCode == 1 {
+						err = nil
+					}
 				}
 			}
 		}
 
-		return response.Err(fmt.Errorf("Process for model %s exited with issue: %v", modelName, err))
+		if err != nil {
+			return response.Err(fmt.Errorf("Process for model %s exited with issue: %v", modelName, err))
+		}
 	}
 
 	if instance.stdin != nil {
-		if err := instance.stdin.Close(); err != nil {
+		if err := instance.stdin.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 			return response.Err(fmt.Errorf("Failed to close stdin for model %s: %v", modelName, err))
 		}
 	}
 	if instance.stdout != nil {
-		if err := instance.stdout.Close(); err != nil {
+		if err := instance.stdout.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 			return response.Err(fmt.Errorf("Failed to close stdout for model %s: %v", modelName, err))
 		}
 	}
 	if instance.stderr != nil {
-		if err := instance.stderr.Close(); err != nil {
+		if err := instance.stderr.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 			return response.Err(fmt.Errorf("Failed to close stderr for model %s: %v", modelName, err))
 		}
 	}

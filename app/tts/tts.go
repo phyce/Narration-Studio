@@ -170,7 +170,6 @@ func preparePayload(message util.CharacterMessage) ([]byte, error) {
 		payload := elevenlabs.ElevenLabsRequest{
 			Text:    message.Text,
 			ModelID: message.Voice.Model,
-			VoiceID: message.Voice.Voice,
 		}
 		return json.Marshal(payload)
 	}

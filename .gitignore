@@ -5,3 +5,5 @@ frontend/dist
 *.onnx
 
 .DS_Store
+
+*.exe

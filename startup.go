@@ -48,6 +48,7 @@ func registerEngines() {
 	piperEngine := engine.Engine{
 		ID:     "piper",
 		Name:   "Piper",
+		Type:   engine.Local,
 		Engine: &piper.Piper{},
 		Models: piper.FetchModels(),
 	}
@@ -60,6 +61,7 @@ func registerEngines() {
 	openAIEngine := engine.Engine{
 		ID:     "openai",
 		Name:   "OpenAI",
+		Type:   engine.Api,
 		Engine: &openai.OpenAI{},
 		Models: openai.FetchModels(),
 	}
@@ -77,6 +79,7 @@ func registerEngines() {
 	elevenLabsEngine := engine.Engine{
 		ID:     "elevenlabs",
 		Name:   "ElevenLabs",
+		Type:   engine.Api,
 		Engine: &elevenlabs.ElevenLabs{},
 		Models: models,
 	}
@@ -90,6 +93,7 @@ func registerEngines() {
 		msSapi4Engine := engine.Engine{
 			ID:     "mssapi4",
 			Name:   "Microsoft SAPI4",
+			Type:   engine.Local,
 			Engine: &mssapi4.MsSapi4{},
 			Models: mssapi4.FetchModels(),
 		}

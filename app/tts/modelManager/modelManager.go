@@ -2,6 +2,7 @@ package modelManager
 
 import (
 	"fmt"
+	"nstudio/app/common/eventManager"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
 	"nstudio/app/common/util"
@@ -12,6 +13,7 @@ import (
 	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +47,86 @@ func Initialize(isGUIMode bool) {
 				Detail:  err.Error(),
 			})
 		}
+
+		eventManager.GetInstance().SubscribeToEvent("config.changed", handleConfigChange)
 	})
+}
+
+func handleConfigChange(data interface{}) {
+	changeData, ok := data.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	path, pathOk := changeData["path"].(string)
+	if !pathOk || path == "" {
+		restartLocalEngines()
+		return
+	}
+
+	if !strings.HasPrefix(path, "engine.local.") {
+		return
+	}
+
+	parts := strings.Split(path, ".")
+	if len(parts) < 3 {
+		return
+	}
+
+	engineName := strings.ToLower(parts[2])
+	log.Info(fmt.Sprintf("Config changed for engine: %s, path: %s", engineName, path))
+
+	restartEngine(engineName)
+}
+
+func restartEngine(engineName string) {
+	manager.Lock()
+	defer manager.Unlock()
+
+	entry, exists := manager.Engines[engineName]
+	if !exists {
+		log.Warn(fmt.Sprintf("Engine %s not found, skipping restart", engineName))
+		return
+	}
+
+	log.Info(fmt.Sprintf("Restarting \"%s\" engine models", engineName))
+
+	for modelID, modelPool := range entry.Models {
+		if len(modelPool.Instances) == 0 {
+			continue
+		}
+
+		for _, instance := range modelPool.Instances {
+			if err := instance.Stop(modelID); err != nil {
+				response.Error(util.MessageData{
+					Summary: fmt.Sprintf("Failed to stop model %s:%s", engineName, modelID),
+					Detail:  err.Error(),
+				})
+			}
+		}
+
+		for _, instance := range modelPool.Instances {
+			if err := instance.Start(modelID); err != nil {
+				response.Error(util.MessageData{
+					Summary: fmt.Sprintf("Failed to restart model %s:%s", engineName, modelID),
+					Detail:  err.Error(),
+				})
+			}
+		}
+	}
+}
+
+func restartLocalEngines() {
+	manager.Lock()
+	defer manager.Unlock()
+
+	for engineID, entry := range manager.Engines {
+		if entry.Engine.Type == tts.Local {
+			manager.Unlock()
+			restartEngine(engineID)
+			manager.Lock()
+		}
+	}
 }
 
 func RefreshModels() error {
@@ -154,30 +235,26 @@ func RegisterEngine(baseEngine tts.Engine) error {
 
 		var instances []tts.Base
 		for i := 0; i < instanceCount; i++ {
-			var engineImpl tts.Base
+			var engine tts.Base
 
 			switch engineID {
 			case string(Engines.Piper):
-				engineImpl = &piper.Piper{}
+				engine = &piper.Piper{}
 			case string(Engines.MsSapi4):
-				engineImpl = &mssapi4.MsSapi4{}
+				engine = &mssapi4.MsSapi4{}
 			case string(Engines.ElevenLabs):
-				engineImpl = &elevenlabs.ElevenLabs{}
+				engine = &elevenlabs.ElevenLabs{}
 			case string(Engines.OpenAI):
-				engineImpl = &openai.OpenAI{}
+				engine = &openai.OpenAI{}
 			default:
-				if i == 0 {
-					engineImpl = baseEngine.Engine
-				} else {
-					engineImpl = baseEngine.Engine
-				}
+				engine = baseEngine.Engine
 			}
 
-			if err := engineImpl.Initialize(); err != nil {
+			if err := engine.Initialize(); err != nil {
 				return response.Err(err)
 			}
 
-			instances = append(instances, engineImpl)
+			instances = append(instances, engine)
 		}
 
 		// Create buffered channel pool and populate with all instances

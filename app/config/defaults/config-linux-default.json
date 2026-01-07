@@ -25,20 +25,17 @@
 		"local": {
 			"piper": {
 				"directory": "~/piper/piper",
-				"modelsDirectory": "~/piper/models",
-				"cacheAudioClips": true
+				"modelsDirectory": "~/piper/models"
 			}
 		},
 		"api": {
 			"openAi": {
 				"apiKey": "",
-				"outputType": "flac",
-				"cacheAudioClips": true
+				"outputType": "flac"
 			},
 			"elevenLabs": {
 				"apiKey": "",
-				"outputType": "pcm_24000",
-				"cacheAudioClips": true
+				"outputType": "pcm_24000"
 			}
 		}
 	},

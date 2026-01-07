@@ -10,10 +10,6 @@
 								"type": "path",
 								"pathType": "file",
 								"description": "Path to piper executable"
-							},
-							"cacheAudioClips": {
-								"label": "Cache Audio Clips",
-								"description": "Cache generated audio clips"
 							}
 						}
 					},
@@ -26,18 +22,10 @@
 				"children": {
 					"openAI": {
 						"children": {
-							"cacheAudioClips": {
-								"label": "Cache Audio Clips",
-								"description": "Cache generated audio clips"
-							}
 						}
 					},
 					"elevenLabs": {
 						"children": {
-							"cacheAudioClips": {
-								"label": "Cache Audio Clips",
-								"description": "Cache generated audio clips"
-							}
 						}
 					}
 				}

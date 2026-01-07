@@ -58,6 +58,18 @@ func InitializeWithPath(info Info, customPath string) error {
 				configFile = configLinuxDefault
 			}
 
+			var newConfig Base
+			if err := json.Unmarshal(configFile, &newConfig); err != nil {
+				return err
+			}
+
+			findEngines(&newConfig)
+
+			configFile, err = json.MarshalIndent(newConfig, "", "\t")
+			if err != nil {
+				return err
+			}
+
 			configPath := filepath.Dir(manager.filePath)
 			if err := os.MkdirAll(configPath, 0755); err != nil {
 				return err
@@ -70,7 +82,6 @@ func InitializeWithPath(info Info, customPath string) error {
 	}
 
 	err = json.Unmarshal(configFile, &manager.config)
-	//TODO remove Info from being saved into defaults file
 	manager.config.Info = info
 
 	if Debug() {

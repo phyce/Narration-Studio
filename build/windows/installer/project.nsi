@@ -100,6 +100,8 @@ Section "Main Application" SEC_MAIN
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
 
+    WriteRegStr HKLM "Software\${INFO_PRODUCTNAME}" "InstallPath" "$INSTDIR"
+
     !insertmacro wails.writeUninstaller
 SectionEnd
 
@@ -164,6 +166,8 @@ Section "Uninstall"
 
     !insertmacro wails.unassociateFiles
     !insertmacro wails.unassociateCustomProtocols
+
+    DeleteRegKey HKLM "Software\${INFO_PRODUCTNAME}"
 
     !insertmacro wails.deleteUninstaller
 SectionEnd

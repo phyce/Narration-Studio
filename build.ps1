@@ -15,6 +15,9 @@ Copy-Item -Path "build/bin/nstudio-cli.exe" -Destination "build/windows/installe
 Write-Host "Building GUI application..."
 wails build
 
+Write-Host "Building Installer..."
+wails build -nsis
+
 Write-Host "Build complete!"
 Write-Host "GUI App: build/bin/Narration Studio.exe"
 Write-Host "CLI App: build/bin/nstudio-cli.exe"

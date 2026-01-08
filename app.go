@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"nstudio/app/common/eventManager"
+	"nstudio/app/common/process"
 	"os"
 	"os/exec"
 	"runtime"
@@ -32,5 +33,6 @@ func clearConsole() error {
 		cmd = exec.Command("clear")
 	}
 	cmd.Stdout = os.Stdout
+	process.HideCommandLine(cmd)
 	return cmd.Run()
 }

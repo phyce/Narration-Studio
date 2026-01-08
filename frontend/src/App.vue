@@ -9,6 +9,7 @@ import CharacterVoices from './components/pages/CharacterVoices.vue';
 import VoicePacks from './components/pages/VoicePacks.vue';
 import Settings from './components/pages/Settings.vue';
 import Start from './components/pages/Start.vue';
+import Server from './components/pages/Server.vue';
 import {eventManager} from "./util/eventManager";
 import Toast, {ToastMessageOptions} from 'primevue/toast';
 import {useToast} from "primevue/usetoast";
@@ -31,7 +32,8 @@ const pageComponents: pageComponent = {
 	'script-editor': ScriptEditor,
 	'character-voices': CharacterVoices,
 	'voice-packs': VoicePacks,
-	'settings': Settings
+	'settings': Settings,
+	'server': Server
 };
 
 function showNotification(data: ToastMessageOptions) {

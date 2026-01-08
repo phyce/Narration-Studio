@@ -18,6 +18,10 @@ export function EventTrigger(arg1, arg2) {
   return window['go']['main']['App']['EventTrigger'](arg1, arg2);
 }
 
+export function GenerateServerCommand(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GenerateServerCommand'](arg1, arg2, arg3, arg4);
+}
+
 export function GetAvailableModels() {
   return window['go']['main']['App']['GetAvailableModels']();
 }
@@ -44,6 +48,14 @@ export function GetProfileVoices(arg1) {
 
 export function GetProfiles() {
   return window['go']['main']['App']['GetProfiles']();
+}
+
+export function GetServerLogs() {
+  return window['go']['main']['App']['GetServerLogs']();
+}
+
+export function GetServerStatus() {
+  return window['go']['main']['App']['GetServerStatus']();
 }
 
 export function GetSetting(arg1) {
@@ -88,4 +100,12 @@ export function SelectDirectory(arg1) {
 
 export function SelectFile(arg1) {
   return window['go']['main']['App']['SelectFile'](arg1);
+}
+
+export function StartDaemonServer(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartDaemonServer'](arg1, arg2, arg3, arg4);
+}
+
+export function StopDaemonServer() {
+  return window['go']['main']['App']['StopDaemonServer']();
 }

@@ -38,6 +38,7 @@ func IsRunning(p *os.Process) bool {
 
 func HideCommandLine(command *exec.Cmd) {
 	command.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: windows.CREATE_NO_WINDOW,
+		HideWindow:    true,
+		CreationFlags: windows.CREATE_NO_WINDOW | syscall.CREATE_NEW_PROCESS_GROUP,
 	}
 }

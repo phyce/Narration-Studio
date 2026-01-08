@@ -23,7 +23,6 @@ type DaemonStatusInfo struct {
 	Version           string    `json:"version"`
 	StartTime         time.Time `json:"start_time"`
 	ProcessedMessages int64     `json:"processed_messages"`
-	LastUpdated       time.Time `json:"last_updated"`
 }
 
 func GetPidFilePath() string {
@@ -56,8 +55,6 @@ func SetupDaemonLogger() (*os.File, error) {
 func WriteDaemonStatus(status DaemonStatusInfo) error {
 	statusMutex.Lock()
 	defer statusMutex.Unlock()
-
-	status.LastUpdated = time.Now()
 
 	statusFile := GetStatusFilePath()
 	data, err := json.MarshalIndent(status, "", "  ")

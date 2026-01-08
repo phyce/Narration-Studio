@@ -10,6 +10,8 @@ export function EventSubscribe(arg1:string,arg2:any):Promise<void>;
 
 export function EventTrigger(arg1:string,arg2:any):Promise<void>;
 
+export function GenerateServerCommand(arg1:string,arg2:number,arg3:string,arg4:string):Promise<string>;
+
 export function GetAvailableModels():Promise<string>;
 
 export function GetConfigSchema():Promise<string>;
@@ -23,6 +25,10 @@ export function GetProfile(arg1:string):Promise<string>;
 export function GetProfileVoices(arg1:string):Promise<string>;
 
 export function GetProfiles():Promise<string>;
+
+export function GetServerLogs():Promise<string>;
+
+export function GetServerStatus():Promise<string>;
 
 export function GetSetting(arg1:string):Promise<any>;
 
@@ -45,3 +51,7 @@ export function SaveSettings(arg1:config.Base):Promise<void>;
 export function SelectDirectory(arg1:string):Promise<string>;
 
 export function SelectFile(arg1:string):Promise<string>;
+
+export function StartDaemonServer(arg1:string,arg2:number,arg3:string,arg4:string):Promise<string>;
+
+export function StopDaemonServer():Promise<string>;

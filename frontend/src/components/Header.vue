@@ -9,9 +9,9 @@ const props = defineProps({
 });
 
 const views = ref([
-	// { id: 'streaming', display: 'Streaming'},
 	{id: 'sandbox', display: 'Sandbox'},
 	{id: 'script-editor', display: 'Script Editor'},
+	{id: 'server', 'display': 'Server'},
 	{id: 'character-voices', display: 'Character Voices'},
 	{id: 'voice-packs', display: 'Voice Packs'},
 	{id: 'settings', display: 'Settings'},

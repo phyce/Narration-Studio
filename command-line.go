@@ -28,7 +28,7 @@ type commandLineArguments struct {
 
 func processCommandLine() commandLineArguments {
 	mode := flag.String("mode", "help", "Server mode: gui, http, websocket, grpc, tcp, namedpipe, filesystem")
-	port := flag.Int("port", 8080, "Server port (for applicable modes)")
+	port := flag.Int("port", 8989, "Server port (for applicable modes)")
 	host := flag.String("host", "localhost", "Server host (for applicable modes)")
 	configFile := flag.String("config", "", "Path to custom config JSON file")
 	status := flag.Bool("status", false, "Check server status")
@@ -92,13 +92,11 @@ func handleStatus() {
 	}
 
 	uptime := time.Since(statusInfo.StartTime)
-	lastUpdated := time.Since(statusInfo.LastUpdated)
 
 	fmt.Printf("🟢 Server is running (PID: %d)\n", statusInfo.PID)
 	fmt.Printf("Version:            %s\n", statusInfo.Version)
 	fmt.Printf("Uptime:             %s\n", util.FormatDuration(uptime))
 	fmt.Printf("Processed Messages: %d\n", statusInfo.ProcessedMessages)
-	fmt.Printf("Last Updated:       %s (%s ago)\n", statusInfo.LastUpdated.Format("2006-01-02 15:04:05"), util.FormatDuration(lastUpdated))
 }
 
 func handleStop() {

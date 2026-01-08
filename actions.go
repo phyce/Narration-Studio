@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"nstudio/app/cache"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/issue"
+	"nstudio/app/common/process"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
 	"nstudio/app/common/util"
@@ -17,6 +19,7 @@ import (
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -574,6 +577,268 @@ func (app *App) GetConfigSchema() string {
 	}
 
 	return string(schemaJSON)
+}
+
+// </editor-fold>
+
+// <editor-fold desc="Server Management">
+
+func getCliExecutablePath() (string, error) {
+	err, executablePath := util.ExpandPath(os.Args[0])
+	if err != nil {
+		return "", err
+	}
+
+	executableDirectory := filepath.Dir(executablePath)
+	cliExecutableName := "nstudio-cli"
+	if runtime.GOOS == "windows" {
+		cliExecutableName = "nstudio-cli.exe"
+	}
+
+	cliExecutablePath := filepath.Join(executableDirectory, cliExecutableName)
+
+	if _, err := os.Stat(cliExecutablePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("CLI executable not found at: %s", cliExecutablePath)
+	}
+
+	return cliExecutablePath, nil
+}
+
+func (app *App) StartDaemonServer(mode string, port int, host string, configFile string) string {
+	cliExecutablePath, err := getCliExecutablePath()
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to locate CLI executable",
+			Detail:  err.Error(),
+		})
+		return jsonError("Failed to locate CLI executable", err.Error())
+	}
+
+	arguments := []string{"-mode", mode}
+
+	if port > 0 {
+		arguments = append(arguments, "-port", fmt.Sprintf("%d", port))
+	}
+
+	if host != "" {
+		arguments = append(arguments, "-host", host)
+	}
+
+	if configFile != "" {
+		arguments = append(arguments, "-config", configFile)
+	}
+
+	command := exec.Command(cliExecutablePath, arguments...)
+	process.HideCommandLine(command)
+
+	output, err := command.CombinedOutput()
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to start server",
+			Detail:  string(output),
+		})
+		return jsonError("Failed to start server", string(output))
+	}
+
+	time.Sleep(1 * time.Second)
+
+	response.Success(util.MessageData{
+		Summary: "Server started",
+		Detail:  fmt.Sprintf("Server started successfully in %s mode on %s:%d", mode, host, port),
+	})
+
+	return app.GetServerStatus()
+}
+
+func (app *App) StopDaemonServer() string {
+	cliExecutablePath, err := getCliExecutablePath()
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to locate CLI executable",
+			Detail:  err.Error(),
+		})
+		return jsonError("Failed to locate CLI executable", err.Error())
+	}
+
+	command := exec.Command(cliExecutablePath, "-stop")
+	process.HideCommandLine(command)
+
+	output, err := command.CombinedOutput()
+
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to stop server",
+			Detail:  string(output),
+		})
+		return jsonError("Failed to stop server", string(output))
+	}
+
+	response.Success(util.MessageData{
+		Summary: "Server stopped",
+		Detail:  string(output),
+	})
+
+	return app.GetServerStatus()
+}
+
+func (app *App) GetServerStatus() string {
+	cliExecutablePath, err := getCliExecutablePath()
+	if err != nil {
+		return jsonError("Failed to locate CLI executable", err.Error())
+	}
+
+	command := exec.Command(cliExecutablePath, "-status")
+	process.HideCommandLine(command)
+
+	output, err := command.CombinedOutput()
+
+	outputString := string(output)
+
+	serverStatus := map[string]interface{}{
+		"running":           false,
+		"output":            outputString,
+		"error":             "",
+		"pid":               0,
+		"version":           "",
+		"uptime":            "",
+		"processedMessages": 0,
+	}
+
+	if err == nil {
+		serverStatus["running"] = true
+		parseStatusOutput(outputString, serverStatus)
+	} else {
+		if strings.Contains(outputString, "Server is not running") {
+			serverStatus["running"] = false
+			serverStatus["output"] = "Server is not running"
+		} else {
+			serverStatus["error"] = err.Error()
+			if outputString != "" {
+				serverStatus["output"] = outputString
+			}
+		}
+	}
+
+	jsonData, _ := json.Marshal(serverStatus)
+	return string(jsonData)
+}
+
+func (app *App) GetServerLogs() string {
+	logFilePath := filepath.Join(os.TempDir(), "narration-studio-daemon.log")
+
+	fileInfo, err := os.Stat(logFilePath)
+	if os.IsNotExist(err) {
+		result := map[string]interface{}{
+			"logs": "Log file does not exist. Server may not be running or hasn't created logs yet.",
+		}
+		jsonData, _ := json.Marshal(result)
+		return string(jsonData)
+	}
+	if err != nil {
+		return jsonError("Failed to access log file", err.Error())
+	}
+
+	file, err := os.Open(logFilePath)
+	if err != nil {
+		return jsonError("Failed to open log file", err.Error())
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+
+	const maxScanTokenSize = 1024 * 1024 // 1MB
+	buf := make([]byte, maxScanTokenSize)
+	scanner.Buffer(buf, maxScanTokenSize)
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return jsonError("Failed to read log file", err.Error())
+	}
+
+	maxLines := 1000
+	startIndex := 0
+	if len(lines) > maxLines {
+		startIndex = len(lines) - maxLines
+	}
+
+	tailedLines := lines[startIndex:]
+	logsContent := strings.Join(tailedLines, "\n")
+
+	result := map[string]interface{}{
+		"logs":      logsContent,
+		"totalSize": fileInfo.Size(),
+		"lineCount": len(lines),
+		"showing":   len(tailedLines),
+	}
+
+	jsonData, _ := json.Marshal(result)
+	return string(jsonData)
+}
+
+func (app *App) GenerateServerCommand(mode string, port int, host string, configFile string) string {
+	cliExecutablePath, err := getCliExecutablePath()
+	if err != nil {
+		return ""
+	}
+
+	arguments := []string{cliExecutablePath, "-mode", mode}
+
+	if port > 0 {
+		arguments = append(arguments, "-port", fmt.Sprintf("%d", port))
+	}
+
+	if host != "" {
+		arguments = append(arguments, "-host", host)
+	}
+
+	if configFile != "" {
+		arguments = append(arguments, "-config", configFile)
+	}
+
+	return strings.Join(arguments, " ")
+}
+
+func parseStatusOutput(output string, status map[string]interface{}) {
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if strings.Contains(line, "Server is running (PID:") {
+			var pid int
+			fmt.Sscanf(line, "🟢 Server is running (PID: %d)", &pid)
+			status["pid"] = pid
+		}
+
+		if strings.HasPrefix(line, "Version:") {
+			version := strings.TrimSpace(strings.TrimPrefix(line, "Version:"))
+			status["version"] = version
+		}
+
+		if strings.HasPrefix(line, "Uptime:") {
+			uptime := strings.TrimSpace(strings.TrimPrefix(line, "Uptime:"))
+			status["uptime"] = uptime
+		}
+
+		if strings.HasPrefix(line, "Processed Messages:") {
+			var messages int
+			fmt.Sscanf(line, "Processed Messages: %d", &messages)
+			status["processedMessages"] = messages
+		}
+	}
+}
+
+func jsonError(summary string, detail string) string {
+	result := map[string]interface{}{
+		"error":   summary,
+		"detail":  detail,
+		"running": false,
+	}
+	jsonData, _ := json.Marshal(result)
+	return string(jsonData)
 }
 
 // </editor-fold>

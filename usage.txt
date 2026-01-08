@@ -4,7 +4,7 @@ Usage:
   --mode string
         Server mode: gui, http, websocket, grpc, tcp, namedpipe, filesystem, library (default "gui")
   --port int
-        Server port (for applicable modes) (default 8080)
+        Server port (for applicable modes) (default 8989)
   --host string
         Server host (for applicable modes) (default "localhost")
   --config string
@@ -34,8 +34,8 @@ Process Management:
   --stop         - Stop background server
 
 Examples:
-  ./narration-studio --mode=http --port=8080 --config=/path/to/config.json
-  ./narration-studio --mode=http --background --port=8080
+  ./narration-studio --mode=http --port=8989 --config=/path/to/config.json
+  ./narration-studio --mode=http --background --port=8989
   ./narration-studio --status
   ./narration-studio --stop
   ./narration-studio --config=/path/to/my-config.json

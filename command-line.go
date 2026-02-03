@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"nstudio/app/common/audio/player"
 	"nstudio/app/common/daemon"
 	"nstudio/app/common/util"
 	"os"
@@ -23,6 +24,7 @@ type commandLineArguments struct {
 	Status     bool
 	Stop       bool
 	Logs       bool
+	Play       string
 	Help       bool
 }
 
@@ -34,6 +36,7 @@ func processCommandLine() commandLineArguments {
 	status := flag.Bool("status", false, "Check server status")
 	stop := flag.Bool("stop", false, "Stop running server")
 	logs := flag.Bool("logs", false, "Show server log file location")
+	play := flag.String("play", "", "Play an audio file (supports WAV, FLAC, OGG, MP3)")
 	help := flag.Bool("help", false, "Show help")
 
 	flag.Parse()
@@ -46,6 +49,7 @@ func processCommandLine() commandLineArguments {
 		Status:     *status,
 		Stop:       *stop,
 		Logs:       *logs,
+		Play:       *play,
 		Help:       *help,
 	}
 
@@ -61,6 +65,11 @@ func processCommandLine() commandLineArguments {
 
 	if arguments.Logs {
 		handleLogs()
+		os.Exit(0)
+	}
+
+	if arguments.Play != "" {
+		handlePlay(arguments.Play)
 		os.Exit(0)
 	}
 
@@ -167,5 +176,15 @@ func handleLogs() {
 		fmt.Print(line)
 		// Small sleep to yield CPU
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func handlePlay(filePath string) {
+	fmt.Printf("Playing: %s\n", filePath)
+
+	err := player.PlayAudioFile(filePath)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 }

@@ -1,7 +1,7 @@
 {
 	"$schema": "https://wails.io/schemas/config.v2.json",
 	"name": "Narration Studio",
-	"version": "0.14.0",
+	"version": "0.15.0",
 	"website": "https://narration.studio",
 	"outputfilename": "narration_studio",
 	"frontend:install": "npm install",
@@ -15,7 +15,7 @@
 	"Info": {
 		"companyName": "phyce.dev",
 		"productName": "Narration Studio",
-		"productVersion": "0.14.0",
+		"productVersion": "0.15.0",
 		"copyright": "Copyright phyce.dev",
 		"comments": "Built using Wails (https://wails.io)"
 	}

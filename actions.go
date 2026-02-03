@@ -593,6 +593,8 @@ func getCliExecutablePath() (string, error) {
 	cliExecutableName := "nstudio-cli"
 	if runtime.GOOS == "windows" {
 		cliExecutableName = "nstudio-cli.exe"
+	} else if runtime.GOOS == "darwin" {
+		cliExecutableName = "nstudio-cli-osx"
 	}
 
 	cliExecutablePath := filepath.Join(executableDirectory, cliExecutableName)

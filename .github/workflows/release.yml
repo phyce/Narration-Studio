@@ -111,40 +111,48 @@ jobs:
           cd frontend
           npm install
 
-      - name: Build CLI application
-        run: |
-          mkdir -p build/bin
-          go build -tags cli -o build/bin/nstudio-cli-darwin-universal .
-
       - name: Build GUI application
         run: wails build -clean -platform darwin/universal
 
-      - name: Package macOS GUI
+      - name: Build CLI application
+        run: |
+          mkdir -p build/bin
+          go build -tags cli -o build/bin/nstudio-cli-osx .
+
+      - name: Embed CLI and Package macOS GUI
         run: |
           cd build/bin
-          # Create a zip of the .app bundle if it exists
+          
+          # Find the app bundle
           if [ -d "Narration Studio.app" ]; then
-            zip -r narration-studio-macos-universal.zip "Narration Studio.app"
-          elif [ -f "narration_studio.app" ]; then
-            zip -r narration-studio-macos-universal.zip "narration_studio.app"
-          elif [ -f "Narration Studio" ]; then
-            # If it's just an executable, zip it
-            zip narration-studio-macos-universal.zip "Narration Studio"
+            APP_NAME="Narration Studio.app"
+          elif [ -d "narration_studio.app" ]; then
+            APP_NAME="narration_studio.app"
+          else
+            echo "App bundle not found!"
+            exit 1
           fi
+          
+          # Embed CLI
+          echo "Embedding CLI into $APP_NAME..."
+          cp "nstudio-cli-osx" "$APP_NAME/Contents/MacOS/"
+          
+          # Zip it with the new name
+          zip -r "Narration Studio OSX.zip" "$APP_NAME"
 
       - name: Upload macOS GUI
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd build/bin
-          if [ -f narration-studio-macos-universal.zip ]; then
-            gh release upload ${{ github.event.release.tag_name }} narration-studio-macos-universal.zip
+          if [ -f "Narration Studio OSX.zip" ]; then
+            gh release upload ${{ github.event.release.tag_name }} "Narration Studio OSX.zip"
           fi
 
       - name: Upload macOS CLI
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} build/bin/nstudio-cli-darwin-universal
+        run: gh release upload ${{ github.event.release.tag_name }} build/bin/nstudio-cli-osx
 
   build-linux:
     runs-on: ubuntu-22.04

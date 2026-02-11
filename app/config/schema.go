@@ -358,3 +358,45 @@ func DetectFieldType(value interface{}) string {
 		return "text"
 	}
 }
+
+type ProfileSettingsSchema struct {
+	CacheEnabled ConfigField   `json:"cacheEnabled"`
+	ModelToggles []ConfigField `json:"modelToggles"`
+}
+
+func GetProfileSettingsSchema() (*ProfileSettingsSchema, error) {
+	schema := &ProfileSettingsSchema{
+		CacheEnabled: ConfigField{
+			Path:  "cacheEnabled",
+			Value: nil,
+			Metadata: &FieldMetadata{
+				Label:       "Enable Cache",
+				Type:        "checkbox",
+				Description: "Enable audio caching for this profile. Leave unchecked to use global setting.",
+			},
+		},
+		ModelToggles: []ConfigField{},
+	}
+
+	modelToggles := GetModelToggles()
+	for key, _ := range modelToggles {
+		parts := strings.SplitN(key, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		engineID := parts[0]
+		modelID := parts[1]
+
+		schema.ModelToggles = append(schema.ModelToggles, ConfigField{
+			Path:  key,
+			Value: false,
+			Metadata: &FieldMetadata{
+				Label:       fmt.Sprintf("%s - %s", engineID, modelID),
+				Type:        "checkbox",
+				Description: fmt.Sprintf("Enable %s model from %s engine for this profile", modelID, engineID),
+			},
+		})
+	}
+
+	return schema, nil
+}

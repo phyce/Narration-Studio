@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"nstudio/app/common/eventManager"
-	"nstudio/app/common/process"
+	"nstudio/app/common/issue"
+	"nstudio/app/common/response"
+	"nstudio/app/common/status"
+	"nstudio/app/tts/modelManager"
 	"os"
-	"os/exec"
-	"runtime"
 )
 
 type App struct {
@@ -23,16 +24,18 @@ func NewApp() *App {
 func (app *App) startup(ctx context.Context) {
 	app.context = ctx
 	eventManager.GetInstance().Initialize(ctx)
+
+	if err := initializeApp(""); err != nil {
+		issue.Panic("Failed to initialize app", err)
+	}
+
+	modelManager.Initialize(true)
+	registerEngines()
+	response.Initialize()
+	status.Set(status.Ready, "")
 }
 
 func clearConsole() error {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "cls")
-	} else {
-		cmd = exec.Command("clear")
-	}
-	cmd.Stdout = os.Stdout
-	process.HideCommandLine(cmd)
-	return cmd.Run()
+	_, err := os.Stdout.WriteString("\033[2J\033[H")
+	return err
 }

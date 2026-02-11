@@ -10,6 +10,7 @@ const title = ref<string>("");
 
 function updateStatus(data: { status: Status; message: string }) {
 	status.value = data.status ?? Status.Unknown;
+	console.log('updating status to:', status.value)
 	title.value = data.message;
 }
 

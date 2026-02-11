@@ -52,6 +52,8 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 			return response.Err(err)
 		}
 
+		message.Voice = *voice
+
 		selectedEngineInstance, releaseFunc, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
 		if !ok {
 			return response.Err(fmt.Errorf("Failed to retrieve engine instance: %s/%s", voice.Engine, voice.Model))

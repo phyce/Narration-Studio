@@ -12,7 +12,7 @@ const views = ref([
 	{id: 'sandbox', display: 'Sandbox'},
 	{id: 'script-editor', display: 'Script Editor'},
 	{id: 'server', 'display': 'Server'},
-	{id: 'character-voices', display: 'Character Voices'},
+	{id: 'profiles', display: 'Profiles'},
 	{id: 'voice-packs', display: 'Voice Packs'},
 	{id: 'settings', display: 'Settings'},
 ]);

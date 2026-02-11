@@ -25,3 +25,8 @@ export interface CharacterVoice {
 	model: string;
 	voice: string;
 }
+
+export interface ProfileSettings {
+	modelToggles?: Record<string, boolean>;
+	cacheEnabled?: boolean;
+}

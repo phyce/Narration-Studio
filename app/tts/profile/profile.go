@@ -70,3 +70,23 @@ func (profile *Profile) GetCharacters() []string {
 	profile.mutex.RUnlock()
 	return characters
 }
+
+func (profile *Profile) GetSettings() *ProfileSettings {
+	return profile.Settings
+}
+
+func (profile *Profile) SetSettings(settings *ProfileSettings) {
+	profile.mutex.Lock()
+	profile.Settings = settings
+	profile.UpdatedAt = util.GetCurrentTimestamp()
+	profile.mutex.Unlock()
+}
+
+func (profile *Profile) GetModelToggles() map[string]bool {
+	profile.mutex.RLock()
+	defer profile.mutex.RUnlock()
+	if profile.Settings == nil {
+		return nil
+	}
+	return profile.Settings.ModelToggles
+}

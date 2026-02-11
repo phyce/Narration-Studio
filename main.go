@@ -6,9 +6,6 @@ import (
 	"embed"
 	"fmt"
 	"nstudio/app/common/issue"
-	"nstudio/app/common/response"
-	"nstudio/app/config"
-	"nstudio/app/tts/modelManager"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -23,30 +20,12 @@ func main() {
 		fmt.Println("\nShutting down...")
 	})
 
-	if err := initializeApp(""); err != nil {
-		issue.Panic("Failed to initialize app", err)
-	}
-
-	modelManager.Initialize(true)
-
-	registerEngines()
-
 	app := NewApp()
 
-	response.Initialize()
-
-	var startMode options.WindowStartState
-	if config.Debug() {
-		startMode = options.Minimised
-	} else {
-		startMode = options.Normal
-	}
-
 	err := wails.Run(&options.App{
-		Title:            config.GetInfo().Name + " v" + config.GetInfo().Version,
-		Width:            1024,
-		Height:           768,
-		WindowStartState: startMode,
+		Title:  "Narration Studio",
+		Width:  1024,
+		Height: 768,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

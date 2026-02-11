@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
+	"nstudio/app/tts/engine"
 	"strings"
 	"sync"
 )
@@ -146,11 +147,11 @@ func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (
 	}
 
 	voice, exists := profile.GetVoice(character)
-	if exists {
+	if exists && voice.Engine != "" && voice.Model != "" {
 		return voice, nil
 	}
 
-	allocatedVoice, err := manager.AllocateVoice(character)
+	allocatedVoice, err := manager.AllocateVoiceForProfile(character, profileID)
 	if err != nil {
 		return nil, response.Err(fmt.Errorf("failed to allocate voice: %v", err))
 	}
@@ -164,6 +165,10 @@ func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (
 }
 
 func (manager *ProfileManager) AllocateVoice(name string) (util.CharacterVoice, error) {
+	return manager.AllocateVoiceForProfile(name, "")
+}
+
+func (manager *ProfileManager) AllocateVoiceForProfile(name string, profileID string) (util.CharacterVoice, error) {
 	if strings.HasPrefix(name, "::") {
 		parts := strings.Split(name, ":")
 		if len(parts) == 5 {
@@ -181,19 +186,44 @@ func (manager *ProfileManager) AllocateVoice(name string) (util.CharacterVoice, 
 		}
 	}
 
-	engine, err := calculateEngine(name)
+	var selectedEngine engine.Engine
+	var err error
+
+	if profileID != "" {
+		profile, profileErr := manager.GetProfile(profileID)
+		if profileErr == nil && profile.GetModelToggles() != nil && len(profile.GetModelToggles()) > 0 {
+			selectedEngine, err = calculateProfileEngine(name, profileID)
+			if err != nil {
+				return util.CharacterVoice{}, response.Err(err)
+			}
+
+			model, voice, err := calculateProfileVoice(selectedEngine, name, profileID)
+			if err != nil {
+				return util.CharacterVoice{}, response.Err(err)
+			}
+
+			return util.CharacterVoice{
+				Name:   name,
+				Engine: selectedEngine.ID,
+				Model:  model,
+				Voice:  voice,
+			}, nil
+		}
+	}
+
+	selectedEngine, err = calculateEngine(name)
 	if err != nil {
 		return util.CharacterVoice{}, response.Err(err)
 	}
 
-	model, voice, err := calculateVoice(engine, name)
+	model, voice, err := calculateVoice(selectedEngine, name)
 	if err != nil {
 		return util.CharacterVoice{}, response.Err(err)
 	}
 
 	return util.CharacterVoice{
 		Name:   name,
-		Engine: engine.ID,
+		Engine: selectedEngine.ID,
 		Model:  model,
 		Voice:  voice,
 	}, nil

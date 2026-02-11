@@ -5,7 +5,7 @@ import Footer from './components/Footer.vue'
 import {onMounted, onUnmounted, ref} from "vue";
 import Sandbox from './components/pages/Sandbox.vue';
 import ScriptEditor from './components/pages/ScriptEditor.vue';
-import CharacterVoices from './components/pages/CharacterVoices.vue';
+import Profiles from './components/pages/Profiles.vue';
 import VoicePacks from './components/pages/VoicePacks.vue';
 import Settings from './components/pages/Settings.vue';
 import Start from './components/pages/Start.vue';
@@ -30,7 +30,7 @@ const pageComponents: pageComponent = {
 	'start': Start,
 	'sandbox': Sandbox,
 	'script-editor': ScriptEditor,
-	'character-voices': CharacterVoices,
+	'profiles': Profiles,
 	'voice-packs': VoicePacks,
 	'settings': Settings,
 	'server': Server

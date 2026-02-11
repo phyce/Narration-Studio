@@ -8,7 +8,6 @@ import (
 	"syscall"
 )
 
-// SetupSignalHandler sets up signal handling for graceful shutdown
 func SetupSignalHandler(exitFunc func()) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

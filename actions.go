@@ -40,7 +40,7 @@ func (app *App) Play(
 	profileID string,
 ) {
 	clearConsole()
-	status.Set(status.Loading, "Playing")
+	status.Set(status.Loading, "Generating Audio To Play")
 
 	if profileID == "" {
 		profileID = "default"
@@ -203,7 +203,7 @@ func (app *App) ProcessScript(script string, profileID string) {
 
 //</editor-fold>
 
-// <editor-fold desc="Character Voices">
+// <editor-fold desc="Profiles">
 
 func (app *App) GetAvailableModels() string {
 	status.Set(status.Loading, "Getting available models")
@@ -394,7 +394,7 @@ func (app *App) SelectFile(defaultFile string) string {
 func (app *App) RefreshModels() {
 	clearConsole()
 	status.Set(status.Loading, "Refreshing models")
-	err := modelManager.RefreshModels()
+	err := modelManager.ReloadModels()
 	if err == nil {
 		response.Success(util.MessageData{
 			Summary: "Models refreshed",
@@ -577,6 +577,159 @@ func (app *App) GetConfigSchema() string {
 	}
 
 	return string(schemaJSON)
+}
+
+func (app *App) GetProfileSettings(profileID string) string {
+	manager := profile.GetManager()
+
+	selectedProfile, err := manager.GetProfile(profileID)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profile",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	settings := selectedProfile.GetSettings()
+	if settings == nil {
+		return "{}"
+	}
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to serialize profile settings",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	return string(settingsJSON)
+}
+
+func (app *App) SaveProfileSettings(profileID, settingsJSON string) {
+	manager := profile.GetManager()
+
+	selectedProfile, err := manager.GetProfile(profileID)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profile",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	var settings profile.ProfileSettings
+	if err := json.Unmarshal([]byte(settingsJSON), &settings); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to parse settings",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	selectedProfile.SetSettings(&settings)
+
+	if err := manager.SaveProfile(selectedProfile); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to save profile settings",
+			Detail:  err.Error(),
+		})
+	} else {
+		response.Success(util.MessageData{
+			Summary: "Profile settings saved successfully",
+		})
+	}
+}
+
+func (app *App) GetProfileSettingsSchema() string {
+	schema, err := config.GetProfileSettingsSchema()
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get profile settings schema",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to serialize profile settings schema",
+			Detail:  err.Error(),
+		})
+		return "{}"
+	}
+
+	return string(schemaJSON)
+}
+
+func (app *App) GetEnginesForProfile(profileID string) string {
+	manager := profile.GetManager()
+
+	selectedProfile, err := manager.GetProfile(profileID)
+	if err != nil {
+		return app.GetEngines()
+	}
+
+	profileToggles := selectedProfile.GetModelToggles()
+	if profileToggles == nil || len(profileToggles) == 0 {
+		return app.GetEngines()
+	}
+
+	engineToggles := make(map[string]map[string]bool)
+	for key, value := range profileToggles {
+		parts := strings.SplitN(key, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		engineID := parts[0]
+		modelID := parts[1]
+
+		if _, exists := engineToggles[engineID]; !exists {
+			engineToggles[engineID] = make(map[string]bool)
+		}
+		engineToggles[engineID][modelID] = value
+	}
+
+	allEngines := modelManager.GetAllEngines()
+	var filteredEngines []map[string]interface{}
+
+	for _, eng := range allEngines {
+		filteredModels := make(map[string]interface{})
+
+		if engineModels, exists := engineToggles[eng.ID]; exists {
+			for modelID, model := range eng.Models {
+				if engineModels[modelID] {
+					filteredModels[modelID] = map[string]interface{}{
+						"id":     model.ID,
+						"name":   model.Name,
+						"engine": model.Engine,
+					}
+				}
+			}
+		}
+
+		if len(filteredModels) > 0 {
+			filteredEngines = append(filteredEngines, map[string]interface{}{
+				"id":     eng.ID,
+				"name":   eng.Name,
+				"models": filteredModels,
+			})
+		}
+	}
+
+	jsonData, err := json.Marshal(filteredEngines)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to get engines for profile",
+			Detail:  err.Error(),
+		})
+		return "[]"
+	}
+
+	return string(jsonData)
 }
 
 // </editor-fold>

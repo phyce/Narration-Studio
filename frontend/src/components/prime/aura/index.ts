@@ -42,7 +42,7 @@ import inputnumber from './inputnumber';
 import inputswitch from './inputswitch';
 import inputtext from './inputtext';
 // import knob from './knob';
-// import listbox from './listbox';
+import listbox from './listbox';
 // import megamenu from './megamenu';
 // import menu from './menu';
 // import menubar from './menubar';
@@ -114,7 +114,7 @@ export default {
 	// multiselect,
 	// togglebutton,
 	cascadeselect,
-	// listbox,
+	listbox,
 	// colorpicker,
 	inputgroup,
 	inputgroupaddon,

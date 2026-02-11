@@ -129,6 +129,52 @@ func restartLocalEngines() {
 	}
 }
 
+func createModelPool(engineID, modelID string) (*ModelPool, error) {
+	instanceCount := 1
+	if !manager.IsGUIMode {
+		configuredCount := config.GetServerInstanceCount(engineID, modelID)
+		if configuredCount > 0 {
+			instanceCount = configuredCount
+		}
+	}
+
+	var instances []tts.Base
+	for i := 0; i < instanceCount; i++ {
+		var engine tts.Base
+
+		switch engineID {
+		case string(Engines.Piper):
+			engine = &piper.Piper{}
+		case string(Engines.MsSapi4):
+			engine = &mssapi4.MsSapi4{}
+		case string(Engines.ElevenLabs):
+			engine = &elevenlabs.ElevenLabs{}
+		case string(Engines.OpenAI):
+			engine = &openai.OpenAI{}
+		default:
+			return nil, fmt.Errorf("unknown engine: %s", engineID)
+		}
+
+		if err := engine.Initialize(); err != nil {
+			return nil, err
+		}
+
+		instances = append(instances, engine)
+	}
+
+	poolChannel := make(chan tts.Base, instanceCount)
+	for _, instance := range instances {
+		poolChannel <- instance
+	}
+
+	log.Info(fmt.Sprintf("Created %d instances for %s/%s", instanceCount, engineID, modelID))
+
+	return &ModelPool{
+		Instances: instances,
+		pool:      poolChannel,
+	}, nil
+}
+
 func RefreshModels() error {
 	toggles := config.GetEngineToggles()
 	manager.Lock()
@@ -162,6 +208,34 @@ func RefreshModels() error {
 					if enabled {
 						enabledModels++
 					}
+				} else if enabled {
+					if _, modelKnown := entry.Engine.Models[modelID]; !modelKnown {
+						continue
+					}
+
+					pool, err := createModelPool(engineID, modelID)
+					if err != nil {
+						response.Err(err)
+						response.Error(util.MessageData{
+							Summary: fmt.Sprintf("Failed to create pool for %s/%s", engineID, modelID),
+							Detail:  err.Error(),
+						})
+						continue
+					}
+
+					entry.Models[modelID] = pool
+
+					for _, instance := range pool.Instances {
+						if err := instance.Start(modelID); err != nil {
+							response.Err(err)
+							response.Error(util.MessageData{
+								Summary: "Failed to start model:" + modelID,
+								Detail:  err.Error(),
+							})
+						}
+					}
+
+					enabledModels++
 				}
 			}
 		}
@@ -177,7 +251,7 @@ func RefreshModels() error {
 	return response.NewWarn("No models enabled")
 }
 
-func ReloadModels() {
+func ReloadModels() error {
 	manager.Lock()
 
 	for engineID, entry := range manager.Engines {
@@ -194,7 +268,7 @@ func ReloadModels() {
 	}
 
 	manager.Unlock()
-	RefreshModels()
+	return RefreshModels()
 }
 
 func RegisterEngine(baseEngine tts.Engine) error {
@@ -219,56 +293,15 @@ func RegisterEngine(baseEngine tts.Engine) error {
 		}
 
 		if !modelEnabled {
-			//response.Debug
-			//log.Debug(fmt.Sprintf("Skipping instance creation for disabled model: %s/%s", engineID, modelID))
 			continue
 		}
 
-		instanceCount := 1 // Default for GUI mode
-
-		if !manager.IsGUIMode {
-			configuredCount := config.GetServerInstanceCount(engineID, modelID)
-			if configuredCount > 0 {
-				instanceCount = configuredCount
-			}
+		pool, err := createModelPool(engineID, modelID)
+		if err != nil {
+			return response.Err(err)
 		}
 
-		var instances []tts.Base
-		for i := 0; i < instanceCount; i++ {
-			var engine tts.Base
-
-			switch engineID {
-			case string(Engines.Piper):
-				engine = &piper.Piper{}
-			case string(Engines.MsSapi4):
-				engine = &mssapi4.MsSapi4{}
-			case string(Engines.ElevenLabs):
-				engine = &elevenlabs.ElevenLabs{}
-			case string(Engines.OpenAI):
-				engine = &openai.OpenAI{}
-			default:
-				engine = baseEngine.Engine
-			}
-
-			if err := engine.Initialize(); err != nil {
-				return response.Err(err)
-			}
-
-			instances = append(instances, engine)
-		}
-
-		// Create buffered channel pool and populate with all instances
-		poolChan := make(chan tts.Base, instanceCount)
-		for _, instance := range instances {
-			poolChan <- instance
-		}
-
-		entry.Models[modelID] = &ModelPool{
-			Instances: instances,
-			pool:      poolChan,
-		}
-
-		log.Info(fmt.Sprintf("Created %d instances for %s/%s", instanceCount, engineID, modelID))
+		entry.Models[modelID] = pool
 	}
 
 	manager.Engines[engineID] = entry
@@ -422,13 +455,13 @@ func GetAllModels() map[string]tts.Model {
 }
 
 func GetModelVoices(engineName string, modelID string) ([]tts.Voice, error) {
-	entry, exists := manager.Engines[engineName]
+	selectedEngine, exists := manager.Engines[engineName]
 
 	if !exists {
 		return nil, response.Err(fmt.Errorf("Engine %s not found", engineName))
 	}
 
-	if modelPool, modelExists := entry.Models[modelID]; modelExists && len(modelPool.Instances) > 0 {
+	if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists && len(modelPool.Instances) > 0 {
 		return modelPool.Instances[0].GetVoices(modelID)
 	}
 
@@ -436,8 +469,8 @@ func GetModelVoices(engineName string, modelID string) ([]tts.Voice, error) {
 }
 
 func GetInstanceCount(engineID string, modelID string) int {
-	if entry, exists := manager.Engines[engineID]; exists {
-		if modelPool, modelExists := entry.Models[modelID]; modelExists {
+	if selectedEngine, exists := manager.Engines[engineID]; exists {
+		if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists {
 			return len(modelPool.Instances)
 		}
 	}

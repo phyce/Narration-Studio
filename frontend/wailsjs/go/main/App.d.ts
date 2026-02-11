@@ -18,9 +18,15 @@ export function GetConfigSchema():Promise<string>;
 
 export function GetEngines():Promise<string>;
 
+export function GetEnginesForProfile(arg1:string):Promise<string>;
+
 export function GetModelVoices(arg1:string,arg2:string):Promise<string>;
 
 export function GetProfile(arg1:string):Promise<string>;
+
+export function GetProfileSettings(arg1:string):Promise<string>;
+
+export function GetProfileSettingsSchema():Promise<string>;
 
 export function GetProfileVoices(arg1:string):Promise<string>;
 
@@ -43,6 +49,8 @@ export function ProcessScript(arg1:string,arg2:string):Promise<void>;
 export function RefreshModels():Promise<void>;
 
 export function ReloadVoicePacks():Promise<void>;
+
+export function SaveProfileSettings(arg1:string,arg2:string):Promise<void>;
 
 export function SaveProfileVoices(arg1:string,arg2:string):Promise<void>;
 

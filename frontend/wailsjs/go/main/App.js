@@ -34,12 +34,24 @@ export function GetEngines() {
   return window['go']['main']['App']['GetEngines']();
 }
 
+export function GetEnginesForProfile(arg1) {
+  return window['go']['main']['App']['GetEnginesForProfile'](arg1);
+}
+
 export function GetModelVoices(arg1, arg2) {
   return window['go']['main']['App']['GetModelVoices'](arg1, arg2);
 }
 
 export function GetProfile(arg1) {
   return window['go']['main']['App']['GetProfile'](arg1);
+}
+
+export function GetProfileSettings(arg1) {
+  return window['go']['main']['App']['GetProfileSettings'](arg1);
+}
+
+export function GetProfileSettingsSchema() {
+  return window['go']['main']['App']['GetProfileSettingsSchema']();
 }
 
 export function GetProfileVoices(arg1) {
@@ -84,6 +96,10 @@ export function RefreshModels() {
 
 export function ReloadVoicePacks() {
   return window['go']['main']['App']['ReloadVoicePacks']();
+}
+
+export function SaveProfileSettings(arg1, arg2) {
+  return window['go']['main']['App']['SaveProfileSettings'](arg1, arg2);
 }
 
 export function SaveProfileVoices(arg1, arg2) {

@@ -105,10 +105,20 @@ func handleProfileTTSRequest(context echo.Context) error {
 
 	voiceKey := fmt.Sprintf("%s:%s:%s", voice.Engine, voice.Model, voice.Voice)
 
-	// Check cache - cache stores raw PCM bytes
-	var audioObject *audio.Audio
+	cacheEnabled := false
 	cacheManager := cache.GetManager()
 	if cacheManager.IsEnabled() {
+		selectedProfile, err := manager.GetProfile(request.Profile)
+		if err == nil {
+			settings := selectedProfile.GetSettings()
+			if settings != nil && settings.CacheEnabled != nil {
+				cacheEnabled = *settings.CacheEnabled
+			}
+		}
+	}
+
+	var audioObject *audio.Audio
+	if cacheEnabled {
 		cachedAudio, found := cacheManager.GetCachedAudio(request.Profile, request.Character, request.Text)
 		if found {
 			audioObject = audio.NewAudioFromPCM(cachedAudio, 22050, 1, 16)
@@ -125,7 +135,7 @@ func handleProfileTTSRequest(context echo.Context) error {
 			})
 		}
 
-		if cacheManager.IsEnabled() {
+		if cacheEnabled {
 			pcmData, _ := audioObject.ToPCM()
 			if err := cacheManager.CacheAudio(request.Profile, request.Character, request.Text, voiceKey, pcmData); err != nil {
 				response.Warn("failed to cache audio: %v", err)

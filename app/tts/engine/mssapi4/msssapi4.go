@@ -25,14 +25,6 @@ func (sapi *MsSapi4) Initialize() error {
 }
 
 func (sapi *MsSapi4) Start(modelName string) error {
-	configuration := config.Get()
-	configuration.ModelToggles[modelName] = false
-
-	err := config.Set(configuration)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

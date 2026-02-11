@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"nstudio/app/cache"
 	"nstudio/app/common/response"
+	"nstudio/app/common/status"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/elevenlabs"
@@ -43,6 +44,7 @@ func initializeApp(configFile string) error {
 }
 
 func registerEngines() {
+	status.Set(status.Loading, "Registering engines")
 	//TODO: Load Models from file
 
 	piperEngine := engine.Engine{

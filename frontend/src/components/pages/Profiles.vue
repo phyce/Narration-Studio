@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import '../../css/pages/character-voices.css';
+import '../../css/pages/profiles.css';
 
 import InputText from 'primevue/inputtext';
 import Button from "primevue/button";
@@ -11,13 +11,18 @@ import {
 	DeleteProfile,
 	EventTrigger,
 	GetEngines,
+	GetEnginesForProfile,
 	GetModelVoices,
 	GetProfiles,
+	GetProfileSettings,
 	GetProfileVoices,
 	Play,
+	SaveProfileSettings,
 	SaveProfileVoices
 } from '../../../wailsjs/go/main/App';
-import {CharacterVoice, Engine, Voice} from '../interfaces/engine';
+import {CharacterVoice, Engine, ProfileSettings, Voice} from '../interfaces/engine';
+import Checkbox from 'primevue/checkbox';
+import Listbox from 'primevue/listbox';
 import TreeSelect from "primevue/treeselect";
 import {TreeNode} from "primevue/treenode";
 import {useLocalStorage} from '@vueuse/core';
@@ -41,9 +46,15 @@ const profileOptions = ref<Profile[]>([]);
 const selectedProfileObj = ref<Profile | null>(null);
 const showCreateDialog = ref(false);
 const showDeleteDialog = ref(false);
+const showSettingsDialog = ref(false);
 const newProfileId = ref('');
 const newProfileName = ref('');
 const newProfileDescription = ref('');
+
+const profileSettings = ref<ProfileSettings>({});
+const settingsCacheEnabled = ref<boolean | null>(null);
+const modelOptions = ref<{key: string, label: string, engine: string, model: string}[]>([]);
+const selectedModelKeys = ref<{key: string, label: string, engine: string, model: string}[]>([]);
 
 const selectedModels: Record<string, any> = reactive({});
 const selectedVoices: Record<string, any> = reactive({});
@@ -119,7 +130,6 @@ async function loadProfiles() {
 		const result = await GetProfiles();
 		profileOptions.value = JSON.parse(result);
 
-		// Find selected profile object
 		if (selectedProfile.value) {
 			const profile = profileOptions.value.find(p => p.id === selectedProfile.value);
 			if (profile) {
@@ -190,6 +200,103 @@ async function deleteCurrentProfile() {
 	}
 }
 
+async function openSettingsDialog() {
+	if (!selectedProfileObj.value) return;
+
+	try {
+		const settingsResult = await GetProfileSettings(selectedProfile.value);
+		const currentSettings: ProfileSettings = settingsResult ? JSON.parse(settingsResult) : {};
+		profileSettings.value = currentSettings;
+
+		settingsCacheEnabled.value = currentSettings.cacheEnabled ?? null;
+
+		const enginesResult = await GetEngines();
+		const enginesList: Engine[] = JSON.parse(enginesResult);
+
+		const options: {key: string, label: string, engine: string, model: string}[] = [];
+		const selected: {key: string, label: string, engine: string, model: string}[] = [];
+
+		for (const engine of enginesList) {
+			for (const modelId in engine.models) {
+				const key = `${engine.id}:${modelId}`;
+				const modelName = engine.models[modelId].name || modelId;
+				const option = {
+					key,
+					label: `${engine.name} - ${modelName}`,
+					engine: engine.name,
+					model: modelName
+				};
+				options.push(option);
+
+				if (currentSettings.modelToggles?.[key]) {
+					selected.push(option);
+				}
+			}
+		}
+
+		modelOptions.value = options;
+		selectedModelKeys.value = selected;
+
+		showSettingsDialog.value = true;
+	} catch (error) {
+		console.error('Failed to load profile settings:', error);
+	}
+}
+
+async function saveSettingsDialog() {
+	if (!selectedProfileObj.value) return;
+
+	try {
+		const toggles: Record<string, boolean> = {};
+		for (const option of selectedModelKeys.value) {
+			toggles[option.key] = true;
+		}
+
+		const settings: ProfileSettings = {
+			modelToggles: toggles,
+			cacheEnabled: settingsCacheEnabled.value ?? undefined
+		};
+
+		const settingsJSON = JSON.stringify(settings);
+		await SaveProfileSettings(selectedProfile.value, settingsJSON);
+
+		showSettingsDialog.value = false;
+
+		await rebuildEngineModelNodes();
+	} catch (error) {
+		console.error('Failed to save profile settings:', error);
+	}
+}
+
+function cancelSettingsDialog() {
+	showSettingsDialog.value = false;
+}
+
+async function rebuildEngineModelNodes() {
+	const settingsResult = await GetProfileSettings(selectedProfile.value);
+	const currentSettings: ProfileSettings = settingsResult ? JSON.parse(settingsResult) : {};
+
+	let enginesList: Engine[];
+
+	if (currentSettings.modelToggles && Object.keys(currentSettings.modelToggles).length > 0) {
+		const enginesResult = await GetEnginesForProfile(selectedProfile.value);
+		enginesList = JSON.parse(enginesResult);
+	} else {
+		enginesList = Object.values(engines.value);
+	}
+
+	engineModelNodes.value = enginesList.map(engine => ({
+		key: engine.id,
+		label: engine.name,
+		selectable: false,
+		children: Object.entries(engine.models ?? {}).map(([modelId, modelData]) => ({
+			selectable: true,
+			key: `${engine.id}:${modelId}`,
+			label: modelData.name,
+		}))
+	}));
+}
+
 async function onProfileDropdownChange() {
 	if (selectedProfileObj.value) {
 		selectedProfile.value = selectedProfileObj.value.id;
@@ -198,13 +305,13 @@ async function onProfileDropdownChange() {
 }
 
 async function onProfileChange() {
-	// Clear current voices
 	characterVoices.value = {};
 	Object.keys(selectedModels).forEach(key => delete selectedModels[key]);
 	Object.keys(selectedVoices).forEach(key => delete selectedVoices[key]);
 	voiceOptionsMap.value = {};
 
-	// Load voices for new profile
+	await rebuildEngineModelNodes();
+
 	await getCharacterVoices();
 }
 
@@ -300,19 +407,9 @@ function addEmptyCharacterVoice() {
 onMounted(async () => {
 	await loadProfiles();
 	await getEngines();
+	await rebuildEngineModelNodes();
 	await getCharacterVoices();
 	await nextTick();
-
-	engineModelNodes.value = Object.values(engines.value).map(engine => ({
-		key: engine.id,
-		label: engine.name,
-		selectable: false,
-		children: Object.entries(engine.models ?? {}).map(([modelId, modelData]) => ({
-			selectable: true,
-			key: `${engine.id}:${modelId}`,
-			label: modelData.name,
-		}))
-	}));
 });
 
 onUnmounted(() => {
@@ -330,7 +427,7 @@ onUnmounted(() => {
 					:options="profileOptions"
 					optionLabel="name"
 					placeholder="Select Profile"
-					class="w-64"
+					class="w-64 text-left"
 					@change="onProfileDropdownChange"
 				/>
 				<div class="flex border border-gray-600 rounded overflow-hidden">
@@ -339,6 +436,13 @@ onUnmounted(() => {
 						title="Create New Profile"
 						class="voices__action-button"
 						@click="openCreateDialog"
+					/>
+					<Button
+						icon="pi pi-cog"
+						title="Profile Settings"
+						class="voices__action-button"
+						:disabled="!selectedProfileObj"
+						@click="openSettingsDialog"
 					/>
 					<Button
 						icon="pi pi-trash"
@@ -407,7 +511,6 @@ onUnmounted(() => {
 			</div>
 		</div>
 
-		<!-- Create Profile Dialog -->
 		<Dialog
 			v-model:visible="showCreateDialog"
 			header="Create New Profile"
@@ -455,7 +558,6 @@ onUnmounted(() => {
 			</template>
 		</Dialog>
 
-		<!-- Delete Confirmation Dialog -->
 		<Dialog
 			v-model:visible="showDeleteDialog"
 			header="Delete Profile"
@@ -470,6 +572,53 @@ onUnmounted(() => {
 					label="Delete"
 					@click="deleteCurrentProfile"
 					class="p-button-danger"
+				/>
+			</template>
+		</Dialog>
+
+		<Dialog
+			v-model:visible="showSettingsDialog"
+			header="Profile Settings"
+			:modal="true"
+			:style="{ width: '500px' }"
+		>
+			<div class="settings-dialog">
+				<div class="settings-dialog__section">
+					<div class="settings-dialog__field">
+						<div class="flex items-center gap-2">
+							<Checkbox
+								v-model="settingsCacheEnabled"
+								:binary="true"
+								inputId="cache-enabled"
+								:indeterminate="settingsCacheEnabled === null"
+							/>
+							<label for="cache-enabled">Enable Cache for this Profile</label>
+						</div>
+					</div>
+				</div>
+
+				<div class="settings-dialog__section">
+					<p class="settings-dialog__description">
+						Select which models are available for this profile. When no models are selected, all globally enabled models will be available.
+					</p>
+					<Listbox
+						v-model="selectedModelKeys"
+						:options="modelOptions"
+						optionLabel="label"
+						filter
+						multiple
+						checkbox
+						:filterPlaceholder="'Search models...'"
+						listStyle="max-height:300px"
+						class="w-full"
+					/>
+				</div>
+			</div>
+			<template #footer>
+				<Button label="Cancel" @click="cancelSettingsDialog" class="p-button-text"/>
+				<Button
+					label="Save"
+					@click="saveSettingsDialog"
 				/>
 			</template>
 		</Dialog>
@@ -506,5 +655,42 @@ onUnmounted(() => {
 .profile-dialog__field small {
 	color: var(--text-color-secondary);
 	font-size: 0.75rem;
+}
+
+.settings-dialog {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+	padding: 0.5rem 0;
+}
+
+.settings-dialog__section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.settings-dialog__section-title {
+	font-weight: 600;
+	font-size: 1rem;
+	margin: 0;
+	padding-bottom: 0.5rem;
+	border-bottom: 1px solid var(--surface-border);
+}
+
+.settings-dialog__description {
+	color: var(--text-color-secondary);
+	font-size: 0.875rem;
+	margin: 0;
+}
+
+.settings-dialog__field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.text-left :deep(.p-dropdown-label) {
+	text-align: left;
 }
 </style>

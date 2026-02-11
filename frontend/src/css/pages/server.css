@@ -95,7 +95,21 @@
 }
 
 .server__logs-text {
-	@apply m-0 p-3 bg-neutral-900 border border-neutral-700 rounded font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap break-words;
+	@apply
+		m-0
+		p-3
+		bg-neutral-900
+		border
+		border-neutral-700
+		rounded
+		font-mono
+		text-sm
+		max-h-96
+		overflow-auto
+		whitespace-pre-wrap
+		/*break-words*/
+		text-left
+	;
 }
 
 .server__config {

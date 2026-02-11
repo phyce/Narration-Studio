@@ -55,6 +55,12 @@ const logsPanelRef = ref<HTMLElement | null>(null);
 const autoScrollEnabled = ref<boolean>(true);
 
 const isServerRunning = computed(() => serverStatus.value.running);
+const commandDisplay = computed(() => {
+	if (isServerRunning.value) {
+		return `http://${host.value}:${port.value}`;
+	}
+	return generatedCommand.value;
+});
 
 async function fetchLogs() {
 	try {
@@ -162,7 +168,7 @@ async function selectConfigFile() {
 
 async function copyCommandToClipboard() {
 	try {
-		await navigator.clipboard.writeText(generatedCommand.value);
+		await navigator.clipboard.writeText(commandDisplay.value);
 		eventManager.emit('notification.send', {
 			severity: 'success',
 			summary: 'Copied',
@@ -326,7 +332,7 @@ onBeforeUnmount(() => {
 		<div class="server__command-row">
 			<InputText
 				id="command"
-				v-model="generatedCommand"
+				:value="commandDisplay"
 				readonly
 				@click="copyCommandToClipboard"
 				class="w-full font-mono text-sm cursor-pointer"

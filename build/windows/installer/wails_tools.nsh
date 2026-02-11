@@ -14,7 +14,7 @@
     !define INFO_PRODUCTNAME "Narration Studio"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "0.14.0"
+    !define INFO_PRODUCTVERSION "0.15.0"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "Copyright phyce.dev"

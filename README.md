@@ -31,6 +31,8 @@ Built in Go using [wails.io](https://wails.io), Vue + Typescript.
 * [Microsoft Speech Api 4 (Windows Only)](https://en.wikipedia.org/wiki/Microsoft_Speech_API)
 * [ElevenLabs](https://elevenlabs.io/docs/api-reference/text-to-speech)
 * [OpenAI TTS](https://platform.openai.com/docs/guides/text-to-speech)
+* [Google Cloud](https://cloud.google.com/text-to-speech)
+* [Google Gemini API](https://ai.google.dev/gemini-api/docs/speech-generation)
 
 ### _Upcoming Features:_
 

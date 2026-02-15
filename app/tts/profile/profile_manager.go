@@ -134,6 +134,15 @@ func (manager *ProfileManager) RemoveVoiceConfig(profileID, character string) er
 }
 
 func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (*util.CharacterVoice, error) {
+	// Override voices (prefixed with "::") should be resolved without saving to the profile
+	if strings.HasPrefix(character, "::") {
+		allocatedVoice, err := manager.AllocateVoiceForProfile(character, profileID)
+		if err != nil {
+			return nil, response.Err(fmt.Errorf("failed to allocate voice: %v", err))
+		}
+		return &allocatedVoice, nil
+	}
+
 	profile, err := manager.GetProfile(profileID)
 	if err != nil {
 		if !ProfileExists(profileID) {

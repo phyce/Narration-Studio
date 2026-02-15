@@ -13,6 +13,8 @@ import (
 	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
+	"nstudio/app/tts/engine/google"
+	"nstudio/app/tts/engine/gemini"
 	"strings"
 	"sync"
 	"time"
@@ -151,6 +153,10 @@ func createModelPool(engineID, modelID string) (*ModelPool, error) {
 			engine = &elevenlabs.ElevenLabs{}
 		case string(Engines.OpenAI):
 			engine = &openai.OpenAI{}
+		case string(Engines.Google):
+			engine = &google.Google{}
+		case string(Engines.Gemini):
+			engine = &gemini.Gemini{}
 		default:
 			return nil, fmt.Errorf("unknown engine: %s", engineID)
 		}

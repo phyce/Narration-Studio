@@ -107,7 +107,6 @@
 		max-h-96
 		overflow-auto
 		whitespace-pre-wrap
-		/*break-words*/
 		text-left
 	;
 }

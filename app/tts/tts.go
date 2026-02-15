@@ -10,19 +10,22 @@ import (
 	"nstudio/app/common/util"
 	"nstudio/app/enums/Engines"
 	"nstudio/app/tts/engine/elevenlabs"
+	"nstudio/app/tts/engine/gemini"
+	"nstudio/app/tts/engine/google"
 	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 	"strconv"
+	"strings"
 )
 
 func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID string) error {
 	profileManager := profile.GetManager()
 	cacheManager := cache.GetManager()
 
-	status.Set(status.Generating, "")
+	status.Set(status.Generating, "Generating Audio")
 
 	for _, message := range messages {
 		var rawAudio []byte
@@ -172,6 +175,46 @@ func preparePayload(message util.CharacterMessage) ([]byte, error) {
 		payload := elevenlabs.ElevenLabsRequest{
 			Text:    message.Text,
 			ModelID: message.Voice.Model,
+		}
+		return json.Marshal(payload)
+
+	case string(Engines.Google):
+		payload := google.GoogleRequest{
+			Input: google.Input{Text: message.Text},
+			Voice: google.VoiceSelectionParams{
+				Name:         message.Voice.Voice,
+				LanguageCode: "en-US",
+				ModelName:    message.Voice.Model,
+			},
+			AudioConfig: google.AudioConfig{
+				AudioEncoding: "WAV",
+				SpeakingRate:  1,
+				Pitch:         0,
+			},
+		}
+
+		parts := strings.Split(message.Voice.Voice, "-")
+		if len(parts) >= 2 {
+			payload.Voice.LanguageCode = parts[0] + "-" + parts[1]
+		}
+		return json.Marshal(payload)
+
+	case string(Engines.Gemini):
+		payload := gemini.GeminiRequest{
+			Model: message.Voice.Model,
+			Contents: []gemini.Content{
+				{Parts: []gemini.Part{{Text: message.Text}}},
+			},
+			GenerationConfig: gemini.GenerationConfig{
+				ResponseModalities: []string{"AUDIO"},
+				SpeechConfig: gemini.SpeechConfig{
+					VoiceConfig: gemini.VoiceConfig{
+						PrebuiltVoiceConfig: gemini.PrebuiltVoiceConfig{
+							VoiceName: message.Voice.Voice,
+						},
+					},
+				},
+			},
 		}
 		return json.Marshal(payload)
 	}

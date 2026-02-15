@@ -1,5 +1,29 @@
 export namespace config {
 	
+	export class Gemini {
+	    apiKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Gemini(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.apiKey = source["apiKey"];
+	    }
+	}
+	export class Google {
+	    apiKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Google(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.apiKey = source["apiKey"];
+	    }
+	}
 	export class ElevenLabs {
 	    apiKey: string;
 	    outputType: string;
@@ -31,6 +55,8 @@ export namespace config {
 	export class Api {
 	    openAI: OpenAI;
 	    elevenLabs: ElevenLabs;
+	    google: Google;
+	    gemini: Gemini;
 	
 	    static createFrom(source: any = {}) {
 	        return new Api(source);
@@ -40,6 +66,8 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.openAI = this.convertValues(source["openAI"], OpenAI);
 	        this.elevenLabs = this.convertValues(source["elevenLabs"], ElevenLabs);
+	        this.google = this.convertValues(source["google"], Google);
+	        this.gemini = this.convertValues(source["gemini"], Gemini);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -217,6 +245,8 @@ export namespace config {
 	    openai?: Record<string, ModelInstances>;
 	    elevenlabs?: Record<string, ModelInstances>;
 	    mssapi4?: Record<string, ModelInstances>;
+	    google?: Record<string, ModelInstances>;
+	    gemini?: Record<string, ModelInstances>;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServerSettingsEngines(source);
@@ -228,6 +258,8 @@ export namespace config {
 	        this.openai = this.convertValues(source["openai"], ModelInstances, true);
 	        this.elevenlabs = this.convertValues(source["elevenlabs"], ModelInstances, true);
 	        this.mssapi4 = this.convertValues(source["mssapi4"], ModelInstances, true);
+	        this.google = this.convertValues(source["google"], ModelInstances, true);
+	        this.gemini = this.convertValues(source["gemini"], ModelInstances, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -354,6 +386,8 @@ export namespace config {
 		    return a;
 		}
 	}
+	
+	
 	
 	
 	

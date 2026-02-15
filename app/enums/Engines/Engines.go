@@ -8,4 +8,6 @@ const (
 
 	OpenAI     Engine = "openai"
 	ElevenLabs Engine = "elevenlabs"
+	Google     Engine = "google"
+	Gemini     Engine = "gemini"
 )

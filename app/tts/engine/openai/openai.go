@@ -117,10 +117,6 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 }
 
 func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
-	return make([]byte, 0), nil
-}
-
-func (openAI *OpenAI) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
 	var request OpenAIRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
 		return nil, response.Err(err)
@@ -133,6 +129,15 @@ func (openAI *OpenAI) GenerateAudio(model string, payload []byte) (*audio.Audio,
 	flacData, err := openAI.sendRequest(request)
 	if err != nil {
 		return nil, response.Err(err)
+	}
+
+	return flacData, nil
+}
+
+func (openAI *OpenAI) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
+	flacData, err := openAI.Generate(model, payload)
+	if err != nil {
+		return nil, err
 	}
 
 	return audio.NewAudioFromFLAC(flacData), nil

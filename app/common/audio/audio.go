@@ -16,6 +16,7 @@ import (
 	"github.com/go-audio/wav"
 	"github.com/gopxl/beep"
 	beepFlac "github.com/gopxl/beep/flac"
+	beepMp3 "github.com/gopxl/beep/mp3"
 	"github.com/gopxl/beep/speaker"
 	"github.com/mewkiz/flac"
 )
@@ -403,4 +404,31 @@ func PlayRawAudioBytes(audioClip []byte) {
 	})))
 
 	<-done
+}
+
+func PlayMP3AudioBytes(audioClip []byte) error {
+	audioReader := io.NopCloser(bytes.NewReader(audioClip))
+
+	streamer, format, err := beepMp3.Decode(audioReader)
+	if err != nil {
+		return err
+	}
+	defer streamer.Close()
+
+	sampleRate := beep.SampleRate(48000)
+
+	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
+
+	done := make(chan bool)
+	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
+		done <- true
+	})))
+
+	<-done
+
+	return nil
+}
+
+func SaveMP3(audioClip []byte, filename string) error {
+	return os.WriteFile(filename, audioClip, 0644)
 }

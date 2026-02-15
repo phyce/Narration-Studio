@@ -124,10 +124,6 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 }
 
 func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
-	return make([]byte, 0), nil
-}
-
-func (labs *ElevenLabs) GenerateAudio(model string, payload []byte) (*commonAudio.Audio, error) {
 	var request ElevenLabsRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
 		return nil, response.Err(err)
@@ -136,6 +132,15 @@ func (labs *ElevenLabs) GenerateAudio(model string, payload []byte) (*commonAudi
 	pcmData, err := labs.sendRequest(model, request)
 	if err != nil {
 		return nil, response.Err(err)
+	}
+
+	return pcmData, nil
+}
+
+func (labs *ElevenLabs) GenerateAudio(model string, payload []byte) (*commonAudio.Audio, error) {
+	pcmData, err := labs.Generate(model, payload)
+	if err != nil {
+		return nil, err
 	}
 
 	return commonAudio.NewAudioFromPCM(pcmData, 24000, 1, 16), nil

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-audio/audio"
+	beepMp3 "github.com/gopxl/beep/mp3"
 	"github.com/mewkiz/flac"
 )
 
@@ -55,6 +56,15 @@ func NewAudioFromFLAC(flacData []byte) *Audio {
 	}
 }
 
+func NewAudioFromMP3(mp3Data []byte) *Audio {
+	return &Audio{
+		Data: mp3Data,
+		Metadata: AudioMetadata{
+			Format: FormatMP3,
+		},
+	}
+}
+
 func NewAudioFromWAV(wavData []byte) (*Audio, error) {
 	if len(wavData) < 44 {
 		return nil, response.Err(fmt.Errorf("invalid WAV file: too small"))
@@ -86,6 +96,17 @@ func (a *Audio) ToPCM() ([]byte, error) {
 
 	case FormatFLAC:
 		pcmData, sampleRate, channels, bitDepth, err := decodeFLACToPCM(a.Data)
+		if err != nil {
+			return nil, err
+		}
+
+		a.Metadata.SampleRate = sampleRate
+		a.Metadata.Channels = channels
+		a.Metadata.BitDepth = bitDepth
+		return pcmData, nil
+
+	case FormatMP3:
+		pcmData, sampleRate, channels, bitDepth, err := decodeMP3ToPCM(a.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -263,6 +284,37 @@ func decodeFLACToPCM(flacData []byte) ([]byte, int, int, int, error) {
 	}
 
 	return pcmBuffer.Bytes(), sampleRate, channels, bitDepth, nil
+}
+
+func decodeMP3ToPCM(mp3Data []byte) ([]byte, int, int, int, error) {
+	reader := io.NopCloser(bytes.NewReader(mp3Data))
+	streamer, format, err := beepMp3.Decode(reader)
+	if err != nil {
+		return nil, 0, 0, 0, response.Err(err)
+	}
+	defer streamer.Close()
+
+	var pcmBuffer bytes.Buffer
+    
+    buf := make([][2]float64, 1024)
+    for {
+        n, ok := streamer.Stream(buf)
+        
+        for i := 0; i < n; i++ {
+             sampleL := int16(buf[i][0] * 32767)
+             binary.Write(&pcmBuffer, binary.LittleEndian, sampleL)
+             
+             if format.NumChannels == 2 {
+                 sampleR := int16(buf[i][1] * 32767)
+                 binary.Write(&pcmBuffer, binary.LittleEndian, sampleR)
+             }
+        }
+        if !ok {
+            break
+        }
+    }
+
+	return pcmBuffer.Bytes(), int(format.SampleRate), format.NumChannels, 16, nil
 }
 
 func extractPCMFromWAV(wavData []byte) ([]byte, error) {

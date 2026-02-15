@@ -11,6 +11,8 @@ import (
 	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
+	"nstudio/app/tts/engine/google"
+	"nstudio/app/tts/engine/gemini"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 	"path/filepath"
@@ -87,6 +89,32 @@ func registerEngines() {
 	}
 
 	err = modelManager.RegisterEngine(elevenLabsEngine)
+	if err != nil {
+		response.Err(err)
+	}
+
+	googleEngine := engine.Engine{
+		ID:     "google",
+		Name:   "Google Cloud",
+		Type:   engine.Api,
+		Engine: &google.Google{},
+		Models: google.FetchModels(),
+	}
+
+	err = modelManager.RegisterEngine(googleEngine)
+	if err != nil {
+		response.Err(err)
+	}
+
+	geminiEngine := engine.Engine{
+		ID:     "gemini",
+		Name:   "Gemini",
+		Type:   engine.Api,
+		Engine: &gemini.Gemini{},
+		Models: gemini.FetchModels(),
+	}
+
+	err = modelManager.RegisterEngine(geminiEngine)
 	if err != nil {
 		response.Err(err)
 	}

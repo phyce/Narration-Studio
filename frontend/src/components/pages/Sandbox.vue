@@ -78,7 +78,8 @@ onMounted(async () => {
 					:disabled="isDisabled"
 					@click="generateSpeech"
 			>
-				<i class="pi pi-play"/>
+				<template v-if="isDisabled">select voice</template>
+				<i v-else class="pi pi-play"/>
 			</Button>
 			<TreeSelect class="sandbox__panel__model-tree"
 						:options="modelVoiceTree"

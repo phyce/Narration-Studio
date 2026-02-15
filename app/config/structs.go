@@ -41,6 +41,8 @@ type ServerSettingsEngines struct {
 	OpenAI     map[string]ModelInstances `json:"openai,omitempty"`
 	ElevenLabs map[string]ModelInstances `json:"elevenlabs,omitempty"`
 	MsSapi4    map[string]ModelInstances `json:"mssapi4,omitempty"`
+	Google     map[string]ModelInstances `json:"google,omitempty"`
+	Gemini     map[string]ModelInstances `json:"gemini,omitempty"`
 }
 
 type AuthSettings struct {
@@ -76,6 +78,8 @@ type MsSapi4 struct {
 type Api struct {
 	OpenAI     OpenAI     `json:"openAI"`
 	ElevenLabs ElevenLabs `json:"elevenLabs"`
+	Google     Google     `json:"google"`
+	Gemini     Gemini     `json:"gemini"`
 }
 
 type OpenAI struct {
@@ -86,6 +90,14 @@ type OpenAI struct {
 type ElevenLabs struct {
 	ApiKey     string `json:"apiKey"`
 	OutputType string `json:"outputType"`
+}
+
+type Google struct {
+	ApiKey string `json:"apiKey"`
+}
+
+type Gemini struct {
+	ApiKey string `json:"apiKey"`
 }
 
 type Info struct {

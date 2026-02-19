@@ -8,6 +8,7 @@ interface Props {
 	modelValue: boolean;
 	metadata?: ConfigFieldMetadata;
 	path: string;
+	disabled?: boolean;
 }
 
 interface Emits {
@@ -21,7 +22,9 @@ const vTooltip = Tooltip;
 
 const value = computed({
 	get: () => props.modelValue,
-	set: (val: boolean) => emit('update:modelValue', val)
+	set: (val: boolean) => {
+		if (!props.disabled) emit('update:modelValue', val);
+	}
 });
 
 const label = computed(() => props.metadata?.label || props.path);
@@ -29,12 +32,13 @@ const description = computed(() => props.metadata?.description);
 </script>
 
 <template>
-	<div class="config-field">
+	<div class="config-field" :class="{ 'config-field--disabled': disabled }">
 		<div class="config-field__checkbox-container">
 			<Checkbox
 				:id="path"
 				v-model="value"
 				:binary="true"
+				:disabled="disabled"
 				class="config-field__checkbox"
 			/>
 			<label :for="path" class="config-field__label">
@@ -53,6 +57,11 @@ const description = computed(() => props.metadata?.description);
 	flex-direction: column;
 	gap: 0.5rem;
 	margin-bottom: 1rem;
+}
+
+.config-field--disabled {
+	opacity: 0.5;
+	pointer-events: none;
 }
 
 .config-field__checkbox-container {

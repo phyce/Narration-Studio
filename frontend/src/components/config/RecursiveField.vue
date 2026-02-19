@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed} from 'vue';
-import type {ConfigField, ConfigSchema} from '../../interfaces/config';
+import type {ConfigField, ConfigSchema, FieldCondition} from '../../interfaces/config';
 import FormSection from './FormSection.vue';
 import FieldFactory from './FieldFactory.vue';
 
@@ -9,6 +9,7 @@ interface Props {
 	schema: ConfigSchema;
 	getValueByPath: (path: string) => any;
 	setValueByPath: (path: string, value: any) => void;
+	disabled?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -38,6 +39,20 @@ const children = computed(() => {
 const isObject = computed(() => props.field.metadata?.type === 'object');
 
 const depth = computed(() => props.field.path.split('.').length - 1);
+
+function evalConditions(conditions: FieldCondition | FieldCondition[] | undefined): boolean {
+	if (!conditions) return false;
+	const arr = Array.isArray(conditions) ? conditions : [conditions];
+	return arr.some(c => props.getValueByPath(c.field) === c.value);
+}
+
+function isFieldHidden(f: ConfigField): boolean {
+	return evalConditions(f.metadata?.hideWhen);
+}
+
+function isFieldDisabled(f: ConfigField): boolean {
+	return evalConditions(f.metadata?.disableWhen);
+}
 </script>
 
 <template>
@@ -48,14 +63,16 @@ const depth = computed(() => props.field.path.split('.').length - 1);
 		:metadata="field.metadata"
 		:depth="depth"
 	>
-		<RecursiveField
-			v-for="childField in children"
-			:key="childField.path"
-			:field="childField"
-			:schema="schema"
-			:get-value-by-path="getValueByPath"
-			:set-value-by-path="setValueByPath"
-		/>
+		<template v-for="childField in children" :key="childField.path">
+			<RecursiveField
+				v-if="!childField.metadata?.hidden && !isFieldHidden(childField)"
+				:field="childField"
+				:schema="schema"
+				:get-value-by-path="getValueByPath"
+				:set-value-by-path="setValueByPath"
+				:disabled="isFieldDisabled(childField)"
+			/>
+		</template>
 	</FormSection>
 
 	<!-- If it's a regular field, render the field factory -->
@@ -63,6 +80,7 @@ const depth = computed(() => props.field.path.split('.').length - 1);
 		v-else
 		:field="field"
 		:model-value="getValueByPath(field.path)"
+		:disabled="disabled"
 		@update:model-value="(val) => setValueByPath(field.path, val)"
 	/>
 </template>

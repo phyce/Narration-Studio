@@ -16,6 +16,7 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/enums/OutputType"
 	"nstudio/app/tts"
+	"nstudio/app/tts/engine/piper/native"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 	"os"
@@ -1043,6 +1044,10 @@ func (app *App) GetStatus() string {
 	}
 
 	return string(jsonData)
+}
+
+func (app *App) IsPiperGPUAvailable() bool {
+	return native.IsGPUAvailable()
 }
 
 //</editor-fold>

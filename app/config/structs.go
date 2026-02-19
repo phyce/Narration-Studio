@@ -65,8 +65,10 @@ type Local struct {
 }
 
 type Piper struct {
+	UseExecutable   bool   `json:"useExecutable"`
 	Location        string `json:"location"`
 	ModelsDirectory string `json:"modelsDirectory"`
+	UseGPU          bool   `json:"useGPU"`
 }
 
 type MsSapi4 struct {

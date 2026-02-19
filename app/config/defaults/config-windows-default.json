@@ -29,8 +29,10 @@
 	"engine": {
 		"local": {
 			"piper": {
+				"useExecutable": false,
 				"location": "",
-				"modelsDirectory": ""
+				"modelsDirectory": "",
+				"useGPU": false
 			},
 			"msSapi4": {
 				"location": "",

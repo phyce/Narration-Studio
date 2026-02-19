@@ -1,3 +1,8 @@
+export interface FieldCondition {
+	field: string;
+	value: any;
+}
+
 export interface ConfigFieldMetadata {
 	label: string;
 	type: 'text' | 'password' | 'number' | 'checkbox' | 'path' | 'dropdown' | 'object';
@@ -11,6 +16,8 @@ export interface ConfigFieldMetadata {
 	dynamic?: boolean;
 	valueType?: string;
 	hidden?: boolean;
+	hideWhen?: FieldCondition | FieldCondition[];
+	disableWhen?: FieldCondition | FieldCondition[];
 }
 
 export interface ConfigField {

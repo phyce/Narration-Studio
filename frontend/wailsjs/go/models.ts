@@ -151,8 +151,10 @@ export namespace config {
 	    }
 	}
 	export class Piper {
+	    useExecutable: boolean;
 	    location: string;
 	    modelsDirectory: string;
+	    useGPU: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Piper(source);
@@ -160,8 +162,10 @@ export namespace config {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.useExecutable = source["useExecutable"];
 	        this.location = source["location"];
 	        this.modelsDirectory = source["modelsDirectory"];
+	        this.useGPU = source["useGPU"];
 	    }
 	}
 	export class Local {

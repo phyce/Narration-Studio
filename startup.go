@@ -11,6 +11,7 @@ import (
 	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
+	"nstudio/app/tts/engine/piper/native"
 	"nstudio/app/tts/engine/google"
 	"nstudio/app/tts/engine/gemini"
 	"nstudio/app/tts/modelManager"
@@ -48,6 +49,10 @@ func initializeApp(configFile string) error {
 func registerEngines() {
 	status.Set(status.Loading, "Registering engines")
 	//TODO: Load Models from file
+
+	// Register the DLL availability check so config.GetConfigSchema() can inject the virtual field
+	// without creating a circular import between config and pipernative.
+	config.NativeAvailableFunc = native.IsNativeAvailable
 
 	piperEngine := engine.Engine{
 		ID:     "piper",

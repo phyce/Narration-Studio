@@ -24,8 +24,10 @@
 	"engine": {
 		"local": {
 			"piper": {
-				"directory": "~/piper/piper",
-				"modelsDirectory": "~/piper/models"
+				"useExecutable": true,
+				"location": "~/piper/piper",
+				"modelsDirectory": "~/piper/models",
+				"useGPU": false
 			}
 		},
 		"api": {

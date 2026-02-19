@@ -1,9 +1,20 @@
 build/bin
 node_modules
 frontend/dist
+download
 
 *.onnx
 
 .DS_Store
 
 *.exe
+
+# libpiper: cloned source and build artifacts (built by build-libpiper.ps1)
+lib/*
+!lib/libpiper-mingw.patch
+!lib/libpiper-directml.patch
+
+# DLLs copied to project root by dev.ps1 for wails dev mode
+libpiper.dll
+onnxruntime.dll
+onnxruntime_providers_shared.dll

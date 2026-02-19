@@ -3,6 +3,7 @@ package piper
 import (
 	"io"
 	"nstudio/app/tts/engine"
+	"nstudio/app/tts/engine/piper/native"
 	"os/exec"
 	"sync"
 )
@@ -29,5 +30,6 @@ type PiperInputLite struct {
 
 type Piper struct {
 	models   map[string]PiperInstance
+	native   *native.Piper
 	initOnce sync.Once
 }

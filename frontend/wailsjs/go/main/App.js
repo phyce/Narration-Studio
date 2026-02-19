@@ -82,6 +82,10 @@ export function GetStatus() {
   return window['go']['main']['App']['GetStatus']();
 }
 
+export function IsPiperGPUAvailable() {
+  return window['go']['main']['App']['IsPiperGPUAvailable']();
+}
+
 export function Play(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['Play'](arg1, arg2, arg3, arg4);
 }

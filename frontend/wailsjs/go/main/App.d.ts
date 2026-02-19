@@ -42,6 +42,8 @@ export function GetSettings():Promise<config.Base>;
 
 export function GetStatus():Promise<string>;
 
+export function IsPiperGPUAvailable():Promise<boolean>;
+
 export function Play(arg1:string,arg2:boolean,arg3:string,arg4:string):Promise<void>;
 
 export function ProcessScript(arg1:string,arg2:string):Promise<void>;

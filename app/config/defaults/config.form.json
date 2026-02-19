@@ -119,17 +119,33 @@
 						"label": "Piper",
 						"description": "Piper TTS engine settings",
 						"children": {
+							"useExecutable": {
+								"label": "Use Executable",
+								"type": "checkbox",
+								"description": "Use an external piper binary instead of the built-in native engine",
+								"disableWhen": [{ "field": "engine.local.piper.nativeAvailable", "value": false }]
+							},
 							"location": {
 								"label": "Piper Executable",
 								"type": "path",
 								"pathType": "file",
-								"description": "Path to piper executable"
+								"description": "Path to piper executable",
+								"hideWhen": [{ "field": "engine.local.piper.useExecutable", "value": false }]
 							},
 							"modelsDirectory": {
 								"label": "Models Directory",
 								"type": "path",
 								"pathType": "directory",
 								"description": "Directory containing piper voice models"
+							},
+							"useGPU": {
+								"label": "GPU Acceleration",
+								"type": "checkbox",
+								"description": "Use DirectML GPU acceleration (native mode only)",
+								"disableWhen": [
+									{ "field": "engine.local.piper.useExecutable", "value": true },
+									{ "field": "engine.local.piper.nativeAvailable", "value": false }
+								]
 							}
 						}
 					},

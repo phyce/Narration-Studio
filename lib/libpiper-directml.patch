@@ -1,0 +1,219 @@
+﻿diff --git a/libpiper/CMakeLists.txt b/libpiper/CMakeLists.txt
+index d35d46a..ced3dba 100644
+--- a/libpiper/CMakeLists.txt
++++ b/libpiper/CMakeLists.txt
+@@ -5,6 +5,8 @@ project(piper LANGUAGES C CXX)
+ set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
++option(PIPER_USE_DIRECTML "Download DirectML-enabled onnxruntime and enable GPU acceleration" OFF)
++
+ include(ExternalProject)
+ 
+ # Install location for espeak-ng
+@@ -63,8 +65,18 @@ if(NOT DEFINED ONNXRUNTIME_DIR)
+ 
+     if(WIN32)
+         # Windows x86-64
+-        set(ONNXRUNTIME_PREFIX "onnxruntime-win-x64-${ONNXRUNTIME_VERSION}")
+-        set(ONNXRUNTIME_EXT "zip")
++        if(PIPER_USE_DIRECTML)
++            # DirectML onnxruntime is distributed as a NuGet package (.nupkg = .zip)
++            # Internal structure: build/native/include/, runtimes/win-x64/native/
++            set(ONNXRUNTIME_DML_VERSION "1.22.1")
++            set(ONNXRUNTIME_PREFIX "Microsoft.ML.OnnxRuntime.DirectML.${ONNXRUNTIME_DML_VERSION}")
++            set(ONNXRUNTIME_EXT "nupkg")
++            set(ONNXRUNTIME_IS_NUPKG TRUE)
++            set(ONNXRUNTIME_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_DML_VERSION}/${ONNXRUNTIME_PREFIX}.${ONNXRUNTIME_EXT}")
++        else()
++            set(ONNXRUNTIME_PREFIX "onnxruntime-win-x64-${ONNXRUNTIME_VERSION}")
++            set(ONNXRUNTIME_EXT "zip")
++        endif()
+     elseif (APPLE)
+         if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
+             # MacOS x86-64
+@@ -99,19 +111,59 @@ if(NOT DEFINED ONNXRUNTIME_DIR)
+         set(ONNXRUNTIME_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/${ONNXRUNTIME_PREFIX}.${ONNXRUNTIME_EXT}")
+     endif()
+ 
+-    set(ONNXRUNTIME_FILENAME "${ONNXRUNTIME_PREFIX}.${ONNXRUNTIME_EXT}")
+     set(ONNXRUNTIME_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/${ONNXRUNTIME_PREFIX}")
++    set(ONNXRUNTIME_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/download")
+ 
+     if(NOT EXISTS "${ONNXRUNTIME_DIR}")
+-        if(NOT EXISTS "download/${ONNXRUNTIME_FILENAME}")
+-            # Download onnxruntime release
+-            message("Downloading ${ONNXRUNTIME_URL}")
+-            file(DOWNLOAD "${ONNXRUNTIME_URL}" "download/${ONNXRUNTIME_FILENAME}")
++        if(ONNXRUNTIME_IS_NUPKG)
++            # NuGet packages (.nupkg) are zip files - download as .zip so CMake can extract
++            set(ONNXRUNTIME_DOWNLOAD_FILE "${ONNXRUNTIME_DOWNLOAD_DIR}/${ONNXRUNTIME_PREFIX}.zip")
++            if(NOT EXISTS "${ONNXRUNTIME_DOWNLOAD_FILE}")
++                message("Downloading ${ONNXRUNTIME_URL}")
++                file(DOWNLOAD "${ONNXRUNTIME_URL}" "${ONNXRUNTIME_DOWNLOAD_FILE}")
++            endif()
++            file(ARCHIVE_EXTRACT INPUT "${ONNXRUNTIME_DOWNLOAD_FILE}" DESTINATION "${ONNXRUNTIME_DIR}")
++        else()
++            set(ONNXRUNTIME_FILENAME "${ONNXRUNTIME_PREFIX}.${ONNXRUNTIME_EXT}")
++            set(ONNXRUNTIME_DOWNLOAD_FILE "${ONNXRUNTIME_DOWNLOAD_DIR}/${ONNXRUNTIME_FILENAME}")
++            if(NOT EXISTS "${ONNXRUNTIME_DOWNLOAD_FILE}")
++                message("Downloading ${ONNXRUNTIME_URL}")
++                file(DOWNLOAD "${ONNXRUNTIME_URL}" "${ONNXRUNTIME_DOWNLOAD_FILE}")
++            endif()
++            # Extract .zip or .tgz to a directory like lib/onnxruntime-linux-x64-1.22.0/
++            file(ARCHIVE_EXTRACT INPUT "${ONNXRUNTIME_DOWNLOAD_FILE}" DESTINATION "${CMAKE_CURRENT_LIST_DIR}/lib")
+         endif()
++    endif()
++endif()
++
++# Set include/lib directories based on package layout
++if(ONNXRUNTIME_IS_NUPKG)
++    # NuGet package layout
++    set(ONNXRUNTIME_INCLUDE_DIR "${ONNXRUNTIME_DIR}/build/native/include")
++    set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_DIR}/runtimes/win-x64/native")
++else()
++    # Standard release layout
++    set(ONNXRUNTIME_INCLUDE_DIR "${ONNXRUNTIME_DIR}/include")
++    set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_DIR}/lib")
++endif()
+ 
+-        # Extract .zip or .tgz to a directory like lib/onnxruntime-linux-x64-1.22.0/
+-        file(ARCHIVE_EXTRACT INPUT "download/${ONNXRUNTIME_FILENAME}" DESTINATION "${CMAKE_CURRENT_LIST_DIR}/lib")
++# ---- DirectML SDK (headers for dml_provider_factory.h) ----
++if(PIPER_USE_DIRECTML)
++    set(DIRECTML_VERSION "1.15.2")
++    set(DIRECTML_PREFIX "Microsoft.AI.DirectML.${DIRECTML_VERSION}")
++    set(DIRECTML_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/${DIRECTML_PREFIX}")
++    set(DIRECTML_DOWNLOAD_FILE "${CMAKE_CURRENT_BINARY_DIR}/download/${DIRECTML_PREFIX}.zip")
++
++    if(NOT EXISTS "${DIRECTML_DIR}")
++        set(DIRECTML_URL "https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/${DIRECTML_VERSION}/${DIRECTML_PREFIX}.nupkg")
++        if(NOT EXISTS "${DIRECTML_DOWNLOAD_FILE}")
++            message("Downloading ${DIRECTML_URL}")
++            file(DOWNLOAD "${DIRECTML_URL}" "${DIRECTML_DOWNLOAD_FILE}")
++        endif()
++        file(ARCHIVE_EXTRACT INPUT "${DIRECTML_DOWNLOAD_FILE}" DESTINATION "${DIRECTML_DIR}")
+     endif()
++
++    set(DIRECTML_INCLUDE_DIR "${DIRECTML_DIR}/include")
+ endif()
+ 
+ # ---- libpiper ---
+@@ -126,13 +178,20 @@ add_dependencies(piper espeak_ng_external)
+ # PIPER_BUILDING_DLL triggers __declspec(dllexport) on piper API functions
+ target_compile_definitions(piper PRIVATE LIBESPEAK_NG_EXPORT PIPER_BUILDING_DLL)
+ 
++if(PIPER_USE_DIRECTML)
++    target_compile_definitions(piper PRIVATE PIPER_USE_DIRECTML)
++endif()
++
+ target_include_directories(piper PUBLIC
+     ${ESPEAKNG_INSTALL_DIR}/include
+-    ${ONNXRUNTIME_DIR}/include
++    ${ONNXRUNTIME_INCLUDE_DIR}
+     ${CMAKE_CURRENT_SOURCE_DIR}/include
+ )
++if(PIPER_USE_DIRECTML)
++    target_include_directories(piper PRIVATE ${DIRECTML_INCLUDE_DIR})
++endif()
+ target_link_directories(piper PUBLIC
+-    ${ONNXRUNTIME_DIR}/lib
++    ${ONNXRUNTIME_LIB_DIR}
+ )
+ target_link_libraries(piper
+     ${ESPEAKNG_STATIC_LIB}
+@@ -154,7 +213,7 @@ install(
+ )
+ 
+ install(
+-    DIRECTORY ${ONNXRUNTIME_DIR}/lib/
++    DIRECTORY ${ONNXRUNTIME_LIB_DIR}/
+     DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ )
+ 
+diff --git a/libpiper/include/piper.h b/libpiper/include/piper.h
+index a2d700d..5280f9d 100644
+--- a/libpiper/include/piper.h
++++ b/libpiper/include/piper.h
+@@ -169,6 +169,21 @@ PIPER_API piper_synthesizer *piper_create(const char *model_path,
+                                           const char *config_path,
+                                           const char *espeak_data_path);
+ 
++/**
++ * \brief Create a Piper synthesizer with execution provider selection.
++ *
++ * \param model_path path to ONNX voice model file.
++ * \param config_path path to JSON voice config file or NULL.
++ * \param espeak_data_path path to espeak-ng data directory.
++ * \param execution_provider "cpu" or "directml". NULL defaults to "cpu".
++ *
++ * \return a Piper text-to-speech synthesizer, or NULL on failure.
++ */
++PIPER_API piper_synthesizer *piper_create_ex(const char *model_path,
++                                              const char *config_path,
++                                              const char *espeak_data_path,
++                                              const char *execution_provider);
++
+ /**
+  * \brief Free resources for Piper synthesizer.
+  *
+diff --git a/libpiper/src/piper.cpp b/libpiper/src/piper.cpp
+index 62742ad..cdb9fee 100644
+--- a/libpiper/src/piper.cpp
++++ b/libpiper/src/piper.cpp
+@@ -10,6 +10,26 @@
+ #include <locale>
+ #endif
+ 
++#include <cstring>
++
++#if defined(_WIN32) && defined(PIPER_USE_DIRECTML)
++// SAL annotations (e.g. _Maybenull_) used by DirectML.h are MSVC-specific.
++// Define them as no-ops for MinGW/GCC.
++#ifdef __GNUC__
++#define _Maybenull_
++#define _In_
++#define _In_opt_
++#define _Out_
++#define _Out_opt_
++#define _Inout_
++#define _Inout_opt_
++#define _COM_Outptr_
++#define _COM_Outptr_opt_
++#define _Outptr_result_maybenull_
++#endif
++#include <dml_provider_factory.h>
++#endif
++
+ #include <espeak-ng/speak_lib.h>
+ 
+ using json = nlohmann::json;
+@@ -17,6 +37,13 @@ using json = nlohmann::json;
+ struct piper_synthesizer *piper_create(const char *model_path,
+                                        const char *config_path,
+                                        const char *espeak_data_path) {
++    return piper_create_ex(model_path, config_path, espeak_data_path, nullptr);
++}
++
++struct piper_synthesizer *piper_create_ex(const char *model_path,
++                                           const char *config_path,
++                                           const char *espeak_data_path,
++                                           const char *execution_provider) {
+     if (!model_path) {
+         return nullptr;
+     }
+@@ -101,6 +128,14 @@ struct piper_synthesizer *piper_create(const char *model_path,
+     synth->session_options.DisableMemPattern();
+     synth->session_options.DisableProfiling();
+ 
++#if defined(_WIN32) && defined(PIPER_USE_DIRECTML)
++    if (execution_provider && strcmp(execution_provider, "directml") == 0) {
++        // DirectML requires sequential execution mode
++        synth->session_options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
++        OrtSessionOptionsAppendExecutionProvider_DML(synth->session_options, 0);
++    }
++#endif
++
+ #ifdef _WIN32
+     // On Windows, ONNX Runtime expects wchar_t* for model paths
+     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;

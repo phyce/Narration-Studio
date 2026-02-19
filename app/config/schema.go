@@ -15,6 +15,12 @@ var formMetadataFS embed.FS
 //go:embed defaults/config.form.darwin.json
 var formMetadataDarwinFS embed.FS
 
+// FieldCondition describes a single condition for hideWhen/disableWhen.
+type FieldCondition struct {
+	Field string      `json:"field"`
+	Value interface{} `json:"value"`
+}
+
 type FieldMetadata struct {
 	Label       string                   `json:"label,omitempty"`
 	Type        string                   `json:"type,omitempty"`
@@ -28,6 +34,8 @@ type FieldMetadata struct {
 	Dynamic     bool                     `json:"dynamic,omitempty"`
 	ValueType   string                   `json:"valueType,omitempty"`
 	Hidden      bool                     `json:"hidden,omitempty"`
+	HideWhen    []FieldCondition         `json:"hideWhen,omitempty"`
+	DisableWhen []FieldCondition         `json:"disableWhen,omitempty"`
 }
 
 type NestedFormMetadata struct {
@@ -43,6 +51,8 @@ type NestedFormMetadata struct {
 	Dynamic     bool                          `json:"dynamic,omitempty"`
 	ValueType   string                        `json:"valueType,omitempty"`
 	Hidden      bool                          `json:"hidden,omitempty"`
+	HideWhen    []FieldCondition              `json:"hideWhen,omitempty"`
+	DisableWhen []FieldCondition              `json:"disableWhen,omitempty"`
 	Children    map[string]NestedFormMetadata `json:"children,omitempty"`
 }
 
@@ -57,6 +67,10 @@ type ConfigSchema struct {
 }
 
 var formMetadata map[string]FieldMetadata
+
+// NativeAvailableFunc is set at startup to avoid a circular import between config and pipernative.
+// It returns true when libpiper.dll is present and usable.
+var NativeAvailableFunc func() bool
 
 func LoadFormMetadata() error {
 	formMetadata = make(map[string]FieldMetadata)
@@ -110,6 +124,15 @@ func GetConfigSchema() (*ConfigSchema, error) {
 	flattenConfig("engine", config.Engine, &schema.Fields)
 	flattenConfig("modelToggles", config.ModelToggles, &schema.Fields)
 
+	// Inject virtual nativeAvailable field so the frontend can evaluate conditions
+	// referencing DLL availability without persisting this value to config.
+	nativeAvail := NativeAvailableFunc != nil && NativeAvailableFunc()
+	schema.Fields = append(schema.Fields, ConfigField{
+		Path:  "engine.local.piper.nativeAvailable",
+		Value: nativeAvail,
+		Metadata: &FieldMetadata{Hidden: true, Type: "checkbox"},
+	})
+
 	return schema, nil
 }
 
@@ -127,6 +150,8 @@ func flattenNestedMetadata(path string, nested NestedFormMetadata) {
 		Dynamic:     nested.Dynamic,
 		ValueType:   nested.ValueType,
 		Hidden:      nested.Hidden,
+		HideWhen:    nested.HideWhen,
+		DisableWhen: nested.DisableWhen,
 	}
 
 	formMetadata[path] = metadata
@@ -291,6 +316,12 @@ func mergeMetadata(inferred *FieldMetadata, formMeta *FieldMetadata) *FieldMetad
 	}
 	if formMeta.Hidden {
 		merged.Hidden = formMeta.Hidden
+	}
+	if len(formMeta.HideWhen) > 0 {
+		merged.HideWhen = formMeta.HideWhen
+	}
+	if len(formMeta.DisableWhen) > 0 {
+		merged.DisableWhen = formMeta.DisableWhen
 	}
 
 	return &merged

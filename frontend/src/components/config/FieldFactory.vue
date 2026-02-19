@@ -12,6 +12,7 @@ import type {ConfigField} from '../../interfaces/config';
 interface Props {
 	field: ConfigField;
 	modelValue: any;
+	disabled?: boolean;
 }
 
 interface Emits {
@@ -83,6 +84,7 @@ const fieldType = computed(() => {
 		v-model="value"
 		:path="field.path"
 		:metadata="field.metadata"
+		:disabled="disabled"
 	/>
 
 	<!-- Dropdown -->

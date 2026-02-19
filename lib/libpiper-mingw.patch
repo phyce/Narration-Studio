@@ -1,0 +1,154 @@
+diff --git a/libpiper/CMakeLists.txt b/libpiper/CMakeLists.txt
+index 57349c1..d35d46a 100644
+--- a/libpiper/CMakeLists.txt
++++ b/libpiper/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ # Builds libpiper
+-cmake_minimum_required(VERSION 3.26)
++cmake_minimum_required(VERSION 3.25)
+ project(piper LANGUAGES C CXX)
+ 
+ set(CMAKE_CXX_STANDARD 17)
+@@ -11,11 +11,12 @@ include(ExternalProject)
+ set(ESPEAKNG_BUILD_DIR ${CMAKE_BINARY_DIR}/espeak_ng)
+ set(ESPEAKNG_INSTALL_DIR ${CMAKE_BINARY_DIR}/espeak_ng-install)
+ 
+-if(WIN32)
+-    # Special handling for Windows
++if(WIN32 AND NOT MINGW)
++    # MSVC naming convention
+     set(ESPEAKNG_STATIC_LIB ${ESPEAKNG_INSTALL_DIR}/lib/espeak-ng.lib)
+     set(UCD_STATIC_LIB ${ESPEAKNG_BUILD_DIR}/src/espeak_ng_external-build/src/ucd-tools/ucd.lib)
+ else()
++    # MinGW and Unix naming convention
+     set(ESPEAKNG_STATIC_LIB ${ESPEAKNG_INSTALL_DIR}/lib/libespeak-ng.a)
+     set(UCD_STATIC_LIB ${ESPEAKNG_BUILD_DIR}/src/espeak_ng_external-build/src/ucd-tools/libucd.a)
+ endif()
+@@ -24,8 +25,11 @@ ExternalProject_Add(espeak_ng_external
+     GIT_REPOSITORY https://github.com/espeak-ng/espeak-ng.git
+     GIT_TAG 212928b394a96e8fd2096616bfd54e17845c48f6  # 2025-Mar-22
+     PREFIX ${ESPEAKNG_BUILD_DIR}
++    CMAKE_GENERATOR ${CMAKE_GENERATOR}
+     CMAKE_ARGS
+         -DCMAKE_INSTALL_PREFIX=${ESPEAKNG_INSTALL_DIR}
++        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
++        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+         -DBUILD_SHARED_LIBS:BOOL=OFF
+         -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+         -DUSE_ASYNC:BOOL=OFF
+@@ -117,6 +121,11 @@ add_library(piper SHARED
+ )
+ 
+ add_dependencies(piper espeak_ng_external)
++
++# Tell espeak-ng headers we're linking statically (suppress __declspec(dllimport))
++# PIPER_BUILDING_DLL triggers __declspec(dllexport) on piper API functions
++target_compile_definitions(piper PRIVATE LIBESPEAK_NG_EXPORT PIPER_BUILDING_DLL)
++
+ target_include_directories(piper PUBLIC
+     ${ESPEAKNG_INSTALL_DIR}/include
+     ${ONNXRUNTIME_DIR}/include
+diff --git a/libpiper/include/piper.h b/libpiper/include/piper.h
+index 25841c2..a2d700d 100644
+--- a/libpiper/include/piper.h
++++ b/libpiper/include/piper.h
+@@ -14,6 +14,16 @@ extern "C" {
+ #define PIPER_DONE 1
+ #define PIPER_ERR_GENERIC -1
+ 
++#ifdef _WIN32
++#  ifdef PIPER_BUILDING_DLL
++#    define PIPER_API __declspec(dllexport)
++#  else
++#    define PIPER_API __declspec(dllimport)
++#  endif
++#else
++#  define PIPER_API
++#endif
++
+ /**
+  * \brief Text-to-speech synthesizer.
+  */
+@@ -155,15 +165,16 @@ typedef struct piper_synthesize_options {
+  *
+  * \return a Piper text-to-speech synthesizer for the voice model.
+  */
+-piper_synthesizer *piper_create(const char *model_path, const char *config_path,
+-                                const char *espeak_data_path);
++PIPER_API piper_synthesizer *piper_create(const char *model_path,
++                                          const char *config_path,
++                                          const char *espeak_data_path);
+ 
+ /**
+  * \brief Free resources for Piper synthesizer.
+  *
+  * \param synth Piper synthesizer.
+  */
+-void piper_free(piper_synthesizer *synth);
++PIPER_API void piper_free(piper_synthesizer *synth);
+ 
+ /**
+  * \brief Get the default synthesis options for a Piper synthesizer.
+@@ -172,7 +183,7 @@ void piper_free(piper_synthesizer *synth);
+  *
+  * \return synthesis options from voice config.
+  */
+-piper_synthesize_options
++PIPER_API piper_synthesize_options
+ piper_default_synthesize_options(piper_synthesizer *synth);
+ 
+ /**
+@@ -188,8 +199,8 @@ piper_default_synthesize_options(piper_synthesizer *synth);
+  *
+  * \return PIPER_OK or error code.
+  */
+-int piper_synthesize_start(piper_synthesizer *synth, const char *text,
+-                           const piper_synthesize_options *options);
++PIPER_API int piper_synthesize_start(piper_synthesizer *synth, const char *text,
++                                     const piper_synthesize_options *options);
+ 
+ /**
+  * \brief Synthesize next chunk of audio.
+@@ -208,7 +219,8 @@ int piper_synthesize_start(piper_synthesizer *synth, const char *text,
+  *
+  * \return PIPER_DONE when complete, otherwise PIPER_OK or error code.
+  */
+-int piper_synthesize_next(piper_synthesizer *synth, piper_audio_chunk *chunk);
++PIPER_API int piper_synthesize_next(piper_synthesizer *synth,
++                                    piper_audio_chunk *chunk);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/libpiper/src/piper.cpp b/libpiper/src/piper.cpp
+index 774e87d..62742ad 100644
+--- a/libpiper/src/piper.cpp
++++ b/libpiper/src/piper.cpp
+@@ -5,6 +5,11 @@
+ #include <fstream>
+ #include <limits>
+ 
++#ifdef _WIN32
++#include <codecvt>
++#include <locale>
++#endif
++
+ #include <espeak-ng/speak_lib.h>
+ 
+ using json = nlohmann::json;
+@@ -96,8 +101,16 @@ struct piper_synthesizer *piper_create(const char *model_path,
+     synth->session_options.DisableMemPattern();
+     synth->session_options.DisableProfiling();
+ 
++#ifdef _WIN32
++    // On Windows, ONNX Runtime expects wchar_t* for model paths
++    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
++    std::wstring wide_model_path = converter.from_bytes(model_path);
++    synth->session = std::make_unique<Ort::Session>(
++        Ort::Session(ort_env, wide_model_path.c_str(), synth->session_options));
++#else
+     synth->session = std::make_unique<Ort::Session>(
+         Ort::Session(ort_env, model_path, synth->session_options));
++#endif
+ 
+     return synth;
+ }

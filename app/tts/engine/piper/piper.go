@@ -14,6 +14,7 @@ import (
 	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
+	"nstudio/app/tts/engine/piper/native"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,9 +53,25 @@ func (ab *AudioBuffer) Reset() {
 
 //</editor-fold>
 
+// isNativeMode returns true when the engine should use the native DLL instead of the binary.
+func (piper *Piper) isNativeMode() bool {
+	return !config.GetEngine().Local.Piper.UseExecutable
+}
+
+// getNative lazily creates the native engine instance.
+func (piper *Piper) getNative() *native.Piper {
+	if piper.native == nil {
+		piper.native = &native.Piper{}
+	}
+	return piper.native
+}
+
 // <editor-fold desc="Engine Interface">
 func (piper *Piper) Initialize() error {
-	var err error
+	if piper.isNativeMode() {
+		return piper.getNative().Initialize()
+	}
+
 	settings := config.GetEngine().Local.Piper
 
 	if settings.Location == "" {
@@ -69,10 +86,14 @@ func (piper *Piper) Initialize() error {
 		piper.models = make(map[string]PiperInstance)
 	}
 
-	return err
+	return nil
 }
 
 func (piper *Piper) Start(modelName string) error {
+	if piper.isNativeMode() {
+		return piper.getNative().Start(modelName)
+	}
+
 	var err error
 	err = piper.Initialize()
 	if err != nil {
@@ -174,6 +195,10 @@ func (piper *Piper) Start(modelName string) error {
 }
 
 func (piper *Piper) Stop(modelName string) error {
+	if piper.native != nil && piper.isNativeMode() {
+		return piper.native.Stop(modelName)
+	}
+
 	defer delete(piper.models, modelName)
 
 	instance, exists := piper.models[modelName]
@@ -244,6 +269,10 @@ func (piper *Piper) Stop(modelName string) error {
 }
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
+	if piper.isNativeMode() {
+		return piper.getNative().Play(message)
+	}
+
 	response.Debug(util.MessageData{
 		Summary: "Piper playing:" + message.Character,
 		Detail:  message.Text,
@@ -276,6 +305,10 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 }
 
 func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
+	if piper.isNativeMode() {
+		return piper.getNative().Save(messages, play)
+	}
+
 	response.Debug(util.MessageData{
 		Summary: "Piper saving messages",
 	})
@@ -320,6 +353,10 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 }
 
 func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
+	if piper.isNativeMode() {
+		return piper.getNative().Generate(model, payload)
+	}
+
 	log.Info("generating in piper")
 	if piper.GetProcessID(model) == 0 {
 		if !config.GetEngineToggles()["piper"][model] {
@@ -374,6 +411,10 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 }
 
 func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
+	if piper.isNativeMode() {
+		return piper.getNative().GenerateAudio(model, payload)
+	}
+
 	rawBytes, err := piper.Generate(model, payload)
 	if err != nil {
 		return nil, err
@@ -383,6 +424,10 @@ func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, e
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
+	if piper.native != nil && piper.isNativeMode() {
+		return piper.native.GetVoices(model)
+	}
+
 	modelData, exists := piper.models[model]
 	if !exists {
 		return nil, response.Err(fmt.Errorf("Model %s is not initialized", model))

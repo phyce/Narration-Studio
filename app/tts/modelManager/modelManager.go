@@ -304,7 +304,11 @@ func RegisterEngine(baseEngine tts.Engine) error {
 
 		pool, err := createModelPool(engineID, modelID)
 		if err != nil {
-			return response.Err(err)
+			response.Error(util.MessageData{
+				Summary: fmt.Sprintf("Failed to create pool for %s/%s", engineID, modelID),
+				Detail:  err.Error(),
+			})
+			continue
 		}
 
 		entry.Models[modelID] = pool
@@ -453,7 +457,7 @@ func GetAllModels() map[string]tts.Model {
 
 	for _, entry := range manager.Engines {
 		for _, model := range entry.Engine.Models {
-			result[model.ID] = model
+			result[model.Engine+":"+model.ID] = model
 		}
 	}
 

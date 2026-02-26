@@ -302,6 +302,11 @@ jobs:
         with:
           go-version: '1.22'
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libasound2-dev
+
       - name: Build CLI application
         run: |
           mkdir -p build/bin

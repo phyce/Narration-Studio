@@ -208,8 +208,9 @@ function Build-Variant {
         "-B", $BuildDir,
         "-DCMAKE_BUILD_TYPE=$BuildType",
         "-DCMAKE_INSTALL_PREFIX=$InstallDir",
-        "-DCMAKE_C_COMPILER=gcc",
-        "-DCMAKE_CXX_COMPILER=g++"
+        "-DCMAKE_C_COMPILER=$Msys2Bin\gcc.exe",
+        "-DCMAKE_CXX_COMPILER=$Msys2Bin\g++.exe",
+        "-DCMAKE_MAKE_PROGRAM=$Msys2Bin\ninja.exe"
     ) + $ExtraCMakeArgs
 
     & cmake @cmakeArgs
@@ -320,6 +321,44 @@ if (-not $SkipCPU) {
         -InstallDir (Join-Path $SafeRoot "install-cpu") `
         -DllOutputName "libpiper.dll" `
         -CopyEspeakData
+}
+
+# --- Pre-download DirectML NuGet packages into CMake's download cache ---
+# CMake's file(DOWNLOAD) runs through MSYS2's SSL stack in CI, which lacks trusted
+# root certificates and produces empty/corrupt files. PowerShell's Invoke-WebRequest
+# uses Windows networking (WinHTTP) and works reliably everywhere.
+#
+# CMake checks: if(NOT EXISTS "${DOWNLOAD_FILE}") before downloading, so pre-populating
+# the cache causes cmake to skip its own download and go straight to extraction.
+#
+# Cache paths match exactly what the CMakeLists.txt patch expects:
+#   ${CMAKE_CURRENT_BINARY_DIR}/download/Microsoft.ML.OnnxRuntime.DirectML.1.22.1.zip
+#   ${CMAKE_CURRENT_BINARY_DIR}/download/Microsoft.AI.DirectML.1.15.2.zip
+if (-not $SkipDirectML) {
+    $dlDir = Join-Path (Join-Path $SafeRoot "build-directml") "download"
+    New-Item -ItemType Directory -Path $dlDir -Force | Out-Null
+
+    $onnxDmlFile = Join-Path $dlDir "Microsoft.ML.OnnxRuntime.DirectML.1.22.1.zip"
+    if (-not (Test-Path $onnxDmlFile)) {
+        Write-Host "Downloading Microsoft.ML.OnnxRuntime.DirectML 1.22.1..." -ForegroundColor Cyan
+        Invoke-WebRequest `
+            -Uri "https://github.com/microsoft/onnxruntime/releases/download/v1.22.1/Microsoft.ML.OnnxRuntime.DirectML.1.22.1.nupkg" `
+            -OutFile $onnxDmlFile -UseBasicParsing
+    } else {
+        Write-Host "OnnxRuntime.DirectML already in cache." -ForegroundColor Green
+    }
+
+    $directmlFile = Join-Path $dlDir "Microsoft.AI.DirectML.1.15.2.zip"
+    if (-not (Test-Path $directmlFile)) {
+        Write-Host "Downloading Microsoft.AI.DirectML 1.15.2..." -ForegroundColor Cyan
+        Invoke-WebRequest `
+            -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/1.15.2/microsoft.ai.directml.1.15.2.nupkg" `
+            -OutFile $directmlFile -UseBasicParsing
+    } else {
+        Write-Host "DirectML SDK already in cache." -ForegroundColor Green
+    }
+
+    Write-Host ""
 }
 
 # --- Build DirectML variant ---

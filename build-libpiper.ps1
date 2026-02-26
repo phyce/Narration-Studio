@@ -202,15 +202,17 @@ function Build-Variant {
 
     # Configure
     Write-Host "Configuring CMake ($VariantName)..." -ForegroundColor Cyan
+    # CMake interprets backslashes as escape sequences in path strings, so use forward slashes.
+    $Msys2BinFwd = $Msys2Bin.Replace('\', '/')
     $cmakeArgs = @(
         "-G", "Ninja",
         "-S", $CmakeSourceDir,
         "-B", $BuildDir,
         "-DCMAKE_BUILD_TYPE=$BuildType",
         "-DCMAKE_INSTALL_PREFIX=$InstallDir",
-        "-DCMAKE_C_COMPILER=$Msys2Bin\gcc.exe",
-        "-DCMAKE_CXX_COMPILER=$Msys2Bin\g++.exe",
-        "-DCMAKE_MAKE_PROGRAM=$Msys2Bin\ninja.exe"
+        "-DCMAKE_C_COMPILER=$Msys2BinFwd/gcc.exe",
+        "-DCMAKE_CXX_COMPILER=$Msys2BinFwd/g++.exe",
+        "-DCMAKE_MAKE_PROGRAM=$Msys2BinFwd/ninja.exe"
     ) + $ExtraCMakeArgs
 
     & cmake @cmakeArgs
@@ -323,17 +325,15 @@ if (-not $SkipCPU) {
         -CopyEspeakData
 }
 
-# --- Pre-download DirectML NuGet packages into CMake's download cache ---
+# --- Pre-download OnnxRuntime.DirectML NuGet package into CMake's download cache ---
 # CMake's file(DOWNLOAD) runs through MSYS2's SSL stack in CI, which lacks trusted
 # root certificates and produces empty/corrupt files. PowerShell's Invoke-WebRequest
 # uses Windows networking (WinHTTP) and works reliably everywhere.
 #
-# CMake checks: if(NOT EXISTS "${DOWNLOAD_FILE}") before downloading, so pre-populating
-# the cache causes cmake to skip its own download and go straight to extraction.
-#
-# Cache paths match exactly what the CMakeLists.txt patch expects:
-#   ${CMAKE_CURRENT_BINARY_DIR}/download/Microsoft.ML.OnnxRuntime.DirectML.1.22.1.zip
-#   ${CMAKE_CURRENT_BINARY_DIR}/download/Microsoft.AI.DirectML.1.15.2.zip
+# For the ORT package: pre-populate CMake's download cache so it skips its own download.
+# For DirectML.h: pre-create the SDK directory in the CMake source tree so CMake's
+# if(NOT EXISTS "${DIRECTML_DIR}") check passes and skips the 192 MB NuGet download
+# entirely. Only DirectML.h is needed at build time; the DLL comes from the ORT package.
 if (-not $SkipDirectML) {
     $dlDir = Join-Path (Join-Path $SafeRoot "build-directml") "download"
     New-Item -ItemType Directory -Path $dlDir -Force | Out-Null
@@ -348,14 +348,19 @@ if (-not $SkipDirectML) {
         Write-Host "OnnxRuntime.DirectML already in cache." -ForegroundColor Green
     }
 
-    $directmlFile = Join-Path $dlDir "Microsoft.AI.DirectML.1.15.2.zip"
-    if (-not (Test-Path $directmlFile)) {
-        Write-Host "Downloading Microsoft.AI.DirectML 1.15.2..." -ForegroundColor Cyan
+    # Pre-create the DirectML SDK include directory with just DirectML.h.
+    # This satisfies CMake's existence check and avoids extracting the full 192 MB
+    # Microsoft.AI.DirectML NuGet package (which is needed only for this header).
+    $directmlIncludeDir = Join-Path $CmakeSourceDir "lib\Microsoft.AI.DirectML.1.15.2\include"
+    $directmlHeaderPath = Join-Path $directmlIncludeDir "DirectML.h"
+    if (-not (Test-Path $directmlHeaderPath)) {
+        Write-Host "Downloading DirectML.h header..." -ForegroundColor Cyan
+        New-Item -ItemType Directory -Path $directmlIncludeDir -Force | Out-Null
         Invoke-WebRequest `
-            -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/1.15.2/microsoft.ai.directml.1.15.2.nupkg" `
-            -OutFile $directmlFile -UseBasicParsing
+            -Uri "https://raw.githubusercontent.com/microsoft/DirectML/master/Libraries/DirectML.h" `
+            -OutFile $directmlHeaderPath -UseBasicParsing
     } else {
-        Write-Host "DirectML SDK already in cache." -ForegroundColor Green
+        Write-Host "DirectML.h already present." -ForegroundColor Green
     }
 
     Write-Host ""

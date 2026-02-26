@@ -31,6 +31,16 @@ jobs:
           echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         shell: pwsh
 
+      - name: Setup MSYS2 for libpiper build
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
@@ -44,13 +54,37 @@ jobs:
           if (-not (Test-Path "build/bin")) {
             New-Item -ItemType Directory -Path "build/bin" | Out-Null
           }
-          go build -tags cli -o build/bin/nstudio-cli-windows-amd64.exe .
+          go build -tags cli -o "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe" .
         shell: pwsh
 
       - name: Prepare CLI for NSIS installer
         run: |
           # Copy CLI to installer directory so NSIS can include it
-          Copy-Item -Path "build/bin/nstudio-cli-windows-amd64.exe" -Destination "build/windows/installer/nstudio-cli.exe"
+          Copy-Item -Path "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe" -Destination "build/windows/installer/nstudio-cli.exe"
+        shell: pwsh
+
+      - name: Build piper native DLLs
+        run: .\build-libpiper.ps1
+        shell: pwsh
+
+      - name: Stage piper native files for installer
+        run: |
+          $piperDir = "build\windows\installer\engines\piper"
+          New-Item -ItemType Directory -Path $piperDir -Force | Out-Null
+
+          Copy-Item "build\bin\libpiper.dll" -Destination $piperDir -Force
+          Copy-Item "build\bin\onnxruntime.dll" -Destination $piperDir -Force
+          Copy-Item "build\bin\onnxruntime_providers_shared.dll" -Destination $piperDir -Force
+
+          if (Test-Path "build\bin\libpiper_directml.dll") {
+            Copy-Item "build\bin\libpiper_directml.dll" -Destination $piperDir -Force
+          }
+          if (Test-Path "build\bin\DirectML.dll") {
+            Copy-Item "build\bin\DirectML.dll" -Destination $piperDir -Force
+          }
+          if (Test-Path "build\bin\espeak-ng-data") {
+            Copy-Item "build\bin\espeak-ng-data" -Destination $piperDir -Recurse -Force
+          }
         shell: pwsh
 
       - name: Build GUI application with NSIS installer
@@ -61,23 +95,23 @@ jobs:
           # Copy engine dependencies for installer context
           Copy-Item -Path "build/windows/installer/engines" -Destination "build/bin/engines" -Recurse -Force
           # Restore CLI executable (removed by -clean flag during GUI build)
-          Copy-Item -Path "build/windows/installer/nstudio-cli.exe" -Destination "build/bin/nstudio-cli-windows-amd64.exe"
+          Copy-Item -Path "build/windows/installer/nstudio-cli.exe" -Destination "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe"
+          # Rename installer to include version
+          $installer = Get-ChildItem -Path "build/bin" -Filter "*installer.exe" | Select-Object -First 1
+          if ($installer) {
+            Rename-Item $installer.FullName "Narration-Studio-${{ github.event.release.tag_name }}-Windows-Installer.exe"
+          }
         shell: pwsh
 
       - name: Upload Windows Installer
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Write-Host "Listing all files in build/bin:"
-          Get-ChildItem -Path "build/bin" -Recurse | ForEach-Object { Write-Host $_.FullName }
-
-          $installer = Get-ChildItem -Path "build/bin" -Filter "*installer.exe" | Select-Object -First 1
+          $installer = Get-ChildItem -Path "build/bin" -Filter "Narration-Studio-*-Windows-Installer.exe" | Select-Object -First 1
           if ($installer) {
-            Write-Host "Found installer: $($installer.FullName)"
             gh release upload ${{ github.event.release.tag_name }} $installer.FullName
           } else {
-            Write-Host "ERROR: No installer.exe file found in build/bin"
-            Write-Host "This may indicate the NSIS build failed or the installer has a different name pattern"
+            Write-Host "ERROR: Installer not found in build/bin"
             exit 1
           }
         shell: pwsh
@@ -85,7 +119,7 @@ jobs:
       - name: Upload Windows CLI
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} build/bin/nstudio-cli-windows-amd64.exe
+        run: gh release upload ${{ github.event.release.tag_name }} "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe"
         shell: pwsh
 
   build-macos:
@@ -117,12 +151,12 @@ jobs:
       - name: Build CLI application
         run: |
           mkdir -p build/bin
-          go build -tags cli -o build/bin/nstudio-cli-osx .
+          go build -tags cli -o "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-OSX" .
 
       - name: Embed CLI and Package macOS GUI
         run: |
           cd build/bin
-          
+
           # Find the app bundle
           if [ -d "Narration Studio.app" ]; then
             APP_NAME="Narration Studio.app"
@@ -132,29 +166,27 @@ jobs:
             echo "App bundle not found!"
             exit 1
           fi
-          
+
           # Embed CLI
           echo "Embedding CLI into $APP_NAME..."
-          cp "nstudio-cli-osx" "$APP_NAME/Contents/MacOS/"
-          
-          # Zip it with the new name
-          zip -r "Narration Studio OSX.zip" "$APP_NAME"
+          cp "nstudio-cli-${{ github.event.release.tag_name }}-OSX" "$APP_NAME/Contents/MacOS/"
+
+          # Zip it with the versioned name
+          zip -r "Narration-Studio-${{ github.event.release.tag_name }}-OSX.zip" "$APP_NAME"
 
       - name: Upload macOS GUI
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd build/bin
-          if [ -f "Narration Studio OSX.zip" ]; then
-            gh release upload ${{ github.event.release.tag_name }} "Narration Studio OSX.zip"
-          fi
+          gh release upload ${{ github.event.release.tag_name }} "Narration-Studio-${{ github.event.release.tag_name }}-OSX.zip"
 
       - name: Upload macOS CLI
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} build/bin/nstudio-cli-osx
+        run: gh release upload ${{ github.event.release.tag_name }} "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-OSX"
 
-  build-linux:
+  build-linux-gui-webkit40:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -169,156 +201,113 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.0-dev libasound2-dev
+          sudo apt-get install -y build-essential cmake ninja-build libgtk-3-dev libwebkit2gtk-4.0-dev libasound2-dev
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Install frontend dependencies
+        run: cd frontend && npm install
+
+      - name: Build piper native .so
+        run: chmod +x build-libpiper.sh && ./build-libpiper.sh
+
+      - name: Save piper native files before clean build
         run: |
-          cd frontend
-          npm install
+          mkdir -p /tmp/piper-native
+          cp build/bin/libpiper.so /tmp/piper-native/
+          cp -r build/bin/espeak-ng-data /tmp/piper-native/
+          find build/bin -name 'libonnxruntime*.so*' -exec cp {} /tmp/piper-native/ \;
+
+      - name: Build GUI (webkit2gtk 4.0)
+        run: wails build -clean -platform linux/amd64
+
+      - name: Package GUI zip (WebKit 4.0)
+        run: |
+          mkdir -p staging
+          cp build/bin/narration_studio staging/
+          cp /tmp/piper-native/libpiper.so staging/
+          cp -r /tmp/piper-native/espeak-ng-data staging/
+          find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
+          cd staging && zip -r "../Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.0.zip" .
+
+      - name: Upload GUI zip (WebKit 4.0)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.event.release.tag_name }} "Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.0.zip"
+
+  build-linux-gui-webkit41:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm install
+
+      - name: Build piper native .so
+        run: chmod +x build-libpiper.sh && ./build-libpiper.sh
+
+      - name: Save piper native files before clean build
+        run: |
+          mkdir -p /tmp/piper-native
+          cp build/bin/libpiper.so /tmp/piper-native/
+          cp -r build/bin/espeak-ng-data /tmp/piper-native/
+          find build/bin -name 'libonnxruntime*.so*' -exec cp {} /tmp/piper-native/ \;
+
+      - name: Build GUI (webkit2gtk 4.1)
+        run: wails build -clean -platform linux/amd64 -tags webkit2_41
+
+      - name: Package GUI zip (WebKit 4.1)
+        run: |
+          mkdir -p staging
+          cp build/bin/narration_studio staging/
+          cp /tmp/piper-native/libpiper.so staging/
+          cp -r /tmp/piper-native/espeak-ng-data staging/
+          find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
+          cd staging && zip -r "../Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.1.zip" .
+
+      - name: Upload GUI zip (WebKit 4.1)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.event.release.tag_name }} "Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.1.zip"
+
+  build-linux-cli:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
 
       - name: Build CLI application
         run: |
           mkdir -p build/bin
-          go build -tags cli -o build/bin/nstudio-cli-linux-amd64 .
+          go build -tags cli -o "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Linux" .
 
-      - name: Save CLI before clean build
-        run: |
-          mkdir -p /tmp/cli-backup
-          cp build/bin/nstudio-cli-linux-amd64 /tmp/cli-backup/
-
-      - name: Build GUI application
-        run: wails build -clean -platform linux/amd64
-
-      - name: Restore CLI after clean build
-        run: |
-          mkdir -p build/bin
-          cp /tmp/cli-backup/nstudio-cli-linux-amd64 build/bin/
-
-      - name: Create GUI .deb package
-        run: |
-          # Determine the GUI executable name
-          if [ -f "build/bin/narration_studio" ]; then
-            GUI_EXEC="narration_studio"
-          elif [ -f "build/bin/Narration Studio" ]; then
-            GUI_EXEC="Narration Studio"
-          else
-            echo "GUI executable not found"
-            exit 1
-          fi
-
-          # Create package structure
-          PKG_DIR="narration-studio-gui_${{ github.event.release.tag_name }}_amd64"
-          mkdir -p "${PKG_DIR}/DEBIAN"
-          mkdir -p "${PKG_DIR}/usr/bin"
-          mkdir -p "${PKG_DIR}/usr/share/applications"
-          mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
-          mkdir -p "${PKG_DIR}/usr/share/doc/narration-studio"
-
-          # Copy binary
-          cp "build/bin/${GUI_EXEC}" "${PKG_DIR}/usr/bin/narration-studio"
-          chmod 755 "${PKG_DIR}/usr/bin/narration-studio"
-
-          # Copy icon
-          cp build/appicon.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/narration-studio.png"
-
-          # Create .desktop file
-          cat > "${PKG_DIR}/usr/share/applications/narration-studio.desktop" << EOF
-          [Desktop Entry]
-          Name=Narration Studio
-          Comment=Text-to-speech narration tool
-          Exec=/usr/bin/narration-studio
-          Icon=narration-studio
-          Terminal=false
-          Type=Application
-          Categories=Audio;AudioVideo;
-          EOF
-
-          # Create control file
-          cat > "${PKG_DIR}/DEBIAN/control" << EOF
-          Package: narration-studio
-          Version: ${{ github.event.release.tag_name }}
-          Section: sound
-          Priority: optional
-          Architecture: amd64
-          Maintainer: phyce <contact@mechanic.ink>
-          Description: Narration Studio - Text-to-speech application
-           A powerful text-to-speech narration tool with support for
-           multiple TTS engines including Piper and Microsoft SAPI.
-          Homepage: https://narration.studio
-          EOF
-
-          # Build .deb
-          dpkg-deb --build "${PKG_DIR}"
-          mv "${PKG_DIR}.deb" "build/bin/narration-studio-gui_${{ github.event.release.tag_name }}_amd64.deb"
-
-      - name: Create CLI .deb package
-        run: |
-          # Create package structure
-          PKG_DIR="narration-studio-cli_${{ github.event.release.tag_name }}_amd64"
-          mkdir -p "${PKG_DIR}/DEBIAN"
-          mkdir -p "${PKG_DIR}/usr/bin"
-          mkdir -p "${PKG_DIR}/usr/share/doc/narration-studio-cli"
-
-          # Copy binary
-          cp build/bin/nstudio-cli-linux-amd64 "${PKG_DIR}/usr/bin/nstudio-cli"
-          chmod 755 "${PKG_DIR}/usr/bin/nstudio-cli"
-
-          # Create control file
-          cat > "${PKG_DIR}/DEBIAN/control" << EOF
-          Package: narration-studio-cli
-          Version: ${{ github.event.release.tag_name }}
-          Section: sound
-          Priority: optional
-          Architecture: amd64
-          Maintainer: phyce <contact@mechanic.ink>
-          Description: Narration Studio CLI - Text-to-speech command-line tool
-           Command-line interface for Narration Studio, a powerful text-to-speech
-           narration tool with support for multiple TTS engines.
-          Homepage: https://narration.studio
-          EOF
-
-          # Build .deb
-          dpkg-deb --build "${PKG_DIR}"
-          mv "${PKG_DIR}.deb" "build/bin/narration-studio-cli_${{ github.event.release.tag_name }}_amd64.deb"
-
-      - name: Create tar.gz archives (alternative to .deb)
-        run: |
-          cd build/bin
-          # GUI tar.gz
-          if [ -f "narration_studio" ]; then
-            tar -czf narration-studio-gui-linux-amd64.tar.gz narration_studio
-          elif [ -f "Narration Studio" ]; then
-            tar -czf narration-studio-gui-linux-amd64.tar.gz "Narration Studio"
-          fi
-          # CLI tar.gz
-          tar -czf narration-studio-cli-linux-amd64.tar.gz nstudio-cli-linux-amd64
-
-      - name: Upload GUI .deb package
+      - name: Upload Linux CLI
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} build/bin/narration-studio-gui_${{ github.event.release.tag_name }}_amd64.deb
-
-      - name: Upload CLI .deb package
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} build/bin/narration-studio-cli_${{ github.event.release.tag_name }}_amd64.deb
-
-      - name: Upload GUI tar.gz
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cd build/bin
-          if [ -f narration-studio-gui-linux-amd64.tar.gz ]; then
-            gh release upload ${{ github.event.release.tag_name }} narration-studio-gui-linux-amd64.tar.gz
-          fi
-
-      - name: Upload CLI tar.gz
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} build/bin/narration-studio-cli-linux-amd64.tar.gz
+        run: gh release upload ${{ github.event.release.tag_name }} "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Linux"

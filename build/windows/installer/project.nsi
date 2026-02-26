@@ -113,6 +113,28 @@ Section "Piper" SEC_PIPER
     File /r "engines\piper\*"
 SectionEnd
 
+Section "Piper Native (DLL)" SEC_PIPER_NATIVE
+    DetailPrint "Installing Piper Native DLLs..."
+
+    ; DLLs must reside next to the executable so the Windows loader can find them
+    SetOutPath "$INSTDIR"
+
+    File "engines\piper\libpiper.dll"
+    File "engines\piper\onnxruntime.dll"
+    File "engines\piper\onnxruntime_providers_shared.dll"
+
+!if /FileExists "engines\piper\libpiper_directml.dll"
+    File "engines\piper\libpiper_directml.dll"
+!endif
+!if /FileExists "engines\piper\DirectML.dll"
+    File "engines\piper\DirectML.dll"
+!endif
+
+    ; espeak-ng-data must also be next to the executable (native mode reads it from there)
+    SetOutPath "$INSTDIR\espeak-ng-data"
+    File /r "engines\piper\espeak-ng-data\*"
+SectionEnd
+
 Section "CLI Tool" SEC_CLI
     DetailPrint "Installing CLI tool..."
 

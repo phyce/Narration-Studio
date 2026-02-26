@@ -9,10 +9,11 @@ download
 
 *.exe
 
-# libpiper: cloned source and build artifacts (built by build-libpiper.ps1)
+# libpiper: cloned source and build artifacts (built by build-libpiper.ps1 / build-libpiper.sh)
 lib/*
 !lib/libpiper-mingw.patch
 !lib/libpiper-directml.patch
+!lib/libpiper-cuda.patch
 
 # DLLs copied to project root by dev.ps1 for wails dev mode
 libpiper.dll

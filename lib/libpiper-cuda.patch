@@ -1,0 +1,151 @@
+--- a/libpiper/CMakeLists.txt
++++ b/libpiper/CMakeLists.txt
+@@ -7,6 +7,13 @@
+ 
+ include(ExternalProject)
+ 
++# ---- GPU support ----
++option(PIPER_USE_GPU "Build with CUDA GPU support via onnxruntime-gpu" OFF)
++
++if(PIPER_USE_GPU AND NOT (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
++    message(FATAL_ERROR "PIPER_USE_GPU is currently only supported on Linux x86-64")
++endif()
++
+ # Install location for espeak-ng
+ set(ESPEAKNG_BUILD_DIR ${CMAKE_BINARY_DIR}/espeak_ng)
+ set(ESPEAKNG_INSTALL_DIR ${CMAKE_BINARY_DIR}/espeak_ng-install)
+@@ -79,8 +86,12 @@
+         set(ONNXRUNTIME_EXT "tgz")
+     else()
+         if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
+-            # Linux x86-64
+-            set(ONNXRUNTIME_PREFIX "onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}")
++            # Linux x86-64 — CPU or GPU package
++            if(PIPER_USE_GPU)
++                set(ONNXRUNTIME_PREFIX "onnxruntime-linux-x64-gpu-${ONNXRUNTIME_VERSION}")
++            else()
++                set(ONNXRUNTIME_PREFIX "onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}")
++            endif()
+         elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64)
+             # Linux ARM 64-bit
+             set(ONNXRUNTIME_PREFIX "onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}")
+@@ -126,6 +137,10 @@
+ # PIPER_BUILDING_DLL triggers __declspec(dllexport) on piper API functions
+ target_compile_definitions(piper PRIVATE LIBESPEAK_NG_EXPORT PIPER_BUILDING_DLL)
+ 
++if(PIPER_USE_GPU)
++    target_compile_definitions(piper PRIVATE PIPER_USE_CUDA)
++endif()
++
+ target_include_directories(piper PUBLIC
+     ${ESPEAKNG_INSTALL_DIR}/include
+     ${ONNXRUNTIME_DIR}/include
+--- a/libpiper/include/piper.h
++++ b/libpiper/include/piper.h
+@@ -170,6 +170,30 @@
+                                           const char *espeak_data_path);
+ 
+ /**
++ * \brief Options for creating a Piper synthesizer.
++ * \sa piper_create_ex
++ */
++typedef struct piper_create_options {
++  /**
++   * Execution provider hint: NULL/"cpu" → CPU (default), "cuda" → NVIDIA CUDA.
++   * Falls back to CPU if the requested provider is unavailable at runtime.
++   */
++  const char *provider;
++
++  /** CUDA device index (0-based). Ignored when provider is not "cuda". */
++  int cuda_device_id;
++} piper_create_options;
++
++/**
++ * \brief Create a Piper synthesizer with extended options.
++ * \param options  NULL for defaults (CPU, device 0).
++ */
++PIPER_API piper_synthesizer *piper_create_ex(const char *model_path,
++                                              const char *config_path,
++                                              const char *espeak_data_path,
++                                              const piper_create_options *options);
++
++/**
+  * \brief Free resources for Piper synthesizer.
+  *
+  * \param synth Piper synthesizer.
+--- a/libpiper/src/piper.cpp
++++ b/libpiper/src/piper.cpp
+@@ -2,8 +2,10 @@
+ #include "piper_impl.hpp"
+ 
+ #include <array>
++#include <cstddef>
+ #include <fstream>
+ #include <limits>
++#include <string>
+ 
+ #ifdef _WIN32
+ #include <codecvt>
+@@ -17,6 +19,13 @@
+ struct piper_synthesizer *piper_create(const char *model_path,
+                                        const char *config_path,
+                                        const char *espeak_data_path) {
++    return piper_create_ex(model_path, config_path, espeak_data_path, nullptr);
++}
++
++struct piper_synthesizer *piper_create_ex(const char *model_path,
++                                          const char *config_path,
++                                          const char *espeak_data_path,
++                                          const piper_create_options *options) {
+     if (!model_path) {
+         return nullptr;
+     }
+@@ -101,6 +110,48 @@
+     synth->session_options.DisableMemPattern();
+     synth->session_options.DisableProfiling();
+ 
++    // --- CUDA execution provider setup ---
++    bool use_cuda = false;
++    int cuda_device_id = 0;
++
++    if (options && options->provider) {
++        std::string provider_str(options->provider);
++        if (provider_str == "cuda") {
++#ifdef PIPER_USE_CUDA
++            cuda_device_id = (options->cuda_device_id >= 0) ? options->cuda_device_id : 0;
++            use_cuda = true;
++#endif
++        }
++    }
++
++    if (use_cuda) {
++        try {
++            // Runtime check: is CUDA EP compiled into this ORT build?
++            bool cuda_listed = false;
++            for (const auto &p : Ort::GetAvailableProviders()) {
++                if (p == "CUDAExecutionProvider") { cuda_listed = true; break; }
++            }
++
++            if (cuda_listed) {
++                OrtCUDAProviderOptions cuda_opts{};
++                cuda_opts.device_id                 = cuda_device_id;
++                cuda_opts.cudnn_conv_algo_search    = OrtCudnnConvAlgoSearchHeuristic;
++                cuda_opts.gpu_mem_limit             = SIZE_MAX;
++                cuda_opts.arena_extend_strategy     = 0;
++                cuda_opts.do_copy_in_default_stream = 1;
++                cuda_opts.has_user_compute_stream   = 0;
++                cuda_opts.user_compute_stream       = nullptr;
++                cuda_opts.default_memory_arena_cfg  = nullptr;
++                cuda_opts.tunable_op_enable         = 0;
++                cuda_opts.tunable_op_tuning_enable  = 0;
++                synth->session_options.AppendExecutionProvider_CUDA(cuda_opts);
++            }
++            // If not listed, silently fall through to CPU.
++        } catch (const Ort::Exception &) {
++            // Driver/init failure — fall through to CPU.
++        }
++    }
++
+ #ifdef _WIN32
+     // On Windows, ONNX Runtime expects wchar_t* for model paths
+     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;

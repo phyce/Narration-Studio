@@ -31,7 +31,7 @@ func (piper *Piper) Initialize() error {
 	}
 
 	if settings.ModelsDirectory == "" {
-		return response.Err(fmt.Errorf("piper-native models directory is not set"))
+		return response.Err(fmt.Errorf("piper models directory is not set"))
 	}
 	piper.modelsDir = settings.ModelsDirectory
 	piper.useGPU = settings.UseGPU
@@ -75,7 +75,7 @@ func (piper *Piper) Start(modelName string) error {
 
 	if _, exists := piper.models[modelName]; exists {
 		response.Debug(util.MessageData{
-			Summary: fmt.Sprintf("piper-native model '%s' already loaded", modelName),
+			Summary: fmt.Sprintf("piper model '%s' already loaded", modelName),
 		})
 		return nil
 	}
@@ -83,7 +83,7 @@ func (piper *Piper) Start(modelName string) error {
 	// Load voice metadata
 	metadataPath := filepath.Join(piper.modelsDir, modelName, fmt.Sprintf("%s.metadata.json", modelName))
 	response.Debug(util.MessageData{
-		Summary: "piper-native metadata for model: " + modelName,
+		Summary: "piper metadata for model: " + modelName,
 		Detail:  metadataPath,
 	})
 
@@ -102,7 +102,7 @@ func (piper *Piper) Start(modelName string) error {
 	configPath := onnxPath + ".json"
 
 	response.Debug(util.MessageData{
-		Summary: fmt.Sprintf("piper-native loading model: %s", modelName),
+		Summary: fmt.Sprintf("piper loading model: %s", modelName),
 		Detail:  fmt.Sprintf("onnx=%s espeak=%s", onnxPath, piper.espeakDataDir),
 	})
 
@@ -117,7 +117,7 @@ func (piper *Piper) Start(modelName string) error {
 	}
 
 	response.Debug(util.MessageData{
-		Summary: fmt.Sprintf("piper-native model '%s' loaded successfully", modelName),
+		Summary: fmt.Sprintf("piper model '%s' loaded successfully", modelName),
 	})
 
 	return nil
@@ -127,7 +127,7 @@ func (piper *Piper) Stop(modelName string) error {
 	instance, exists := piper.models[modelName]
 	if !exists {
 		response.Debug(util.MessageData{
-			Summary: fmt.Sprintf("piper-native instance for %s is not running", modelName),
+			Summary: fmt.Sprintf("piper instance for %s is not running", modelName),
 		})
 		return nil
 	}
@@ -136,7 +136,7 @@ func (piper *Piper) Stop(modelName string) error {
 	delete(piper.models, modelName)
 
 	response.Debug(util.MessageData{
-		Summary: fmt.Sprintf("piper-native stopped model: %s", modelName),
+		Summary: fmt.Sprintf("piper stopped model: %s", modelName),
 	})
 
 	return nil
@@ -144,7 +144,7 @@ func (piper *Piper) Stop(modelName string) error {
 
 func (piper *Piper) Play(message util.CharacterMessage) error {
 	response.Debug(util.MessageData{
-		Summary: "piper-native playing: " + message.Character,
+		Summary: "piper playing: " + message.Character,
 		Detail:  message.Text,
 	})
 
@@ -167,7 +167,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 
 	audio.PlayRawAudioBytes(audioClip)
 	response.Debug(util.MessageData{
-		Summary: "piper-native finished playing audio for: " + message.Character,
+		Summary: "piper finished playing audio for: " + message.Character,
 		Detail:  message.Text,
 	})
 	return nil
@@ -175,7 +175,7 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 
 func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 	response.Debug(util.MessageData{
-		Summary: "piper-native saving messages",
+		Summary: "piper saving messages",
 	})
 
 	err, outputPath := util.ExpandPath(config.GetSettings().OutputPath)
@@ -225,7 +225,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 }
 
 func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
-	log.Info("generating in piper-native")
+	log.Info("generating in piper")
 
 	instance, exists := piper.models[model]
 	if !exists {
@@ -233,11 +233,11 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 			return nil, response.Err(fmt.Errorf("model is not enabled: piper:%s", model))
 		}
 
-		response.NewWarn("piper-native model is not running: " + model)
+		response.NewWarn("piper model is not running: " + model)
 
 		err := piper.Start(model)
 		if err != nil {
-			return nil, response.Err(fmt.Errorf("failed to start piper-native model %s: %v", model, err))
+			return nil, response.Err(fmt.Errorf("failed to start piper model %s: %v", model, err))
 		}
 
 		instance = piper.models[model]
@@ -249,7 +249,7 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	}
 
 	response.Debug(util.MessageData{
-		Summary: fmt.Sprintf("piper-native synthesizing model=%s speaker=%d", model, input.SpeakerID),
+		Summary: fmt.Sprintf("piper synthesizing model=%s speaker=%d", model, input.SpeakerID),
 		Detail:  input.Text,
 	})
 
@@ -279,7 +279,7 @@ func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, e
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	instance, exists := piper.models[model]
 	if !exists {
-		return nil, response.Err(fmt.Errorf("piper-native model %s is not initialized", model))
+		return nil, response.Err(fmt.Errorf("piper model %s is not initialized", model))
 	}
 
 	return instance.Voices, nil

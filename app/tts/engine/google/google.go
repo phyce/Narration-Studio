@@ -164,11 +164,6 @@ func (google *Google) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (google *Google) FetchModels() map[string]engine.Model {
-	apiKey := config.GetEngine().Api.Google.ApiKey
-	if apiKey == "" {
-		return make(map[string]engine.Model)
-	}
-
 	return FetchModels()
 }
 
@@ -176,6 +171,9 @@ func (google *Google) FetchModels() map[string]engine.Model {
 
 // <editor-fold desc="Other">
 func FetchModels() map[string]engine.Model {
+	if config.GetEngine().Api.Google.ApiKey == "" {
+		return make(map[string]engine.Model)
+	}
 	return map[string]engine.Model{
 		"standard": {
 			ID:     "standard",

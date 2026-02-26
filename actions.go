@@ -293,11 +293,7 @@ func (app *App) SaveSettings(settings config.Base) {
 func (app *App) SelectDirectory(defaultDirectory string) string {
 	status.Set(status.Loading, "Selecting directory")
 	err, fullPath := util.ExpandPath(defaultDirectory)
-	if err != nil {
-		response.Error(util.MessageData{
-			Summary: "Failed to expand provided directory",
-		})
-
+	if err != nil || func() bool { _, e := os.Stat(fullPath); return os.IsNotExist(e) }() {
 		fullPath, err = os.UserHomeDir()
 		if err != nil {
 			response.Error(util.MessageData{
@@ -338,11 +334,8 @@ func (app *App) SelectFile(defaultFile string) string {
 	defer status.Set(status.Ready, "")
 
 	err, fullPath := util.ExpandPath(defaultFile)
-	if err != nil {
-		response.Error(util.MessageData{
-			Summary: "Failed to expand provided file path",
-		})
-
+	startDir := filepath.Dir(fullPath)
+	if err != nil || func() bool { _, e := os.Stat(startDir); return os.IsNotExist(e) }() {
 		fullPath, err = os.UserHomeDir()
 		if err != nil {
 			response.Error(util.MessageData{
@@ -350,6 +343,7 @@ func (app *App) SelectFile(defaultFile string) string {
 			})
 			return ""
 		}
+		startDir = fullPath
 	}
 
 	// On macOS, file filters prevent selecting files without extensions
@@ -357,12 +351,12 @@ func (app *App) SelectFile(defaultFile string) string {
 	var dialogOptions wailsRuntime.OpenDialogOptions
 	if runtime.GOOS == "darwin" {
 		dialogOptions = wailsRuntime.OpenDialogOptions{
-			DefaultDirectory: filepath.Dir(fullPath),
+			DefaultDirectory: startDir,
 			Title:            "Select File",
 		}
 	} else {
 		dialogOptions = wailsRuntime.OpenDialogOptions{
-			DefaultDirectory: filepath.Dir(fullPath),
+			DefaultDirectory: startDir,
 			Title:            "Select File",
 			Filters: []wailsRuntime.FileFilter{
 				{

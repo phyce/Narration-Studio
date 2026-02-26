@@ -148,11 +148,6 @@ func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (openAI *OpenAI) FetchModels() map[string]engine.Model {
-	apiKey := config.GetEngine().Api.OpenAI.ApiKey
-	if apiKey == "" {
-		return make(map[string]engine.Model)
-	}
-
 	return FetchModels()
 }
 
@@ -160,6 +155,9 @@ func (openAI *OpenAI) FetchModels() map[string]engine.Model {
 
 // <editor-fold desc="Other">
 func FetchModels() map[string]engine.Model {
+	if config.GetEngine().Api.OpenAI.ApiKey == "" {
+		return make(map[string]engine.Model)
+	}
 	return map[string]engine.Model{
 		"tts-1": {
 			ID:     "tts-1",

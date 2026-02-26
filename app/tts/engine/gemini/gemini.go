@@ -187,11 +187,6 @@ func (gemini *Gemini) GetVoices(model string) ([]engine.Voice, error) {
 }
 
 func (gemini *Gemini) FetchModels() map[string]engine.Model {
-	apiKey := config.GetEngine().Api.Gemini.ApiKey
-	if apiKey == "" {
-		return make(map[string]engine.Model)
-	}
-
 	return FetchModels()
 }
 
@@ -199,6 +194,9 @@ func (gemini *Gemini) FetchModels() map[string]engine.Model {
 
 // <editor-fold desc="Other">
 func FetchModels() map[string]engine.Model {
+	if config.GetEngine().Api.Gemini.ApiKey == "" {
+		return make(map[string]engine.Model)
+	}
 	return map[string]engine.Model{
 		"gemini-2.5-flash-preview-tts": {
 			ID:     "gemini-2.5-flash-preview-tts",

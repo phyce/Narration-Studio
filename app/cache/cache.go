@@ -80,6 +80,7 @@ func (cacheManager *CacheManager) IsEnabled() bool {
 func (cacheManager *CacheManager) loadProfileCache(profileID string) (*ProfileCache, error) {
 	cacheManager.mutex.RLock()
 	if cache, exists := cacheManager.profiles[profileID]; exists {
+		cacheManager.mutex.RUnlock()
 		return cache, nil
 	}
 	cacheManager.mutex.RUnlock()
@@ -206,21 +207,19 @@ func (cacheManager *CacheManager) CacheAudio(profileID, characterName, text, voi
 		return response.Err(err)
 	}
 
-	profileCache.mutex.RLock()
+	profileCache.mutex.Lock()
 	characterCache, exists := profileCache.Characters[characterName]
-	profileCache.mutex.RUnlock()
 	if !exists {
 		characterCache = &CharacterCache{
 			Voice: voiceKey,
 			Lines: make(map[string]string),
 		}
 		profileCache.Characters[characterName] = characterCache
-	}
-
-	if characterCache.Voice != voiceKey {
+	} else if characterCache.Voice != voiceKey {
 		characterCache.Voice = voiceKey
 		characterCache.Lines = make(map[string]string)
 	}
+	profileCache.mutex.Unlock()
 
 	textHash := util.HashText(text)[:8]
 	sanitizedFilename := util.SanitizeFilename(text)
@@ -248,7 +247,9 @@ func (cacheManager *CacheManager) CacheAudio(profileID, characterName, text, voi
 		return response.Err(err)
 	}
 
+	profileCache.mutex.Lock()
 	characterCache.Lines[textHash] = filename
+	profileCache.mutex.Unlock()
 
 	if err := cacheManager.saveProfileCache(profileID, profileCache); err != nil {
 		return response.Alert("CacheAudio: Failed to save cache metadata: %v\n", err)
@@ -270,6 +271,7 @@ func (cacheManager *CacheManager) ClearCharacterCache(profileID, character strin
 	profileCache.mutex.Lock()
 	_, characterIsCached := profileCache.Characters[character]
 	if !characterIsCached {
+		profileCache.mutex.Unlock()
 		return nil
 	}
 	profileCache.mutex.Unlock()

@@ -3,9 +3,15 @@ name: Release Build
 on:
   release:
     types: [published]
+  push:
+    branches: [preview]
 
 permissions:
   contents: write
+
+env:
+  # Use release tag when available, otherwise "preview" for test builds
+  VERSION: ${{ github.event.release.tag_name || 'preview' }}
 
 jobs:
   build-windows:
@@ -54,13 +60,13 @@ jobs:
           if (-not (Test-Path "build/bin")) {
             New-Item -ItemType Directory -Path "build/bin" | Out-Null
           }
-          go build -tags cli -o "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe" .
+          go build -tags cli -o "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe" .
         shell: pwsh
 
       - name: Prepare CLI for NSIS installer
         run: |
           # Copy CLI to installer directory so NSIS can include it
-          Copy-Item -Path "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe" -Destination "build/windows/installer/nstudio-cli.exe"
+          Copy-Item -Path "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe" -Destination "build/windows/installer/nstudio-cli.exe"
         shell: pwsh
 
       - name: Build piper native DLLs
@@ -95,21 +101,22 @@ jobs:
           # Copy engine dependencies for installer context
           Copy-Item -Path "build/windows/installer/engines" -Destination "build/bin/engines" -Recurse -Force
           # Restore CLI executable (removed by -clean flag during GUI build)
-          Copy-Item -Path "build/windows/installer/nstudio-cli.exe" -Destination "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe"
+          Copy-Item -Path "build/windows/installer/nstudio-cli.exe" -Destination "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe"
           # Rename installer to include version
           $installer = Get-ChildItem -Path "build/bin" -Filter "*installer.exe" | Select-Object -First 1
           if ($installer) {
-            Rename-Item $installer.FullName "Narration-Studio-${{ github.event.release.tag_name }}-Windows-Installer.exe"
+            Rename-Item $installer.FullName "Narration-Studio-${{ env.VERSION }}-Windows-Installer.exe"
           }
         shell: pwsh
 
       - name: Upload Windows Installer
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = Get-ChildItem -Path "build/bin" -Filter "Narration-Studio-*-Windows-Installer.exe" | Select-Object -First 1
           if ($installer) {
-            gh release upload ${{ github.event.release.tag_name }} $installer.FullName
+            gh release upload ${{ env.VERSION }} $installer.FullName
           } else {
             Write-Host "ERROR: Installer not found in build/bin"
             exit 1
@@ -117,9 +124,10 @@ jobs:
         shell: pwsh
 
       - name: Upload Windows CLI
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Windows.exe"
+        run: gh release upload ${{ env.VERSION }} "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe"
         shell: pwsh
 
   build-macos:
@@ -151,7 +159,7 @@ jobs:
       - name: Build CLI application
         run: |
           mkdir -p build/bin
-          go build -tags cli -o "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-OSX" .
+          go build -tags cli -o "build/bin/nstudio-cli-${{ env.VERSION }}-OSX" .
 
       - name: Embed CLI and Package macOS GUI
         run: |
@@ -169,22 +177,24 @@ jobs:
 
           # Embed CLI
           echo "Embedding CLI into $APP_NAME..."
-          cp "nstudio-cli-${{ github.event.release.tag_name }}-OSX" "$APP_NAME/Contents/MacOS/"
+          cp "nstudio-cli-${{ env.VERSION }}-OSX" "$APP_NAME/Contents/MacOS/"
 
           # Zip it with the versioned name
-          zip -r "Narration-Studio-${{ github.event.release.tag_name }}-OSX.zip" "$APP_NAME"
+          zip -r "Narration-Studio-${{ env.VERSION }}-OSX.zip" "$APP_NAME"
 
       - name: Upload macOS GUI
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd build/bin
-          gh release upload ${{ github.event.release.tag_name }} "Narration-Studio-${{ github.event.release.tag_name }}-OSX.zip"
+          gh release upload ${{ env.VERSION }} "Narration-Studio-${{ env.VERSION }}-OSX.zip"
 
       - name: Upload macOS CLI
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-OSX"
+        run: gh release upload ${{ env.VERSION }} "build/bin/nstudio-cli-${{ env.VERSION }}-OSX"
 
   build-linux-gui-webkit40:
     runs-on: ubuntu-22.04
@@ -232,12 +242,13 @@ jobs:
           cp /tmp/piper-native/libpiper.so staging/
           cp -r /tmp/piper-native/espeak-ng-data staging/
           find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
-          cd staging && zip -r "../Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.0.zip" .
+          cd staging && zip -r "../Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.0.zip" .
 
       - name: Upload GUI zip (WebKit 4.0)
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} "Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.0.zip"
+        run: gh release upload ${{ env.VERSION }} "Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.0.zip"
 
   build-linux-gui-webkit41:
     runs-on: ubuntu-24.04
@@ -285,12 +296,13 @@ jobs:
           cp /tmp/piper-native/libpiper.so staging/
           cp -r /tmp/piper-native/espeak-ng-data staging/
           find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
-          cd staging && zip -r "../Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.1.zip" .
+          cd staging && zip -r "../Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.1.zip" .
 
       - name: Upload GUI zip (WebKit 4.1)
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} "Narration-Studio-${{ github.event.release.tag_name }}-Linux-WebKit-4.1.zip"
+        run: gh release upload ${{ env.VERSION }} "Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.1.zip"
 
   build-linux-cli:
     runs-on: ubuntu-22.04
@@ -305,18 +317,15 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libasound2 libasound2-dev
-          # Ensure the linker symlink exists (libasound2-dev may not create it
-          # if there is a version conflict with the pre-installed libasound2)
-          test -f /usr/lib/x86_64-linux-gnu/libasound.so || \
-            sudo ln -sf /usr/lib/x86_64-linux-gnu/libasound.so.2 /usr/lib/x86_64-linux-gnu/libasound.so
+          sudo apt-get install -y build-essential pkg-config libasound2-dev
 
       - name: Build CLI application
         run: |
           mkdir -p build/bin
-          go build -tags cli -o "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Linux" .
+          CGO_LDFLAGS="-L/usr/lib/x86_64-linux-gnu" go build -tags cli -o "build/bin/nstudio-cli-${{ env.VERSION }}-Linux" .
 
       - name: Upload Linux CLI
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} "build/bin/nstudio-cli-${{ github.event.release.tag_name }}-Linux"
+        run: gh release upload ${{ env.VERSION }} "build/bin/nstudio-cli-${{ env.VERSION }}-Linux"

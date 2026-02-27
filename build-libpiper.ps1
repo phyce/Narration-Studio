@@ -349,28 +349,29 @@ if (-not $SkipDirectML) {
     }
 
     # Stage DirectML.h from the committed repo copy into CMake source tree.
-    # Microsoft.AI.DirectML NuGet package (which is needed only for this header).
     $directmlIncludeDir = Join-Path $CmakeSourceDir "lib\Microsoft.AI.DirectML.1.15.2\include"
-    $directmlHeaderPath = Join-Path $directmlIncludeDir "DirectML.h"
-    if (-not (Test-Path $directmlHeaderPath)) {
-        Write-Host "Staging DirectML.h from repo..." -ForegroundColor Cyan
-        New-Item -ItemType Directory -Path $directmlIncludeDir -Force | Out-Null
-        $repoDirectMLHeader = Join-Path $ProjectRoot "lib\directml-headers\DirectML.h"
-        Copy-Item $repoDirectMLHeader -Destination $directmlHeaderPath -Force
-    } else {
-        Write-Host "DirectML.h already present." -ForegroundColor Green
+    $repoDirectMLHeader = Join-Path $ProjectRoot "lib\directml-headers\DirectML.h"
+    Write-Host "Staging DirectML.h from repo..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Path $directmlIncludeDir -Force | Out-Null
+    Copy-Item $repoDirectMLHeader -Destination (Join-Path $directmlIncludeDir "DirectML.h") -Force
+    if (-not (Test-Path (Join-Path $directmlIncludeDir "DirectML.h"))) {
+        Write-Error "Failed to stage DirectML.h to $directmlIncludeDir"
+        exit 1
     }
+    Write-Host "  Staged DirectML.h -> $directmlIncludeDir" -ForegroundColor Green
 
     Write-Host ""
 }
 
 # --- Build DirectML variant ---
 if (-not $SkipDirectML) {
+    # Pass the repo's DirectML header directory as a fallback include path
+    $DirectMLHeaderDir = (Join-Path $ProjectRoot "lib\directml-headers").Replace('\', '/')
     Build-Variant `
         -VariantName "DirectML" `
         -BuildDir (Join-Path $SafeRoot "build-directml") `
         -InstallDir (Join-Path $SafeRoot "install-directml") `
-        -ExtraCMakeArgs @("-DPIPER_USE_DIRECTML=ON")
+        -ExtraCMakeArgs @("-DPIPER_USE_DIRECTML=ON", "-DCMAKE_CXX_FLAGS=-I$DirectMLHeaderDir")
 
     Stage-Runtime `
         -InstallDir (Join-Path $SafeRoot "install-directml") `

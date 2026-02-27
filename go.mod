@@ -1,6 +1,6 @@
 module nstudio
 
-go 1.24.0
+go 1.24
 
 require (
 	cloud.google.com/go/texttospeech v1.16.0

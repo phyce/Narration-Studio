@@ -69,35 +69,29 @@ Write-Host "Source:     $SourceDir"
 Write-Host "Runtime:    $RuntimeDir"
 Write-Host ""
 
-# --- Ensure MSYS2 MinGW-w64 toolchain ---
+# --- Ensure MinGW toolchain (MSYS2 UCRT64 preferred, standalone MinGW as fallback) ---
 $Msys2Bin = "C:\msys64\ucrt64\bin"
 if (Test-Path $Msys2Bin) {
     $env:PATH = "$Msys2Bin;$env:PATH"
-    Write-Host "Using MSYS2 UCRT64 toolchain from $Msys2Bin" -ForegroundColor Green
-} else {
-    Write-Error @"
-MSYS2 UCRT64 not found at $Msys2Bin.
-
-Install MSYS2 from https://www.msys2.org/ then run in MSYS2 UCRT64 terminal:
-  pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
-"@
-    exit 1
+    Write-Host "Added MSYS2 UCRT64 to PATH: $Msys2Bin" -ForegroundColor Green
 }
 
-# Verify toolchain
+# Discover tools from PATH (works with MSYS2, standalone MinGW, or CI-provided tools)
 $GccPath = (Get-Command gcc -ErrorAction SilentlyContinue).Source
+$GxxPath = (Get-Command g++ -ErrorAction SilentlyContinue).Source
 $CmakePath = (Get-Command cmake -ErrorAction SilentlyContinue).Source
 $NinjaPath = (Get-Command ninja -ErrorAction SilentlyContinue).Source
 $GitPath = (Get-Command git -ErrorAction SilentlyContinue).Source
 
 Write-Host "  gcc:   $GccPath"
+Write-Host "  g++:   $GxxPath"
 Write-Host "  cmake: $CmakePath"
 Write-Host "  ninja: $NinjaPath"
 Write-Host "  git:   $GitPath"
 
-foreach ($tool in @(@("gcc", $GccPath), @("cmake", $CmakePath), @("ninja", $NinjaPath), @("git", $GitPath))) {
+foreach ($tool in @(@("gcc", $GccPath), @("g++", $GxxPath), @("cmake", $CmakePath), @("ninja", $NinjaPath), @("git", $GitPath))) {
     if (-not $tool[1]) {
-        Write-Error "$($tool[0]) not found on PATH."
+        Write-Error "$($tool[0]) not found on PATH. Install MSYS2 UCRT64 toolchain or ensure tools are available."
         exit 1
     }
 }
@@ -203,16 +197,18 @@ function Build-Variant {
     # Configure
     Write-Host "Configuring CMake ($VariantName)..." -ForegroundColor Cyan
     # CMake interprets backslashes as escape sequences in path strings, so use forward slashes.
-    $Msys2BinFwd = $Msys2Bin.Replace('\', '/')
+    $GccFwd = $GccPath.Replace('\', '/')
+    $GxxFwd = $GxxPath.Replace('\', '/')
+    $NinjaFwd = $NinjaPath.Replace('\', '/')
     $cmakeArgs = @(
         "-G", "Ninja",
         "-S", $CmakeSourceDir,
         "-B", $BuildDir,
         "-DCMAKE_BUILD_TYPE=$BuildType",
         "-DCMAKE_INSTALL_PREFIX=$InstallDir",
-        "-DCMAKE_C_COMPILER=$Msys2BinFwd/gcc.exe",
-        "-DCMAKE_CXX_COMPILER=$Msys2BinFwd/g++.exe",
-        "-DCMAKE_MAKE_PROGRAM=$Msys2BinFwd/ninja.exe"
+        "-DCMAKE_C_COMPILER=$GccFwd",
+        "-DCMAKE_CXX_COMPILER=$GxxFwd",
+        "-DCMAKE_MAKE_PROGRAM=$NinjaFwd"
     ) + $ExtraCMakeArgs
 
     & cmake @cmakeArgs

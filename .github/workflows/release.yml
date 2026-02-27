@@ -37,15 +37,18 @@ jobs:
           echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         shell: pwsh
 
-      - name: Setup MSYS2 for libpiper build
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: false
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
+      - name: Ensure MinGW build tools
+        run: |
+          # Windows runners have MinGW gcc at C:\mingw64\bin and CMake pre-installed.
+          # Just ensure ninja is available (install via choco if missing).
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          }
+          Write-Host "gcc:   $((Get-Command gcc).Source)"
+          Write-Host "g++:   $((Get-Command g++).Source)"
+          Write-Host "cmake: $((Get-Command cmake).Source)"
+          Write-Host "ninja: $((Get-Command ninja).Source)"
+        shell: pwsh
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest

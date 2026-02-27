@@ -300,12 +300,16 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libasound2 libasound2-dev
+          # Ensure the linker symlink exists (libasound2-dev may not create it
+          # if there is a version conflict with the pre-installed libasound2)
+          test -f /usr/lib/x86_64-linux-gnu/libasound.so || \
+            sudo ln -sf /usr/lib/x86_64-linux-gnu/libasound.so.2 /usr/lib/x86_64-linux-gnu/libasound.so
 
       - name: Build CLI application
         run: |

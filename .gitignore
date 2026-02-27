@@ -14,6 +14,7 @@ lib/*
 !lib/libpiper-mingw.patch
 !lib/libpiper-directml.patch
 !lib/libpiper-cuda.patch
+!lib/directml-headers/
 
 # DLLs copied to project root by dev.ps1 for wails dev mode
 libpiper.dll

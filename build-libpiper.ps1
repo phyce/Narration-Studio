@@ -348,17 +348,15 @@ if (-not $SkipDirectML) {
         Write-Host "OnnxRuntime.DirectML already in cache." -ForegroundColor Green
     }
 
-    # Pre-create the DirectML SDK include directory with just DirectML.h.
-    # This satisfies CMake's existence check and avoids extracting the full 192 MB
+    # Stage DirectML.h from the committed repo copy into CMake source tree.
     # Microsoft.AI.DirectML NuGet package (which is needed only for this header).
     $directmlIncludeDir = Join-Path $CmakeSourceDir "lib\Microsoft.AI.DirectML.1.15.2\include"
     $directmlHeaderPath = Join-Path $directmlIncludeDir "DirectML.h"
     if (-not (Test-Path $directmlHeaderPath)) {
-        Write-Host "Downloading DirectML.h header..." -ForegroundColor Cyan
+        Write-Host "Staging DirectML.h from repo..." -ForegroundColor Cyan
         New-Item -ItemType Directory -Path $directmlIncludeDir -Force | Out-Null
-        Invoke-WebRequest `
-            -Uri "https://raw.githubusercontent.com/microsoft/DirectML/master/Libraries/DirectML.h" `
-            -OutFile $directmlHeaderPath -UseBasicParsing
+        $repoDirectMLHeader = Join-Path $ProjectRoot "lib\directml-headers\DirectML.h"
+        Copy-Item $repoDirectMLHeader -Destination $directmlHeaderPath -Force
     } else {
         Write-Host "DirectML.h already present." -ForegroundColor Green
     }

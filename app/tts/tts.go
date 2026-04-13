@@ -13,6 +13,7 @@ import (
 	"nstudio/app/tts/engine/gemini"
 	"nstudio/app/tts/engine/google"
 	"nstudio/app/tts/engine/mssapi4"
+	"nstudio/app/tts/engine/mssapi5"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/modelManager"
@@ -171,10 +172,18 @@ func preparePayload(message util.CharacterMessage) ([]byte, error) {
 		}
 		return json.Marshal(payload)
 
+	case string(Engines.MsSapi5):
+		payload := mssapi5.MsSapi5Request{
+			Text:  message.Text,
+			Voice: message.Voice.Voice,
+		}
+		return json.Marshal(payload)
+
 	case string(Engines.ElevenLabs):
 		payload := elevenlabs.ElevenLabsRequest{
 			Text:    message.Text,
 			ModelID: message.Voice.Model,
+			VoiceID: message.Voice.Voice,
 		}
 		return json.Marshal(payload)
 

@@ -4,25 +4,46 @@ on:
   release:
     types: [published]
   push:
-    branches: [preview]
+    branches: [preview, rebuild]
 
 permissions:
   contents: write
 
-env:
-  # Use release tag when available, otherwise "preview" for test builds
-  VERSION: ${{ github.event.release.tag_name || 'preview' }}
-
 jobs:
+  resolve-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_upload: ${{ steps.version.outputs.should_upload }}
+    steps:
+      - name: Determine version and upload target
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo "should_upload=true" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_name }}" = "rebuild" ]; then
+            # Get latest release tag
+            LATEST=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName -q '.[0].tagName')
+            echo "version=${LATEST}" >> $GITHUB_OUTPUT
+            echo "should_upload=true" >> $GITHUB_OUTPUT
+          else
+            echo "version=preview" >> $GITHUB_OUTPUT
+            echo "should_upload=false" >> $GITHUB_OUTPUT
+          fi
+
   build-windows:
-    runs-on: windows-latest
+    needs: [resolve-version]
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,15 +58,18 @@ jobs:
           echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         shell: pwsh
 
-      - name: Setup MSYS2 for libpiper build
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: false
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
+      - name: Ensure MinGW build tools
+        run: |
+          # Windows runners have MinGW gcc at C:\mingw64\bin and CMake pre-installed.
+          # Just ensure ninja is available (install via choco if missing).
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          }
+          Write-Host "gcc:   $((Get-Command gcc).Source)"
+          Write-Host "g++:   $((Get-Command g++).Source)"
+          Write-Host "cmake: $((Get-Command cmake).Source)"
+          Write-Host "ninja: $((Get-Command ninja).Source)"
+        shell: pwsh
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -60,37 +84,17 @@ jobs:
           if (-not (Test-Path "build/bin")) {
             New-Item -ItemType Directory -Path "build/bin" | Out-Null
           }
-          go build -tags cli -o "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe" .
+          go build -tags cli -o "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe" .
         shell: pwsh
 
       - name: Prepare CLI for NSIS installer
         run: |
           # Copy CLI to installer directory so NSIS can include it
-          Copy-Item -Path "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe" -Destination "build/windows/installer/nstudio-cli.exe"
+          Copy-Item -Path "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe" -Destination "build/windows/installer/nstudio-cli.exe"
         shell: pwsh
 
       - name: Build piper native DLLs
-        run: .\build-libpiper.ps1
-        shell: pwsh
-
-      - name: Stage piper native files for installer
-        run: |
-          $piperDir = "build\windows\installer\engines\piper"
-          New-Item -ItemType Directory -Path $piperDir -Force | Out-Null
-
-          Copy-Item "build\bin\libpiper.dll" -Destination $piperDir -Force
-          Copy-Item "build\bin\onnxruntime.dll" -Destination $piperDir -Force
-          Copy-Item "build\bin\onnxruntime_providers_shared.dll" -Destination $piperDir -Force
-
-          if (Test-Path "build\bin\libpiper_directml.dll") {
-            Copy-Item "build\bin\libpiper_directml.dll" -Destination $piperDir -Force
-          }
-          if (Test-Path "build\bin\DirectML.dll") {
-            Copy-Item "build\bin\DirectML.dll" -Destination $piperDir -Force
-          }
-          if (Test-Path "build\bin\espeak-ng-data") {
-            Copy-Item "build\bin\espeak-ng-data" -Destination $piperDir -Recurse -Force
-          }
+        run: .\scripts\build-libpiper.ps1
         shell: pwsh
 
       - name: Build GUI application with NSIS installer
@@ -101,22 +105,22 @@ jobs:
           # Copy engine dependencies for installer context
           Copy-Item -Path "build/windows/installer/engines" -Destination "build/bin/engines" -Recurse -Force
           # Restore CLI executable (removed by -clean flag during GUI build)
-          Copy-Item -Path "build/windows/installer/nstudio-cli.exe" -Destination "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe"
+          Copy-Item -Path "build/windows/installer/nstudio-cli.exe" -Destination "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe"
           # Rename installer to include version
           $installer = Get-ChildItem -Path "build/bin" -Filter "*installer.exe" | Select-Object -First 1
           if ($installer) {
-            Rename-Item $installer.FullName "Narration-Studio-${{ env.VERSION }}-Windows-Installer.exe"
+            Rename-Item $installer.FullName "Narration-Studio-${{ needs.resolve-version.outputs.version }}-Windows-Installer.exe"
           }
         shell: pwsh
 
       - name: Upload Windows Installer
-        if: github.event_name == 'release'
+        if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = Get-ChildItem -Path "build/bin" -Filter "Narration-Studio-*-Windows-Installer.exe" | Select-Object -First 1
           if ($installer) {
-            gh release upload ${{ env.VERSION }} $installer.FullName
+            gh release upload ${{ needs.resolve-version.outputs.version }} $installer.FullName --clobber
           } else {
             Write-Host "ERROR: Installer not found in build/bin"
             exit 1
@@ -124,13 +128,14 @@ jobs:
         shell: pwsh
 
       - name: Upload Windows CLI
-        if: github.event_name == 'release'
+        if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ env.VERSION }} "build/bin/nstudio-cli-${{ env.VERSION }}-Windows.exe"
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe" --clobber
         shell: pwsh
 
   build-macos:
+    needs: [resolve-version]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,7 +143,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -159,7 +164,7 @@ jobs:
       - name: Build CLI application
         run: |
           mkdir -p build/bin
-          go build -tags cli -o "build/bin/nstudio-cli-${{ env.VERSION }}-OSX" .
+          go build -tags cli -o "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-OSX" .
 
       - name: Embed CLI and Package macOS GUI
         run: |
@@ -177,26 +182,27 @@ jobs:
 
           # Embed CLI
           echo "Embedding CLI into $APP_NAME..."
-          cp "nstudio-cli-${{ env.VERSION }}-OSX" "$APP_NAME/Contents/MacOS/"
+          cp "nstudio-cli-${{ needs.resolve-version.outputs.version }}-OSX" "$APP_NAME/Contents/MacOS/"
 
           # Zip it with the versioned name
-          zip -r "Narration-Studio-${{ env.VERSION }}-OSX.zip" "$APP_NAME"
+          zip -r "Narration-Studio-${{ needs.resolve-version.outputs.version }}-OSX.zip" "$APP_NAME"
 
       - name: Upload macOS GUI
-        if: github.event_name == 'release'
+        if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd build/bin
-          gh release upload ${{ env.VERSION }} "Narration-Studio-${{ env.VERSION }}-OSX.zip"
+          gh release upload ${{ needs.resolve-version.outputs.version }} "Narration-Studio-${{ needs.resolve-version.outputs.version }}-OSX.zip" --clobber
 
       - name: Upload macOS CLI
-        if: github.event_name == 'release'
+        if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ env.VERSION }} "build/bin/nstudio-cli-${{ env.VERSION }}-OSX"
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-OSX" --clobber
 
   build-linux-gui-webkit40:
+    needs: [resolve-version]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -204,7 +210,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -223,7 +229,7 @@ jobs:
         run: cd frontend && npm install
 
       - name: Build piper native .so
-        run: chmod +x build-libpiper.sh && ./build-libpiper.sh
+        run: chmod +x scripts/build-libpiper.sh && ./scripts/build-libpiper.sh
 
       - name: Save piper native files before clean build
         run: |
@@ -242,15 +248,16 @@ jobs:
           cp /tmp/piper-native/libpiper.so staging/
           cp -r /tmp/piper-native/espeak-ng-data staging/
           find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
-          cd staging && zip -r "../Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.0.zip" .
+          cd staging && zip -r "../Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.0.zip" .
 
       - name: Upload GUI zip (WebKit 4.0)
-        if: github.event_name == 'release'
+        if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ env.VERSION }} "Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.0.zip"
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.0.zip" --clobber
 
   build-linux-gui-webkit41:
+    needs: [resolve-version]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -258,7 +265,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -277,7 +284,7 @@ jobs:
         run: cd frontend && npm install
 
       - name: Build piper native .so
-        run: chmod +x build-libpiper.sh && ./build-libpiper.sh
+        run: chmod +x scripts/build-libpiper.sh && ./scripts/build-libpiper.sh
 
       - name: Save piper native files before clean build
         run: |
@@ -296,16 +303,17 @@ jobs:
           cp /tmp/piper-native/libpiper.so staging/
           cp -r /tmp/piper-native/espeak-ng-data staging/
           find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
-          cd staging && zip -r "../Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.1.zip" .
+          cd staging && zip -r "../Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.1.zip" .
 
       - name: Upload GUI zip (WebKit 4.1)
-        if: github.event_name == 'release'
+        if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ env.VERSION }} "Narration-Studio-${{ env.VERSION }}-Linux-WebKit-4.1.zip"
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.1.zip" --clobber
 
   build-linux-cli:
-    runs-on: ubuntu-22.04
+    needs: [resolve-version]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -317,15 +325,15 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libasound2-dev
+          sudo apt-get install -y build-essential pkg-config libasound2-dev libasound-dev 2>/dev/null || sudo apt-get install -y build-essential pkg-config libasound-dev
 
       - name: Build CLI application
         run: |
           mkdir -p build/bin
-          CGO_LDFLAGS="-L/usr/lib/x86_64-linux-gnu" go build -tags cli -o "build/bin/nstudio-cli-${{ env.VERSION }}-Linux" .
+          CGO_LDFLAGS="-L/usr/lib/x86_64-linux-gnu" go build -tags cli -o "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Linux" .
 
       - name: Upload Linux CLI
-        if: github.event_name == 'release'
+        if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ env.VERSION }} "build/bin/nstudio-cli-${{ env.VERSION }}-Linux"
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Linux" --clobber

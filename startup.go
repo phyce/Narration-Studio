@@ -9,6 +9,7 @@ import (
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/elevenlabs"
 	"nstudio/app/tts/engine/mssapi4"
+	"nstudio/app/tts/engine/mssapi5"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/engine/piper/native"
@@ -58,6 +59,7 @@ func registerEngines() {
 		ID:     "piper",
 		Name:   "Piper",
 		Type:   engine.Local,
+		Tags:   []string{"local"},
 		Engine: &piper.Piper{},
 		Models: piper.FetchModels(),
 	}
@@ -71,6 +73,7 @@ func registerEngines() {
 		ID:     "openai",
 		Name:   "OpenAI",
 		Type:   engine.Api,
+		Tags:   []string{"api"},
 		Engine: &openai.OpenAI{},
 		Models: openai.FetchModels(),
 	}
@@ -89,6 +92,7 @@ func registerEngines() {
 		ID:     "elevenlabs",
 		Name:   "ElevenLabs",
 		Type:   engine.Api,
+		Tags:   []string{"api"},
 		Engine: &elevenlabs.ElevenLabs{},
 		Models: models,
 	}
@@ -102,6 +106,7 @@ func registerEngines() {
 		ID:     "google",
 		Name:   "Google Cloud",
 		Type:   engine.Api,
+		Tags:   []string{"api"},
 		Engine: &google.Google{},
 		Models: google.FetchModels(),
 	}
@@ -115,6 +120,7 @@ func registerEngines() {
 		ID:     "gemini",
 		Name:   "Gemini",
 		Type:   engine.Api,
+		Tags:   []string{"api"},
 		Engine: &gemini.Gemini{},
 		Models: gemini.FetchModels(),
 	}
@@ -129,11 +135,26 @@ func registerEngines() {
 			ID:     "mssapi4",
 			Name:   "Microsoft SAPI4",
 			Type:   engine.Local,
+			Tags:   []string{"local"},
 			Engine: &mssapi4.MsSapi4{},
 			Models: mssapi4.FetchModels(),
 		}
 
 		err = modelManager.RegisterEngine(msSapi4Engine)
+		if err != nil {
+			response.Err(err)
+		}
+
+		msSapi5Engine := engine.Engine{
+			ID:     "mssapi5",
+			Name:   "Microsoft SAPI5",
+			Type:   engine.Local,
+			Tags:   []string{"local"},
+			Engine: &mssapi5.MsSapi5{},
+			Models: mssapi5.FetchModels(),
+		}
+
+		err = modelManager.RegisterEngine(msSapi5Engine)
 		if err != nil {
 			response.Err(err)
 		}

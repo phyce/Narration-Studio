@@ -36,14 +36,37 @@ func (piper *Piper) Initialize() error {
 	piper.modelsDir = settings.ModelsDirectory
 	piper.useGPU = settings.UseGPU
 
-	// espeak-ng-data is always located next to the DLLs (i.e. next to the executable)
-	exePath, err := os.Executable()
-	if err != nil {
-		return response.Err(fmt.Errorf("could not determine executable path: %w", err))
+	// Use configured espeak data dir, or search for it
+	espeakDir := ""
+	if settings.EspeakDataDir != "" {
+		if _, err := os.Stat(settings.EspeakDataDir); err == nil {
+			espeakDir = settings.EspeakDataDir
+		}
 	}
-	espeakDir := filepath.Join(filepath.Dir(exePath), "espeak-ng-data")
-	if _, err := os.Stat(espeakDir); os.IsNotExist(err) {
-		return response.Err(fmt.Errorf("espeak-ng-data not found next to executable: %s", espeakDir))
+
+	if espeakDir == "" {
+		exePath, err := os.Executable()
+		if err != nil {
+			return response.Err(fmt.Errorf("could not determine executable path: %w", err))
+		}
+		exeDir := filepath.Dir(exePath)
+
+		searchPaths := []string{
+			filepath.Join(exeDir, "espeak-ng-data"),
+			filepath.Join(exeDir, "engines", "piper", "espeak-ng-data"),
+			filepath.Join(exeDir, "..", "windows", "installer", "engines", "piper", "espeak-ng-data"),
+		}
+
+		for _, candidate := range searchPaths {
+			if _, err := os.Stat(candidate); err == nil {
+				espeakDir = candidate
+				break
+			}
+		}
+	}
+
+	if espeakDir == "" {
+		return response.Err(fmt.Errorf("espeak-ng-data not found"))
 	}
 	piper.espeakDataDir = espeakDir
 

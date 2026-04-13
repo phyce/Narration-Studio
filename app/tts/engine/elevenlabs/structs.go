@@ -28,6 +28,7 @@ type Model struct {
 type ElevenLabsRequest struct {
 	Text          string        `json:"text"`
 	ModelID       string        `json:"model_id"`
+	VoiceID       string        `json:"voice_id,omitempty"`
 	VoiceSettings VoiceSettings `json:"voice_settings"`
 }
 

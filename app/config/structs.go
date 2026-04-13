@@ -41,6 +41,7 @@ type ServerSettingsEngines struct {
 	OpenAI     map[string]ModelInstances `json:"openai,omitempty"`
 	ElevenLabs map[string]ModelInstances `json:"elevenlabs,omitempty"`
 	MsSapi4    map[string]ModelInstances `json:"mssapi4,omitempty"`
+	MsSapi5    map[string]ModelInstances `json:"mssapi5,omitempty"`
 	Google     map[string]ModelInstances `json:"google,omitempty"`
 	Gemini     map[string]ModelInstances `json:"gemini,omitempty"`
 }
@@ -62,12 +63,14 @@ type Engine struct {
 type Local struct {
 	Piper   Piper   `json:"piper"`
 	MsSapi4 MsSapi4 `json:"msSapi4"`
+	MsSapi5 MsSapi5 `json:"msSapi5"`
 }
 
 type Piper struct {
 	UseExecutable   bool   `json:"useExecutable"`
 	Location        string `json:"location"`
 	ModelsDirectory string `json:"modelsDirectory"`
+	EspeakDataDir   string `json:"espeakDataDir"`
 	UseGPU          bool   `json:"useGPU"`
 }
 
@@ -75,6 +78,11 @@ type MsSapi4 struct {
 	Location string `json:"location"`
 	Pitch    int    `json:"pitch"`
 	Speed    int    `json:"speed"`
+}
+
+type MsSapi5 struct {
+	Rate   int `json:"rate"`
+	Volume int `json:"volume"`
 }
 
 type Api struct {

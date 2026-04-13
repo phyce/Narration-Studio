@@ -33,7 +33,7 @@ export default {
 				'rounded-r-none',
 				'border-r-0',
 				{'rounded-l-full': parent.props.rounded},
-				{'rounded-md': !parent.props.rounded, 'rounded-full': parent.props.rounded},
+				{'rounded-l-md rounded-r-none': !parent.props.rounded, 'rounded-full': parent.props.rounded},
 
 				// Link Button
 				{'text-primary-600 bg-transparent border-transparent': parent.props.link},
@@ -218,7 +218,7 @@ export default {
 				// Shape
 				'rounded-l-none',
 				{'rounded-l-full': parent.props.rounded},
-				{'rounded-md': !parent.props.rounded, 'rounded-full': parent.props.rounded},
+				{'rounded-r-md rounded-l-none': !parent.props.rounded, 'rounded-full': parent.props.rounded},
 
 				// Link Button
 				{'text-primary-600 bg-transparent border-transparent': parent.props.link},
@@ -390,8 +390,9 @@ export default {
 				'py-1',
 
 				// Colors
-				'bg-surface-0 dark:bg-surface-700',
-				'border border-surface-200 dark:border-surface-700'
+				'bg-surface-0 dark:bg-surface-800',
+				'border border-surface-200 dark:border-surface-600',
+				'shadow-lg'
 			]
 		},
 		menu: {

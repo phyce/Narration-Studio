@@ -38,6 +38,10 @@
 				"location": "",
 				"pitch": 150,
 				"speed": 100
+			},
+			"msSapi5": {
+				"rate": 0,
+				"volume": 100
 			}
 		},
 		"api": {

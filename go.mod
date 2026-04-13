@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/log v0.4.2
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.1.0
+	github.com/go-ole/go-ole v1.3.0
 	github.com/gopxl/beep v1.4.1
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/mewkiz/flac v1.0.12
@@ -39,7 +40,6 @@ require (
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect

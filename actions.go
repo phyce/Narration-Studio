@@ -1,3 +1,5 @@
+//go:build !cli && !clib
+
 package main
 
 import (

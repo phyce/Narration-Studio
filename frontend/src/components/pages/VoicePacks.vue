@@ -8,6 +8,7 @@ import Tag from 'primevue/tag';
 import Badge from 'primevue/badge';
 import DataView from 'primevue/dataview';
 import SplitButton from 'primevue/splitbutton';
+import PiperDownloadDialog from '../common/PiperDownloadDialog.vue';
 import {computed, onMounted, reactive, ref} from 'vue';
 import {Engine, Model} from '../interfaces/engine';
 import {
@@ -35,9 +36,15 @@ interface EngineMeta {
 	actions: EngineAction[];
 }
 
+const showPiperDownloadDialog = ref(false);
+
 const engineMeta: Record<string, EngineMeta> = {
 	piper: {
-		actions: [{label: 'Download Models', icon: 'pi pi-download', action: () => { /* TODO */ }}],
+		actions: [{
+			label: 'Download Models',
+			icon: 'pi pi-download',
+			action: () => { showPiperDownloadDialog.value = true; },
+		}],
 	},
 };
 
@@ -241,6 +248,7 @@ async function saveSettings() {
 	settingsOriginalConfig.value = JSON.stringify(settingsConfig.value);
 	settingsHasChanges.value = false;
 	showSettingsDialog.value = false;
+	await loadData();
 }
 
 onMounted(loadData);
@@ -350,6 +358,11 @@ onMounted(loadData);
 		<div class="voice-packs__content voice-packs__content--empty" v-else>
 			<p>Select an engine from the sidebar.</p>
 		</div>
+
+		<PiperDownloadDialog
+			v-model:visible="showPiperDownloadDialog"
+			@models-changed="loadData"
+		/>
 
 		<!-- Settings Dialog -->
 		<Dialog

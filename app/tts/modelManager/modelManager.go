@@ -10,12 +10,12 @@ import (
 	"nstudio/app/enums/Engines"
 	tts "nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/elevenlabs"
+	"nstudio/app/tts/engine/gemini"
+	"nstudio/app/tts/engine/google"
 	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/mssapi5"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
-	"nstudio/app/tts/engine/google"
-	"nstudio/app/tts/engine/gemini"
 	"strings"
 	"sync"
 
@@ -69,10 +69,10 @@ func handleConfigChange(data interface{}) {
 
 func restartEngine(engineName string) {
 	manager.Lock()
-	defer manager.Unlock()
 
 	entry, exists := manager.Engines[engineName]
 	if !exists {
+		manager.Unlock()
 		log.Warn(fmt.Sprintf("Engine %s not found, skipping restart", engineName))
 		return
 	}
@@ -102,6 +102,15 @@ func restartEngine(engineName string) {
 			}
 		}
 	}
+
+	if entry.Engine.Engine != nil {
+		entry.Engine.Models = entry.Engine.Engine.FetchModels()
+		manager.Engines[engineName] = entry
+	}
+
+	manager.Unlock()
+
+	_ = RefreshModels()
 }
 
 func restartLocalEngines() {
@@ -249,14 +258,8 @@ func ReloadModels() error {
 	manager.Lock()
 
 	for engineID, entry := range manager.Engines {
-		if len(entry.Models) > 0 {
-			for _, modelPool := range entry.Models {
-				if len(modelPool.Instances) > 0 {
-					models := modelPool.Instances[0].FetchModels()
-					entry.Engine.Models = models
-					break
-				}
-			}
+		if entry.Engine.Engine != nil {
+			entry.Engine.Models = entry.Engine.Engine.FetchModels()
 		}
 		manager.Engines[engineID] = entry
 	}

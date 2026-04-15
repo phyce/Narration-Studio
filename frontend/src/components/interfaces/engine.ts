@@ -1,6 +1,8 @@
 export interface Engine {
 	id: string;
 	name: string;
+	type: 'local' | 'api';
+	tags: string[];
 	models: Record<string, Model>;
 }
 

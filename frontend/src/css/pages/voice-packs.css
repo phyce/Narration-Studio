@@ -1,36 +1,141 @@
 .voice-packs {
-	@apply flex flex-wrap mt-2 mb-2 mr-2
+	@apply flex w-full h-full;
 }
 
-.voice-packs__header {
-	@apply w-full px-2 mb-2 flex;
+/* Sidebar */
+.voice-packs__sidebar {
+	@apply w-1/5 flex flex-col;
 }
 
-.voice-packs__header__save {
-	@apply mt-2 mr-2;
+.voice-packs__sidebar__toolbar {
+	@apply flex items-stretch gap-1 p-1;
+	border-bottom: 1px solid #4a4a4a;
 }
 
-.voice-packs__container {
-	@apply w-full md:w-1/3 pl-2 mb-2;
+.voice-packs__toolbar-btn {
+	@apply flex-1 whitespace-nowrap;
 }
 
-.voice-pack {
-	@apply text-left;
+.voice-packs__sidebar__list {
+	@apply flex-1 overflow-y-auto p-1 flex flex-col gap-1;
 }
 
-.voice-pack__container {
+/* Engine card */
+.voice-packs__engine-card {
+	@apply py-2 px-2.5 rounded cursor-pointer select-none;
+	background: #363636;
+	border: 1px solid #4a4a4a;
+	transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+
+.voice-packs__engine-card:hover {
+	background: #424242;
+	border-color: #e8803a;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.voice-packs__engine-card:active {
+	transform: scale(0.98);
+}
+
+.voice-packs__engine-card--active {
+	background: #3d2e1e !important;
+	border-color: #e8803a !important;
+	box-shadow: 0 0 0 1px #e8803a, 0 2px 8px rgba(232, 128, 58, 0.15) !important;
+}
+
+.voice-packs__engine-card__header {
 	@apply flex justify-between items-center;
 }
 
-.voice-pack__container__info {
-	@apply
-	flex-grow
-	whitespace-nowrap
-	overflow-hidden
-	text-ellipsis
-	;
+.voice-packs__engine-card__name {
+	@apply font-bold text-sm;
+	color: #e0e0e0;
 }
 
-.voice-pack__container__toggle {
-	@apply flex-initial;
+.voice-packs__engine-card--active .voice-packs__engine-card__name {
+	color: #f0a060;
+}
+
+.voice-packs__engine-card__tags {
+	@apply flex flex-wrap gap-1 mt-1;
+}
+
+/* Tiny pill tags */
+.voice-packs__tag-pill {
+	font-size: 0.55rem !important;
+	padding: 0.05rem 0.35rem !important;
+	line-height: 1.3 !important;
+	min-height: unset !important;
+	height: auto !important;
+	font-weight: 600 !important;
+	letter-spacing: 0.03em;
+}
+
+/* Content */
+.voice-packs__content {
+	@apply w-4/5 p-2 overflow-y-auto;
+	background-color: #2D2D2D;
+}
+
+.voice-packs__content--empty {
+	@apply flex items-center justify-center;
+	color: var(--text-color-secondary);
+}
+
+.voice-packs__content__actions {
+	@apply flex flex-wrap gap-2 mb-1 justify-end;
+}
+
+.voice-packs__content__empty {
+	@apply text-center py-8;
+	color: var(--text-color-secondary);
+}
+
+/* DataView list view (>8 voice packs) */
+.voice-packs__dataview {
+	@apply w-full;
+	background: transparent !important;
+	border: none !important;
+}
+
+.voice-packs__list {
+	@apply flex flex-col;
+}
+
+.voice-packs__list-row {
+	@apply flex items-center gap-4 px-3 py-2;
+	border-bottom: 1px solid #3a3a3a;
+	transition: background-color 0.15s;
+}
+
+.voice-packs__list-row:hover {
+	background: #353535;
+}
+
+.voice-packs__list-row__name {
+	@apply font-semibold text-sm flex-shrink-0 text-left;
+	min-width: 10rem;
+	color: var(--text-color);
+}
+
+.voice-packs__list-row__key {
+	@apply flex-grow text-xs text-left;
+	color: var(--text-color-secondary);
+}
+
+/* Settings dialog */
+.voice-packs__settings-loading {
+	@apply flex flex-col items-center justify-center py-4;
+	gap: 1rem;
+	color: var(--text-color-secondary);
+}
+
+.voice-packs__settings-content {
+	@apply py-2;
+}
+
+.voice-packs__settings-none {
+	color: var(--text-color-secondary);
+	font-style: italic;
 }

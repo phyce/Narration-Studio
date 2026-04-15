@@ -86,6 +86,18 @@ export function IsPiperGPUAvailable() {
   return window['go']['main']['App']['IsPiperGPUAvailable']();
 }
 
+export function PiperDeleteModel(arg1) {
+  return window['go']['main']['App']['PiperDeleteModel'](arg1);
+}
+
+export function PiperDownloadModel(arg1) {
+  return window['go']['main']['App']['PiperDownloadModel'](arg1);
+}
+
+export function PiperFetchAvailableModels() {
+  return window['go']['main']['App']['PiperFetchAvailableModels']();
+}
+
 export function Play(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['Play'](arg1, arg2, arg3, arg4);
 }

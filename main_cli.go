@@ -27,8 +27,6 @@ func main() {
 	modelManager.Initialize(false)
 	registerEngines()
 
-	app := NewApp()
-
 	if arguments.Mode == "gui" {
 		fmt.Println("Error: GUI mode not supported in CLI build.")
 		os.Exit(1)
@@ -38,10 +36,10 @@ func main() {
 		fmt.Println(helpText)
 		return
 	}
-	startCmdServer(app, arguments)
+	startCmdServer(arguments)
 }
 
-func startCmdServer(app *App, options commandLineArguments) {
+func startCmdServer(options commandLineArguments) {
 	if !daemon.IsDaemonChild() {
 		pid, err := daemon.Daemonize()
 		if err != nil {

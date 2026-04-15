@@ -10,18 +10,16 @@ import (
 	"nstudio/app/enums/Engines"
 	tts "nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/elevenlabs"
+	"nstudio/app/tts/engine/gemini"
+	"nstudio/app/tts/engine/google"
 	"nstudio/app/tts/engine/mssapi4"
+	"nstudio/app/tts/engine/mssapi5"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
-	"nstudio/app/tts/engine/google"
-	"nstudio/app/tts/engine/gemini"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/gopxl/beep"
-	"github.com/gopxl/beep/speaker"
 )
 
 var (
@@ -36,19 +34,7 @@ func Initialize(isGUIMode bool) {
 			IsGUIMode: isGUIMode,
 		}
 
-		//TODO: Move to audio module
-		format := beep.Format{
-			SampleRate:  48000,
-			NumChannels: 1,
-			Precision:   2,
-		}
-
-		if err := speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
-			response.Error(util.MessageData{
-				Summary: "failed to initialize speaker",
-				Detail:  err.Error(),
-			})
-		}
+		initSpeaker()
 
 		eventManager.GetInstance().SubscribeToEvent("config.changed", handleConfigChange)
 	})
@@ -83,10 +69,10 @@ func handleConfigChange(data interface{}) {
 
 func restartEngine(engineName string) {
 	manager.Lock()
-	defer manager.Unlock()
 
 	entry, exists := manager.Engines[engineName]
 	if !exists {
+		manager.Unlock()
 		log.Warn(fmt.Sprintf("Engine %s not found, skipping restart", engineName))
 		return
 	}
@@ -116,6 +102,15 @@ func restartEngine(engineName string) {
 			}
 		}
 	}
+
+	if entry.Engine.Engine != nil {
+		entry.Engine.Models = entry.Engine.Engine.FetchModels()
+		manager.Engines[engineName] = entry
+	}
+
+	manager.Unlock()
+
+	_ = RefreshModels()
 }
 
 func restartLocalEngines() {
@@ -149,6 +144,8 @@ func createModelPool(engineID, modelID string) (*ModelPool, error) {
 			engine = &piper.Piper{}
 		case string(Engines.MsSapi4):
 			engine = &mssapi4.MsSapi4{}
+		case string(Engines.MsSapi5):
+			engine = &mssapi5.MsSapi5{}
 		case string(Engines.ElevenLabs):
 			engine = &elevenlabs.ElevenLabs{}
 		case string(Engines.OpenAI):
@@ -261,14 +258,8 @@ func ReloadModels() error {
 	manager.Lock()
 
 	for engineID, entry := range manager.Engines {
-		if len(entry.Models) > 0 {
-			for _, modelPool := range entry.Models {
-				if len(modelPool.Instances) > 0 {
-					models := modelPool.Instances[0].FetchModels()
-					entry.Engine.Models = models
-					break
-				}
-			}
+		if entry.Engine.Engine != nil {
+			entry.Engine.Models = entry.Engine.Engine.FetchModels()
 		}
 		manager.Engines[engineID] = entry
 	}
@@ -369,15 +360,40 @@ func GetEngineInstance(engineID, modelID string) (tts.Base, func(), bool) {
 	}
 
 	instance, pool, ok := entry.GetModelInstance(modelID)
-	if !ok {
-		return nil, nil, false
+	if ok {
+		releaseFunc := func() {
+			pool.Release(instance)
+		}
+		return instance, releaseFunc, true
 	}
 
-	releaseFunc := func() {
-		pool.Release(instance)
+	// Model exists but has no pool (not enabled in toggles). Create one on demand.
+	if _, modelExists := entry.Engine.Models[modelID]; modelExists {
+		manager.Lock()
+		// Double-check after acquiring write lock
+		if existingPool, exists := entry.Models[modelID]; exists {
+			manager.Unlock()
+			inst, _, ok := entry.GetModelInstance(modelID)
+			if ok {
+				return inst, func() { existingPool.Release(inst) }, true
+			}
+		} else {
+			newPool, err := createModelPool(engineID, modelID)
+			if err != nil {
+				manager.Unlock()
+				return nil, nil, false
+			}
+			entry.Models[modelID] = newPool
+			manager.Unlock()
+
+			inst, _, ok := entry.GetModelInstance(modelID)
+			if ok {
+				return inst, func() { newPool.Release(inst) }, true
+			}
+		}
 	}
 
-	return instance, releaseFunc, true
+	return nil, nil, false
 }
 
 func GetAllEngines() []tts.Engine {
@@ -388,6 +404,8 @@ func GetAllEngines() []tts.Engine {
 		filteredEngine := tts.Engine{
 			ID:     engineID,
 			Name:   entry.Engine.Name,
+			Type:   entry.Engine.Type,
+			Tags:   entry.Engine.Tags,
 			Models: make(map[string]tts.Model),
 		}
 
@@ -415,6 +433,7 @@ func GetAllEngines() []tts.Engine {
 		availableEngines = append(availableEngines, filteredEngine)
 	}
 
+	tts.SortEngines(availableEngines)
 	return availableEngines
 }
 
@@ -428,6 +447,8 @@ func GetActiveEngines() []tts.Engine {
 		activeEngine := tts.Engine{
 			ID:     engineID,
 			Name:   entry.Engine.Name,
+			Type:   entry.Engine.Type,
+			Tags:   entry.Engine.Tags,
 			Models: make(map[string]tts.Model),
 		}
 
@@ -449,6 +470,7 @@ func GetActiveEngines() []tts.Engine {
 		}
 	}
 
+	tts.SortEngines(activeEngines)
 	return activeEngines
 }
 
@@ -473,6 +495,11 @@ func GetModelVoices(engineName string, modelID string) ([]tts.Voice, error) {
 
 	if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists && len(modelPool.Instances) > 0 {
 		return modelPool.Instances[0].GetVoices(modelID)
+	}
+
+	// Fall back to the engine directly (handles models not yet pooled/enabled)
+	if _, modelExists := selectedEngine.Engine.Models[modelID]; modelExists {
+		return selectedEngine.Engine.Engine.GetVoices(modelID)
 	}
 
 	return nil, response.Err(fmt.Errorf("Model %s not found for engine %s", modelID, engineName))

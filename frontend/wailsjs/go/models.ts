@@ -134,6 +134,20 @@ export namespace config {
 	        this.os = source["os"];
 	    }
 	}
+	export class MsSapi5 {
+	    rate: number;
+	    volume: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MsSapi5(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rate = source["rate"];
+	        this.volume = source["volume"];
+	    }
+	}
 	export class MsSapi4 {
 	    location: string;
 	    pitch: number;
@@ -154,6 +168,7 @@ export namespace config {
 	    useExecutable: boolean;
 	    location: string;
 	    modelsDirectory: string;
+	    espeakDataDir: string;
 	    useGPU: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -165,12 +180,14 @@ export namespace config {
 	        this.useExecutable = source["useExecutable"];
 	        this.location = source["location"];
 	        this.modelsDirectory = source["modelsDirectory"];
+	        this.espeakDataDir = source["espeakDataDir"];
 	        this.useGPU = source["useGPU"];
 	    }
 	}
 	export class Local {
 	    piper: Piper;
 	    msSapi4: MsSapi4;
+	    msSapi5: MsSapi5;
 	
 	    static createFrom(source: any = {}) {
 	        return new Local(source);
@@ -180,6 +197,7 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.piper = this.convertValues(source["piper"], Piper);
 	        this.msSapi4 = this.convertValues(source["msSapi4"], MsSapi4);
+	        this.msSapi5 = this.convertValues(source["msSapi5"], MsSapi5);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -249,6 +267,7 @@ export namespace config {
 	    openai?: Record<string, ModelInstances>;
 	    elevenlabs?: Record<string, ModelInstances>;
 	    mssapi4?: Record<string, ModelInstances>;
+	    mssapi5?: Record<string, ModelInstances>;
 	    google?: Record<string, ModelInstances>;
 	    gemini?: Record<string, ModelInstances>;
 	
@@ -262,6 +281,7 @@ export namespace config {
 	        this.openai = this.convertValues(source["openai"], ModelInstances, true);
 	        this.elevenlabs = this.convertValues(source["elevenlabs"], ModelInstances, true);
 	        this.mssapi4 = this.convertValues(source["mssapi4"], ModelInstances, true);
+	        this.mssapi5 = this.convertValues(source["mssapi5"], ModelInstances, true);
 	        this.google = this.convertValues(source["google"], ModelInstances, true);
 	        this.gemini = this.convertValues(source["gemini"], ModelInstances, true);
 	    }
@@ -390,6 +410,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 	
 	
 	

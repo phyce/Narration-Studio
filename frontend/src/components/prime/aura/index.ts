@@ -2,7 +2,7 @@
 // import autocomplete from './autocomplete';
 // import avatar from './avatar';
 // import avatargroup from './avatargroup';
-// import badge from './badge';
+import badge from './badge';
 import badgedirective from './badgedirective';
 // import blockui from './blockui';
 // import breadcrumb from './breadcrumb';
@@ -18,8 +18,8 @@ import checkbox from './checkbox';
 // import confirmpopup from './confirmpopup';
 // import contextmenu from './contextmenu';
 // import datatable from './datatable';
-// import dataview from './dataview';
-// import dataviewlayoutoptions from './dataviewlayoutoptions';
+import dataview from './dataview';
+import dataviewlayoutoptions from './dataviewlayoutoptions';
 // import deferred from './deferred';
 import dialog from './dialog';
 // import divider from './divider';
@@ -69,14 +69,14 @@ import ripple from './ripple';
 // import skeleton from './skeleton';
 // import slider from './slider';
 // import speeddial from './speeddial';
-// import splitbutton from './splitbutton';
+import splitbutton from './splitbutton';
 // import splitter from './splitter';
 // import splitterpanel from './splitterpanel';
 // import stepper from './stepper';
 // import steps from './steps';
 // import tabmenu from './tabmenu';
 // import tabview from './tabview';
-// import tag from './tag';
+import tag from './tag';
 // import terminal from './terminal';
 // import textarea from './textarea';
 // import tieredmenu from './tieredmenu';
@@ -130,15 +130,15 @@ export default {
 	//
 	// //buttons
 	button,
-	// splitbutton,
+	splitbutton,
 	// speeddial,
 	//
 	// //data
 	// paginator,
 	// datatable,
 	// tree,
-	// dataview,
-	// dataviewlayoutoptions,
+	dataview,
+	dataviewlayoutoptions,
 	// organizationchart,
 	// orderlist,
 	// picklist,
@@ -191,10 +191,10 @@ export default {
 	// image,
 	//
 	// //misc
-	// badge,
+	badge,
 	// avatar,
 	// avatargroup,
-	// tag,
+	tag,
 	// chip,
 	// progressbar,
 	// skeleton,

@@ -1,0 +1,12 @@
+# Force LF for shell scripts so they remain executable on Linux/macOS even
+# when the repo is checked out on Windows with core.autocrlf=true.
+*.sh text eol=lf
+
+# Patch files must keep LF — `git apply` matches line endings against the
+# target file, and freshly-cloned upstream sources use LF.
+*.patch text eol=lf
+
+# Windows-specific scripts keep CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf

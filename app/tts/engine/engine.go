@@ -6,6 +6,7 @@ import (
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
+	"sort"
 )
 
 type EngineType int
@@ -14,6 +15,17 @@ const (
 	Local EngineType = iota
 	Api
 )
+
+func (t EngineType) MarshalJSON() ([]byte, error) {
+	switch t {
+	case Local:
+		return json.Marshal("local")
+	case Api:
+		return json.Marshal("api")
+	default:
+		return json.Marshal("unknown")
+	}
+}
 
 type Base interface {
 	Initialize() error
@@ -33,8 +45,16 @@ type Engine struct {
 	Engine Base             `json:"-"`
 	ID     string           `json:"id"`
 	Name   string           `json:"name"`
-	Type   EngineType       `json:"-"`
+	Type   EngineType       `json:"type"`
+	Tags   []string         `json:"tags"`
 	Models map[string]Model `json:"models"`
+}
+
+// SortEngines sorts a slice of engines alphabetically by Name.
+func SortEngines(engines []Engine) {
+	sort.Slice(engines, func(i, j int) bool {
+		return engines[i].Name < engines[j].Name
+	})
 }
 
 type Model struct {

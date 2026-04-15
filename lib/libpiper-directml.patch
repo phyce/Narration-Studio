@@ -1,4 +1,4 @@
-﻿diff --git a/libpiper/CMakeLists.txt b/libpiper/CMakeLists.txt
+diff --git a/libpiper/CMakeLists.txt b/libpiper/CMakeLists.txt
 index d35d46a..ced3dba 100644
 --- a/libpiper/CMakeLists.txt
 +++ b/libpiper/CMakeLists.txt

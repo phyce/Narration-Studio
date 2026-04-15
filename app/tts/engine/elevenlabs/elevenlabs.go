@@ -129,7 +129,7 @@ func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
 		return nil, response.Err(err)
 	}
 
-	pcmData, err := labs.sendRequest(model, request)
+	pcmData, err := labs.sendRequest(request.VoiceID, request)
 	if err != nil {
 		return nil, response.Err(err)
 	}

@@ -1,3 +1,5 @@
+//go:build !cli && !clib
+
 package main
 
 import (
@@ -16,6 +18,7 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/enums/OutputType"
 	"nstudio/app/tts"
+	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/engine/piper/native"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
@@ -1042,6 +1045,79 @@ func (app *App) GetStatus() string {
 
 func (app *App) IsPiperGPUAvailable() bool {
 	return native.IsGPUAvailable()
+}
+
+func (app *App) PiperFetchAvailableModels() string {
+	status.Set(status.Loading, "Fetching Piper models")
+	models, err := piper.FetchAvailableModels()
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to fetch Piper models",
+			Detail:  err.Error(),
+		})
+		status.Set(status.Ready, "")
+		return "[]"
+	}
+
+	jsonData, err := json.Marshal(models)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to marshal Piper models",
+			Detail:  err.Error(),
+		})
+		status.Set(status.Ready, "")
+		return "[]"
+	}
+
+	status.Set(status.Ready, "")
+	return string(jsonData)
+}
+
+func (app *App) PiperDownloadModel(modelJSON string) string {
+	var model piper.AvailableModel
+	if err := json.Unmarshal([]byte(modelJSON), &model); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Invalid model payload",
+			Detail:  err.Error(),
+		})
+		return err.Error()
+	}
+
+	status.Set(status.Loading, "Downloading "+model.Name)
+	if err := piper.DownloadModel(model); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to download model " + model.Name,
+			Detail:  err.Error(),
+		})
+		status.Set(status.Ready, "")
+		return err.Error()
+	}
+
+	modelManager.ReloadModels()
+	response.Success(util.MessageData{
+		Summary: "Downloaded " + model.Name,
+	})
+	status.Set(status.Ready, "")
+	return ""
+}
+
+func (app *App) PiperDeleteModel(modelID string) string {
+	status.Set(status.Loading, "Deleting Piper model")
+	if err := piper.DeleteModel(modelID); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to delete model " + modelID,
+			Detail:  err.Error(),
+		})
+		status.Set(status.Ready, "")
+		return err.Error()
+	}
+
+	modelManager.ReloadModels()
+	response.Success(util.MessageData{
+		Summary: "Deleted " + modelID,
+	})
+	status.Set(status.Ready, "")
+	return ""
 }
 
 //</editor-fold>

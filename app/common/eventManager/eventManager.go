@@ -3,8 +3,6 @@ package eventManager
 import (
 	"context"
 	"sync"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 /* Currently used Events
@@ -40,12 +38,6 @@ func (manager *EventManager) SubscribeToEvent(eventName string, callback func(da
 	manager.mutex.Lock()
 	defer manager.mutex.Unlock()
 	manager.callbacks[eventName] = callback
-}
-
-func (manager *EventManager) EmitEvent(eventName string, data interface{}) {
-	if manager.context != nil {
-		runtime.EventsEmit(manager.context, eventName, data)
-	}
 }
 
 func (manager *EventManager) TriggerEvent(eventName string, data interface{}) {

@@ -18,6 +18,8 @@ func GetEngines(context echo.Context) error {
 		engineList = append(engineList, map[string]interface{}{
 			"id":     engine.ID,
 			"name":   engine.Name,
+			"type":   engine.Type,
+			"tags":   engine.Tags,
 			"models": len(engine.Models),
 		})
 	}
@@ -117,6 +119,8 @@ func GetAllVoices(context echo.Context) error {
 	type EngineWithModels struct {
 		ID     string            `json:"id"`
 		Name   string            `json:"name"`
+		Type   engine.EngineType `json:"type"`
+		Tags   []string          `json:"tags"`
 		Models []ModelWithVoices `json:"models"`
 	}
 
@@ -141,6 +145,8 @@ func GetAllVoices(context echo.Context) error {
 		engineList = append(engineList, EngineWithModels{
 			ID:     eng.ID,
 			Name:   eng.Name,
+			Type:   eng.Type,
+			Tags:   eng.Tags,
 			Models: modelList,
 		})
 	}

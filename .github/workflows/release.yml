@@ -43,7 +43,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -97,8 +97,57 @@ jobs:
         run: .\scripts\build-libpiper.ps1
         shell: pwsh
 
-      - name: Build GUI application with NSIS installer
-        run: wails build -clean -platform windows/amd64 -nsis
+      - name: Save piper native files before clean build
+        run: |
+          # wails build -clean wipes build/bin/, including the piper DLLs that
+          # NSIS needs. Stash them in a temp dir and restore after the clean build.
+          $stash = Join-Path $env:RUNNER_TEMP "piper-native"
+          New-Item -ItemType Directory -Force -Path $stash | Out-Null
+          foreach ($name in @("libpiper.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll", "libpiper_directml.dll", "DirectML.dll")) {
+            $src = Join-Path "build\bin" $name
+            if (Test-Path $src) { Copy-Item $src -Destination $stash -Force }
+          }
+          if (Test-Path "build\bin\espeak-ng-data") {
+            Copy-Item "build\bin\espeak-ng-data" -Destination $stash -Recurse -Force
+          }
+          Get-ChildItem $stash | ForEach-Object { Write-Host "  stashed: $($_.Name)" }
+        shell: pwsh
+
+      - name: Build GUI application (no installer yet)
+        run: wails build -clean -platform windows/amd64
+
+      - name: Restore piper native files into build/bin
+        run: |
+          $stash = Join-Path $env:RUNNER_TEMP "piper-native"
+          if (-not (Test-Path $stash)) {
+            Write-Error "Stash directory missing: $stash"
+            exit 1
+          }
+          Copy-Item (Join-Path $stash "*") -Destination "build\bin" -Recurse -Force
+          # Sanity-check that NSIS's required files are now in place.
+          foreach ($required in @("libpiper.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll", "espeak-ng-data")) {
+            $path = Join-Path "build\bin" $required
+            if (-not (Test-Path $path)) {
+              Write-Error "Missing after restore: $path"
+              exit 1
+            }
+          }
+        shell: pwsh
+
+      - name: Build NSIS installer
+        run: |
+          $exe = Resolve-Path "build\bin\narration_studio.exe"
+          Push-Location "build\windows\installer"
+          try {
+            makensis "/DARG_WAILS_AMD64_BINARY=$($exe.Path)" project.nsi
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "makensis failed with exit code $LASTEXITCODE"
+              exit 1
+            }
+          } finally {
+            Pop-Location
+          }
+        shell: pwsh
 
       - name: Prepare artifacts
         run: |
@@ -134,6 +183,65 @@ jobs:
         run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe" --clobber
         shell: pwsh
 
+  build-windows-dll:
+    needs: [resolve-version]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Ensure MinGW build tools
+        run: |
+          # Windows runners have MinGW gcc at C:\mingw64\bin and CMake pre-installed.
+          # Just ensure ninja is available (install via choco if missing).
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          }
+          Write-Host "gcc:   $((Get-Command gcc).Source)"
+          Write-Host "g++:   $((Get-Command g++).Source)"
+          Write-Host "cmake: $((Get-Command cmake).Source)"
+          Write-Host "ninja: $((Get-Command ninja).Source)"
+        shell: pwsh
+
+      - name: Build piper native DLLs
+        run: .\scripts\build-libpiper.ps1
+        shell: pwsh
+
+      - name: Build nstudio DLL bundle
+        run: .\scripts\build-dll.ps1 -Clean
+        shell: pwsh
+
+      - name: Package DLL zip
+        run: |
+          $zipName = "Narration-Studio-${{ needs.resolve-version.outputs.version }}-Windows-DLL.zip"
+          $outDir = "build\bin\dll"
+          if (-not (Test-Path $outDir)) {
+            Write-Error "DLL output directory not found: $outDir"
+            exit 1
+          }
+          Compress-Archive -Path "$outDir\*" -DestinationPath "build\bin\$zipName" -Force
+          Write-Host "Created: build\bin\$zipName"
+          Get-ChildItem "build\bin\$zipName" | Select-Object Name, Length
+        shell: pwsh
+
+      - name: Upload DLL zip as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nstudio-dll-${{ needs.resolve-version.outputs.version }}
+          path: build/bin/Narration-Studio-${{ needs.resolve-version.outputs.version }}-Windows-DLL.zip
+          if-no-files-found: error
+
+      - name: Upload DLL zip to release
+        if: needs.resolve-version.outputs.should_upload == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/Narration-Studio-${{ needs.resolve-version.outputs.version }}-Windows-DLL.zip" --clobber
+        shell: pwsh
+
   build-macos:
     needs: [resolve-version]
     runs-on: macos-latest
@@ -143,7 +251,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -210,7 +318,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -265,7 +373,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -320,7 +428,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
 
       - name: Install system dependencies
         run: |

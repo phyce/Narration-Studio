@@ -12,6 +12,8 @@
 		"@codemirror/rangeset": "^0.19.9",
 		"@guolao/vue-monaco-editor": "^1.5.1",
 		"@vueuse/core": "^10.9.0",
+		"@wailsio/runtime": "^3.0.0-alpha.79",
+		"monaco-editor": "0.48.0",
 		"primeicons": "^7.0.0",
 		"primevue": "^3.52.0",
 		"vue": "^3.2.37"

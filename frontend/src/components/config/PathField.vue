@@ -4,7 +4,7 @@ import InputGroup from 'primevue/inputgroup';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Tooltip from 'primevue/tooltip';
-import {SelectDirectory, SelectFile} from '../../../wailsjs/go/main/App';
+import {SelectDirectory, SelectFile} from '../../../bindings/nstudio/app';
 import type {ConfigFieldMetadata} from '../../interfaces/config';
 
 interface Props {

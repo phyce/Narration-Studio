@@ -3,8 +3,8 @@ import '../../css/pages/settings.css';
 
 import Button from "primevue/button";
 import {onBeforeMount, ref, watch} from "vue";
-import {GetConfigSchema, GetSettings, SaveSettings} from "../../../wailsjs/go/main/App";
-import {config as configuration} from "../../../wailsjs/go/models";
+import {GetConfigSchema, GetSettings, SaveSettings} from "../../../bindings/nstudio/app";
+import * as configuration from "../../../bindings/nstudio/app/config/models";
 import type {ConfigField, ConfigSchema} from "../../interfaces/config";
 import RecursiveField from "../config/RecursiveField.vue";
 import configBase = configuration.Base;

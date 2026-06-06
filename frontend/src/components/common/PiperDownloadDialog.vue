@@ -9,8 +9,8 @@ import {
 	PiperDeleteModel,
 	PiperDownloadModel,
 	PiperFetchAvailableModels,
-} from '../../../wailsjs/go/main/App';
-import {EventsOn, EventsOff} from '../../../wailsjs/runtime/runtime';
+} from '../../../bindings/nstudio/app';
+import {Events} from '@wailsio/runtime';
 
 interface AvailableModel {
 	id: string;
@@ -97,7 +97,8 @@ watch(() => props.visible, (v) => {
 });
 
 onMounted(() => {
-	EventsOn('piper.download.progress', (p: { modelId: string; percent: number; done: boolean }) => {
+	Events.On('piper.download.progress', (event: any) => {
+		const p = event.data as { modelId: string; percent: number; done: boolean };
 		// On done, pin to 100 — onDownload's cleanup removes it once the Promise resolves.
 		// Deleting here would briefly show 0% before the button label flips back to "Download".
 		progress[p.modelId] = p.done ? 100 : p.percent;
@@ -105,7 +106,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-	EventsOff('piper.download.progress');
+	Events.Off('piper.download.progress');
 });
 </script>
 

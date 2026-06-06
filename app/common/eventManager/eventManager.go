@@ -1,21 +1,12 @@
 package eventManager
 
 import (
-	"context"
 	"sync"
 )
-
-/* Currently used Events
-notification.send - send a notification to the user
-notification.enabled - enable/disable notifications
-app.refresh - reload current view
-status - current progress
-*/
 
 type EventManager struct {
 	mutex     sync.RWMutex
 	callbacks map[string]func(data interface{})
-	context   context.Context
 }
 
 var instance *EventManager
@@ -28,10 +19,6 @@ func GetInstance() *EventManager {
 		}
 	})
 	return instance
-}
-
-func (manager *EventManager) Initialize(context context.Context) {
-	manager.context = context
 }
 
 func (manager *EventManager) SubscribeToEvent(eventName string, callback func(data interface{})) {

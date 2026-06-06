@@ -6,7 +6,17 @@ import Aura from './components/prime/aura';
 import ToastService from 'primevue/toastservice';
 import Tooltip from 'primevue/tooltip';
 //@ts-ignore
-import {install as VueMonacoEditorPlugin} from '@guolao/vue-monaco-editor'
+import {install as VueMonacoEditorPlugin, loader} from '@guolao/vue-monaco-editor'
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+//@ts-ignore
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+
+(self as any).MonacoEnvironment = {
+	getWorker() {
+		return new EditorWorker();
+	}
+};
+loader.config({monaco});
 
 const app = createApp(App);
 app.use(PrimeVue, {
@@ -14,10 +24,6 @@ app.use(PrimeVue, {
 	pt: Aura
 });
 app.use(ToastService);
-app.use(VueMonacoEditorPlugin, {
-	paths: {
-		vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs'
-	},
-});
+app.use(VueMonacoEditorPlugin);
 app.directive('tooltip', Tooltip);
 app.mount('#app');

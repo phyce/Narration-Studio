@@ -25,11 +25,11 @@ import {
 	ReloadVoicePacks,
 	SaveSettings,
 	SelectFile,
-} from '../../../wailsjs/go/main/App';
-import {EventsOff, EventsOn} from '../../../wailsjs/runtime/runtime';
+} from '../../../bindings/nstudio/app';
+import {Events} from '@wailsio/runtime';
 import type {ConfigField, ConfigSchema} from '../../interfaces/config';
 import RecursiveField from '../config/RecursiveField.vue';
-import {config as configuration} from '../../../wailsjs/go/models';
+import * as configuration from '../../../bindings/nstudio/app/config/models';
 import configBase = configuration.Base;
 
 interface EngineAction {
@@ -409,18 +409,19 @@ async function saveSettings() {
 onMounted(() => {
 	loadData();
 
-	EventsOn('engine.download.progress', (progress: { engineID: string; percent: number; done: boolean }) => {
+	Events.On('engine.download.progress', (event: any) => {
+		const progress = event.data as { engineID: string; percent: number; done: boolean };
 		installProgress[progress.engineID] = progress.done ? 100 : progress.percent;
 	});
 
-	EventsOn('engines.updated', () => {
+	Events.On('engines.updated', () => {
 		loadData();
 	});
 });
 
 onBeforeUnmount(() => {
-	EventsOff('engine.download.progress');
-	EventsOff('engines.updated');
+	Events.Off('engine.download.progress');
+	Events.Off('engines.updated');
 });
 </script>
 

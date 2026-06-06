@@ -1,0 +1,36 @@
+version: '3'
+
+info:
+  companyName: "phyce.dev"
+  productName: "Narration Studio"
+  productIdentifier: "studio.narration.app"
+  description: "All-in-on TTS solution"
+  version: "0.17.0"
+  copyright: "Copyright phyce.dev"
+  comments: "Built using Wails (https://wails.io)"
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend
+      - bin
+      - build
+    file:
+      - .DS_Store
+      - .gitignore
+    watched_extension:
+      - "*.go"
+    git: true
+  executes:
+    - cmd: npm --prefix frontend run dev -- --port 9245 --strictPort
+      type: background
+      delay_next: 2000
+    - cmd: go build -o build/bin/nstudio-dev.exe .
+      type: blocking
+    - cmd: .\build\bin\nstudio-dev.exe
+      type: primary

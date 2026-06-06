@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {config as configuration} from "../../../wailsjs/go/models";
+import * as configuration from "../../../bindings/nstudio/app/config/models";
 import {onMounted, reactive, ref} from "vue";
-import {GetSettings} from "../../../wailsjs/go/main/App";
+import {GetSettings} from "../../../bindings/nstudio/app";
 import configBase = configuration.Base;
 
 const config = reactive<configBase>({} as configBase);

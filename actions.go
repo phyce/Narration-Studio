@@ -31,7 +31,7 @@ import (
 	"strings"
 	"time"
 
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //This is the entry point for all actions coming from the frontend
@@ -307,13 +307,12 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 		}
 	}
 
-	directory, err := wailsRuntime.OpenDirectoryDialog(
-		app.context,
-		wailsRuntime.OpenDialogOptions{
-			DefaultDirectory: fullPath,
-			Title:            "Select Location",
-		},
-	)
+	directory, err := application.Get().Dialog.OpenFile().
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		SetDirectory(fullPath).
+		SetTitle("Select Location").
+		PromptForSingleSelection()
 
 	if err != nil {
 		response.Error(util.MessageData{
@@ -352,26 +351,15 @@ func (app *App) SelectFile(defaultFile string) string {
 
 	// On macOS, file filters prevent selecting files without extensions
 	// so we skip filters entirely on darwin
-	var dialogOptions wailsRuntime.OpenDialogOptions
-	if runtime.GOOS == "darwin" {
-		dialogOptions = wailsRuntime.OpenDialogOptions{
-			DefaultDirectory: startDir,
-			Title:            "Select File",
-		}
-	} else {
-		dialogOptions = wailsRuntime.OpenDialogOptions{
-			DefaultDirectory: startDir,
-			Title:            "Select File",
-			Filters: []wailsRuntime.FileFilter{
-				{
-					DisplayName: "All Files",
-					Pattern:     "*",
-				},
-			},
-		}
+	fileDialog := application.Get().Dialog.OpenFile().
+		CanChooseFiles(true).
+		SetDirectory(startDir).
+		SetTitle("Select File")
+	if runtime.GOOS != "darwin" {
+		fileDialog = fileDialog.AddFilter("All Files", "*")
 	}
 
-	file, err := wailsRuntime.OpenFileDialog(app.context, dialogOptions)
+	file, err := fileDialog.PromptForSingleSelection()
 
 	if err != nil {
 		response.Error(util.MessageData{

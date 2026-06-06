@@ -8,7 +8,7 @@ import Checkbox from 'primevue/checkbox';
 import {computed, onMounted, ref} from "vue"
 import {Engine, Model, Voice} from '../interfaces/engine';
 import {useLocalStorage} from '@vueuse/core';
-import {GetEngines, GetModelVoices, Play} from '../../../wailsjs/go/main/App';
+import {GetEngines, GetModelVoices, Play} from '../../../bindings/nstudio/app';
 import {formatToTreeSelectData} from "../../util/util";
 import TreeSelect from "primevue/treeselect";
 import Dropdown from "primevue/dropdown";

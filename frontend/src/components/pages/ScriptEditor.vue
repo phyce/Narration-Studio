@@ -6,10 +6,10 @@ import InputGroup from 'primevue/inputgroup';
 import InputText from 'primevue/inputtext';
 import Editor from "../common/Editor.vue";
 import ProfileSelector from '../common/ProfileSelector.vue';
-import {GetSettings, ProcessScript, SaveSettings, SelectDirectory} from '../../../wailsjs/go/main/App';
+import {GetSettings, ProcessScript, SaveSettings, SelectDirectory} from '../../../bindings/nstudio/app';
 import {useLocalStorage} from "@vueuse/core";
 import {onMounted, ref} from "vue";
-import {config as configuration} from "../../../wailsjs/go/models";
+import * as configuration from "../../../bindings/nstudio/app/config/models";
 import configBase = configuration.Base;
 
 const text = useLocalStorage<string>('scriptText', 'user: hello world');

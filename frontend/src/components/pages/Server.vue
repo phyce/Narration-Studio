@@ -16,7 +16,7 @@ import {
 	SelectFile,
 	StartDaemonServer,
 	StopDaemonServer
-} from '../../../wailsjs/go/main/App';
+} from '../../../bindings/nstudio/app';
 import {eventManager} from '../../util/eventManager';
 import {ServerStatus} from "../interfaces/server";
 

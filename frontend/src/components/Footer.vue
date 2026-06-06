@@ -3,7 +3,7 @@ import '../css/footer.css';
 import {Status, StatusDisplayNames} from "./enums/status";
 import {computed, onMounted, onUnmounted, ref} from "vue";
 import {eventManager} from "../util/eventManager";
-import {GetStatus} from "../../wailsjs/go/main/App";
+import {GetStatus} from "../../bindings/nstudio/app";
 
 const status = ref<number>(Status.Unknown);
 const title = ref<string>("");

@@ -12,7 +12,7 @@
 </template>
 
 <script lang="ts" setup>
-import * as monaco from 'monaco-editor';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import {defineEmits, defineProps, onUnmounted, ref, shallowRef, watch} from 'vue';
 
 const props = defineProps<{

@@ -19,12 +19,12 @@ import {
 	Play,
 	SaveProfileSettings,
 	SaveProfileVoices
-} from '../../../wailsjs/go/main/App';
+} from '../../../bindings/nstudio/app';
 import {CharacterVoice, Engine, ProfileSettings, Voice} from '../interfaces/engine';
 import Checkbox from 'primevue/checkbox';
 import Listbox from 'primevue/listbox';
 import TreeSelect from "primevue/treeselect";
-import {TreeNode} from "primevue/treenode";
+import type {TreeNode} from "primevue/treenode";
 import {useLocalStorage} from '@vueuse/core';
 
 interface Profile {

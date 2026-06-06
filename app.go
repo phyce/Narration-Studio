@@ -4,29 +4,22 @@ package main
 
 import (
 	"context"
-	"nstudio/app/common/eventManager"
 	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
 	"nstudio/app/tts/modelManager"
 	"os"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-type App struct {
-	context context.Context
-}
+type App struct{}
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
-func (app *App) startup(ctx context.Context) {
-	app.context = ctx
-	eventManager.GetInstance().Initialize(ctx)
-
+func (app *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	if err := initializeApp(""); err != nil {
 		issue.Panic("Failed to initialize app", err)
 	}
@@ -35,6 +28,7 @@ func (app *App) startup(ctx context.Context) {
 	registerEngines()
 	response.Initialize()
 	status.Set(status.Ready, "")
+	return nil
 }
 
 func clearConsole() error {

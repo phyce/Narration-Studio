@@ -4,7 +4,7 @@ import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
-import {CreateProfile, DeleteProfile, GetProfiles} from '../../../wailsjs/go/main/App';
+import {CreateProfile, DeleteProfile, GetProfiles} from '../../../bindings/nstudio/app';
 
 interface Profile {
 	id: string;

@@ -1,4 +1,4 @@
-import {EventsEmit, EventsOn} from '../../wailsjs/runtime';
+import {Events} from '@wailsio/runtime';
 
 class EventManager {
 	private static instance: EventManager;
@@ -16,7 +16,7 @@ class EventManager {
 	}
 
 	subscribe(eventName: string, callback: (...data: any[]) => void): () => void {
-		const unsubscribe = EventsOn(eventName, callback);
+		const unsubscribe = Events.On(eventName, (event: any) => callback(event?.data));
 
 		if (!this.subscriptions[eventName]) {
 			this.subscriptions[eventName] = [];
@@ -45,7 +45,7 @@ class EventManager {
 	}
 
 	emit(eventName: string, data?: any): void {
-		EventsEmit(eventName, data);
+		Events.Emit(eventName, data);
 	}
 }
 

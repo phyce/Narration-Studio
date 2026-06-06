@@ -3,11 +3,11 @@
 package eventManager
 
 import (
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 func (manager *EventManager) EmitEvent(eventName string, data interface{}) {
-	if manager.context != nil {
-		runtime.EventsEmit(manager.context, eventName, data)
+	if app := application.Get(); app != nil {
+		app.Event.Emit(eventName, data)
 	}
 }

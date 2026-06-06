@@ -6,6 +6,14 @@ export function CreateProfile(arg1:string,arg2:string,arg3:string):Promise<strin
 
 export function DeleteProfile(arg1:string):Promise<void>;
 
+export function EnginePackFetchAvailable():Promise<string>;
+
+export function EnginePackImport(arg1:string):Promise<string>;
+
+export function EnginePackInstall(arg1:string):Promise<string>;
+
+export function EnginePackUninstall(arg1:string):Promise<string>;
+
 export function EventSubscribe(arg1:string,arg2:any):Promise<void>;
 
 export function EventTrigger(arg1:string,arg2:any):Promise<void>;

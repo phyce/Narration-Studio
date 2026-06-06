@@ -48,9 +48,10 @@ type Engine struct {
 	Type   EngineType       `json:"type"`
 	Tags   []string         `json:"tags"`
 	Models map[string]Model `json:"models"`
+
+	NewInstance func() Base `json:"-"`
 }
 
-// SortEngines sorts a slice of engines alphabetically by Name.
 func SortEngines(engines []Engine) {
 	sort.Slice(engines, func(i, j int) bool {
 		return engines[i].Name < engines[j].Name

@@ -155,7 +155,11 @@ func createModelPool(engineID, modelID string) (*ModelPool, error) {
 		case string(Engines.Gemini):
 			engine = &gemini.Gemini{}
 		default:
-			return nil, fmt.Errorf("unknown engine: %s", engineID)
+			engineEntry, exists := manager.Engines[engineID]
+			if !exists || engineEntry.Engine.NewInstance == nil {
+				return nil, fmt.Errorf("unknown engine: %s", engineID)
+			}
+			engine = engineEntry.Engine.NewInstance()
 		}
 
 		if err := engine.Initialize(); err != nil {
@@ -311,6 +315,27 @@ func RegisterEngine(baseEngine tts.Engine) error {
 		RegisterModel(model)
 	}
 
+	return nil
+}
+
+func UnregisterEngine(engineID string) error {
+	manager.Lock()
+	defer manager.Unlock()
+
+	engineEntry, exists := manager.Engines[engineID]
+	if !exists {
+		return nil
+	}
+
+	for modelID, pool := range engineEntry.Models {
+		for _, instance := range pool.Instances {
+			if err := instance.Stop(modelID); err != nil {
+				response.Err(err)
+			}
+		}
+	}
+
+	delete(manager.Engines, engineID)
 	return nil
 }
 

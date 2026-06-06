@@ -23,6 +23,12 @@
 				"label": "Debug Mode",
 				"description": "Enable debug logging and minimized startup"
 			},
+			"localEnginePacksPath": {
+				"label": "Local Engine Packs Folder",
+				"type": "path",
+				"pathType": "directory",
+				"description": "A folder where engine packs should be searched locally."
+			},
 			"audioCache": {
 				"label": "Audio Cache",
 				"description": "Cache generated audio",

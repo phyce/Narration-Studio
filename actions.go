@@ -20,6 +20,7 @@ import (
 	"nstudio/app/tts"
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/engine/piper/native"
+	"nstudio/app/tts/engine/python/pack"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 	"os"
@@ -1122,12 +1123,170 @@ func (app *App) PiperDeleteModel(modelID string) string {
 
 //</editor-fold>
 
+// <editor-fold desc="Engine Packs">
+
+func (app *App) EnginePackFetchAvailable() string {
+	status.Set(status.Loading, "Fetching engine packs")
+	defer status.Set(status.Ready, "")
+
+	var availablePacks []pack.AvailablePack
+	var firstErr error
+
+	if localPath := config.GetSettings().LocalEnginePacksPath; localPath != "" {
+		localPacks, err := pack.FetchAvailableFromPath(localPath)
+		if err != nil {
+			firstErr = err
+		}
+		availablePacks = append(availablePacks, localPacks...)
+	}
+
+	remotePacks, err := pack.FetchAvailable()
+	if err != nil && firstErr == nil {
+		firstErr = err
+	}
+	availablePacks = append(availablePacks, remotePacks...)
+
+	if len(availablePacks) == 0 && firstErr != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to fetch engine packs",
+			Detail:  firstErr.Error(),
+		})
+		return "[]"
+	}
+
+	jsonData, err := json.Marshal(availablePacks)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to marshal engine pack list",
+			Detail:  err.Error(),
+		})
+		return "[]"
+	}
+	return string(jsonData)
+}
+
+func (app *App) EnginePackInstall(packJSON string) string {
+	var availablePack pack.AvailablePack
+	if err := json.Unmarshal([]byte(packJSON), &availablePack); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Invalid engine pack payload",
+			Detail:  err.Error(),
+		})
+		return err.Error()
+	}
+
+	status.Set(status.Loading, "Installing "+availablePack.Manifest.Name)
+	defer status.Set(status.Ready, "")
+
+	if err := pack.Install(availablePack); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to install " + availablePack.Manifest.Name,
+			Detail:  err.Error(),
+		})
+		return err.Error()
+	}
+
+	response.Success(util.MessageData{
+		Summary: "Installed " + availablePack.Manifest.Name,
+	})
+	return ""
+}
+
+func (app *App) EnginePackUninstall(engineID string) string {
+	status.Set(status.Loading, "Uninstalling "+engineID)
+	defer status.Set(status.Ready, "")
+
+	if err := pack.Uninstall(engineID); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to uninstall " + engineID,
+			Detail:  err.Error(),
+		})
+		return err.Error()
+	}
+
+	response.Success(util.MessageData{
+		Summary: "Uninstalled " + engineID,
+	})
+	return ""
+}
+
+func (app *App) EnginePackImport(filePath string) string {
+	if filePath == "" {
+		return ""
+	}
+
+	if !strings.EqualFold(filepath.Ext(filePath), ".nstudio") {
+		response.Error(util.MessageData{
+			Summary: "Not an engine pack",
+			Detail:  "Pick a .nstudio file to import.",
+		})
+		return "not a .nstudio file"
+	}
+
+	if _, err := os.Stat(filePath); err != nil {
+		response.Error(util.MessageData{
+			Summary: "File not found",
+			Detail:  err.Error(),
+		})
+		return err.Error()
+	}
+
+	manifest, err := pack.ReadManifestFromBundle(filePath)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Invalid engine pack",
+			Detail:  err.Error(),
+		})
+		return err.Error()
+	}
+
+	if manifest.OS != "" && manifest.OS != runtime.GOOS {
+		detail := fmt.Sprintf("This pack is for %s, but you're on %s.", manifest.OS, runtime.GOOS)
+		response.Error(util.MessageData{Summary: "Wrong platform", Detail: detail})
+		return detail
+	}
+
+	if manifest.Arch != "" && manifest.Arch != runtime.GOARCH {
+		detail := fmt.Sprintf("This pack is for %s, but you're on %s.", manifest.Arch, runtime.GOARCH)
+		response.Error(util.MessageData{Summary: "Wrong architecture", Detail: detail})
+		return detail
+	}
+
+	var bundleSize int64
+	if info, statErr := os.Stat(filePath); statErr == nil {
+		bundleSize = info.Size()
+	}
+
+	status.Set(status.Loading, "Importing "+manifest.Name)
+	defer status.Set(status.Ready, "")
+
+	importedPack := pack.AvailablePack{
+		Manifest:   *manifest,
+		BundleURL:  filePath,
+		BundleSize: bundleSize,
+	}
+	if err := pack.Install(importedPack); err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to import " + manifest.Name,
+			Detail:  err.Error(),
+		})
+		return err.Error()
+	}
+
+	response.Success(util.MessageData{
+		Summary: "Imported " + manifest.Name,
+	})
+	return ""
+}
+
+//</editor-fold>
+
 // <editor-fold desc="Events">
 func (app *App) EventSubscribe(eventName string, handler func(data interface{})) {
 	eventManager.GetInstance().SubscribeToEvent(eventName, handler)
 }
 
-func (a *App) EventTrigger(eventName string, data interface{}) {
+func (app *App) EventTrigger(eventName string, data interface{}) {
 	eventManager.GetInstance().TriggerEvent(eventName, data)
 }
 

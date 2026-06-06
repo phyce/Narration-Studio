@@ -44,9 +44,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 					))
 				}
 
-				status.Set(status.Playing, "")
-				audio.PlayRawAudioBytes(rawAudio)
-				status.Set(status.Ready, "")
+				playEngineOutput(rawAudio)
 				return nil
 			}
 		}
@@ -88,7 +86,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 				return response.Err(err)
 			}
 
-			audio.PlayRawAudioBytes(rawAudio)
+			playEngineOutput(rawAudio)
 
 			if cacheManager != nil && cacheManager.IsEnabled() {
 				go func(data []byte) {
@@ -226,7 +224,26 @@ func preparePayload(message util.CharacterMessage) ([]byte, error) {
 			},
 		}
 		return json.Marshal(payload)
-	}
 
-	return nil, response.NewWarn(fmt.Sprintf("Unsupported engine: %s", message.Voice.Engine))
+	default:
+		return json.Marshal(map[string]interface{}{
+			"voice": message.Voice.Voice,
+			"text":  message.Text,
+		})
+	}
+}
+
+// Python-pack engines return self-describing WAV at varying sample rates;
+// playing those as fixed-rate raw PCM would slow them down, so honor the
+// embedded rate and fall back to raw PCM only when the bytes are not WAV.
+func playEngineOutput(audioData []byte) {
+	status.Set(status.Playing, "")
+	isWAV := len(audioData) >= 12 && string(audioData[0:4]) == "RIFF" && string(audioData[8:12]) == "WAVE"
+	if isWAV {
+		if err := audio.PlayWAVBytes(audioData); err == nil {
+			return
+		}
+	}
+	audio.PlayRawAudioBytes(audioData)
+	status.Set(status.Ready, "")
 }

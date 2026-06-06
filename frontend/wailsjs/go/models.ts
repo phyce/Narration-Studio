@@ -342,6 +342,7 @@ export namespace config {
 	    debug: boolean;
 	    audioCache?: AudioCacheSettings;
 	    server?: ServerSettings;
+	    localEnginePacksPath?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -354,6 +355,7 @@ export namespace config {
 	        this.debug = source["debug"];
 	        this.audioCache = this.convertValues(source["audioCache"], AudioCacheSettings);
 	        this.server = this.convertValues(source["server"], ServerSettings);
+	        this.localEnginePacksPath = source["localEnginePacksPath"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

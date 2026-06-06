@@ -15,6 +15,8 @@ import (
 	"nstudio/app/tts/engine/piper/native"
 	"nstudio/app/tts/engine/google"
 	"nstudio/app/tts/engine/gemini"
+	"nstudio/app/tts/engine/python"
+	"nstudio/app/tts/engine/python/pack"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 	"path/filepath"
@@ -158,6 +160,16 @@ func registerEngines() {
 		if err != nil {
 			response.Err(err)
 		}
+	}
+
+	if installedPacks, err := pack.ScanInstalled(); err == nil {
+		for _, installedPack := range installedPacks {
+			if err := modelManager.RegisterEngine(python.ToEngine(installedPack.Manifest, installedPack.BundlePath)); err != nil {
+				response.Err(err)
+			}
+		}
+	} else {
+		response.Err(err)
 	}
 
 	modelManager.ReloadModels()

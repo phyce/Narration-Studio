@@ -12,6 +12,15 @@
 	border-bottom: 1px solid #4a4a4a;
 }
 
+.voice-packs__sidebar__toolbar--row {
+	@apply items-center;
+}
+
+.voice-packs__filter-label {
+	@apply text-xs cursor-pointer select-none;
+	color: var(--text-color-secondary);
+}
+
 .voice-packs__toolbar-btn {
 	@apply flex-1 whitespace-nowrap;
 }
@@ -59,6 +68,25 @@
 
 .voice-packs__engine-card__tags {
 	@apply flex flex-wrap gap-1 mt-1;
+}
+
+.voice-packs__engine-card--available {
+	opacity: 0.78;
+	border-style: dashed;
+}
+
+.voice-packs__engine-card--available:hover {
+	opacity: 1;
+}
+
+.voice-packs__engine-card__status {
+	color: var(--text-color-secondary);
+	font-size: 0.85rem;
+}
+
+.voice-packs__engine-card__progress {
+	@apply mt-1;
+	height: 4px !important;
 }
 
 /* Tiny pill tags */
@@ -138,4 +166,50 @@
 .voice-packs__settings-none {
 	color: var(--text-color-secondary);
 	font-style: italic;
+}
+
+/* Pack detail (available-but-not-installed engine) */
+.voice-packs__pack-detail {
+	@apply flex flex-col gap-3 mt-2 p-3 rounded;
+	background: #343434;
+	border: 1px solid #4a4a4a;
+}
+
+.voice-packs__pack-detail__title {
+	@apply text-lg font-bold m-0;
+	color: #f0a060;
+}
+
+.voice-packs__pack-detail__description {
+	@apply text-sm m-0;
+	color: var(--text-color);
+}
+
+.voice-packs__pack-detail__meta {
+	@apply grid gap-1 text-xs;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	color: var(--text-color-secondary);
+}
+
+.voice-packs__pack-detail__meta strong {
+	color: var(--text-color);
+}
+
+.voice-packs__pack-detail__models h4 {
+	@apply text-sm font-semibold mb-1 mt-2;
+	color: var(--text-color);
+}
+
+.voice-packs__pack-detail__model {
+	@apply flex items-center gap-2 py-1;
+	border-bottom: 1px solid #3a3a3a;
+}
+
+.voice-packs__pack-detail__model:last-child {
+	border-bottom: none;
+}
+
+.voice-packs__pack-detail__model-name {
+	@apply flex items-center gap-2 text-sm;
+	color: var(--text-color);
 }

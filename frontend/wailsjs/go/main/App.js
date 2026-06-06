@@ -10,6 +10,22 @@ export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
+export function EnginePackFetchAvailable() {
+  return window['go']['main']['App']['EnginePackFetchAvailable']();
+}
+
+export function EnginePackImport(arg1) {
+  return window['go']['main']['App']['EnginePackImport'](arg1);
+}
+
+export function EnginePackInstall(arg1) {
+  return window['go']['main']['App']['EnginePackInstall'](arg1);
+}
+
+export function EnginePackUninstall(arg1) {
+  return window['go']['main']['App']['EnginePackUninstall'](arg1);
+}
+
 export function EventSubscribe(arg1, arg2) {
   return window['go']['main']['App']['EventSubscribe'](arg1, arg2);
 }

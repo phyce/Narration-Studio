@@ -69,34 +69,51 @@ func PlayPCMAudioBytes(audioClip []byte) error {
 }
 
 func PlayRawAudioBytes(audioClip []byte) {
+	PlayRawAudioBytesAt(audioClip, 22050)
+}
+
+func PlayRawAudioBytesAt(audioClip []byte, sourceSampleRate int) {
 	done := make(chan struct{})
 	audioDataReader := bytes.NewReader(audioClip)
 
-	streamer := beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
-		for i := range samples {
+	streamer := beep.StreamerFunc(func(samples [][2]float64) (filledCount int, ok bool) {
+		for index := range samples {
 			if audioDataReader.Len() < 2 {
-				return i, false
+				return index, false
 			}
 			var sample int16
 
 			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
 			if err != nil {
-				return i, false
+				return index, false
 			}
-			flSample := float64(sample) / (1 << 15)
-			samples[i][0] = flSample
-			samples[i][1] = flSample
+			floatSample := float64(sample) / (1 << 15)
+			samples[index][0] = floatSample
+			samples[index][1] = floatSample
 		}
 		return len(samples), true
 	})
 
-	resampledStreamer := beep.Resample(4, 22050, 48000, streamer)
+	resampledStreamer := beep.Resample(4, beep.SampleRate(sourceSampleRate), 48000, streamer)
 
 	speaker.Play(beep.Seq(resampledStreamer, beep.Callback(func() {
 		close(done)
 	})))
 
 	<-done
+}
+
+func PlayWAVBytes(wavData []byte) error {
+	clip, err := NewAudioFromWAV(wavData)
+	if err != nil {
+		return err
+	}
+	pcm, err := clip.ToPCM()
+	if err != nil {
+		return err
+	}
+	PlayRawAudioBytesAt(pcm, clip.Metadata.SampleRate)
+	return nil
 }
 
 func PlayFLACAudioBytes(audioClip []byte) error {

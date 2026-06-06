@@ -14,6 +14,13 @@ func PlayPCMAudioBytes(audioClip []byte) error {
 func PlayRawAudioBytes(audioClip []byte) {
 }
 
+func PlayRawAudioBytesAt(audioClip []byte, sourceSampleRate int) {
+}
+
+func PlayWAVBytes(wavData []byte) error {
+	return fmt.Errorf("audio playback not available in DLL mode")
+}
+
 func PlayFLACAudioBytes(audioClip []byte) error {
 	return fmt.Errorf("audio playback not available in DLL mode")
 }

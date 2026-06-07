@@ -166,6 +166,11 @@ function isExpandable(chain: Chain): boolean {
 	return chain.frames.length > 1 || !!chain.representative.detail;
 }
 
+// Outermost (user-facing) frame first, drilling down into causes.
+function orderedFrames(chain: Chain): Entry[] {
+	return chain.frames.slice().reverse();
+}
+
 function formatTime(timestamp: string): string {
 	const date = new Date(timestamp);
 	if (isNaN(date.getTime())) {
@@ -199,6 +204,7 @@ function formatTime(timestamp: string): string {
 				@click="isExpandable(chain) && toggleChain(chain.chainId)"
 			>
 				<div class="entry-row">
+					<span class="chevron">{{ isExpandable(chain) ? (expandedChains.has(chain.chainId) ? "▾" : "▸") : "" }}</span>
 					<span :class="['dot', chain.representative.severity]"></span>
 					<span class="time">{{ formatTime(chain.representative.timestamp) }}</span>
 					<span class="summary">{{ chain.representative.summary }}</span>
@@ -208,9 +214,17 @@ function formatTime(timestamp: string): string {
 				</div>
 
 				<div v-if="expandedChains.has(chain.chainId)" class="frames">
-					<div v-for="frame in chain.frames" :key="frame.id" class="frame">
-						<span class="frame-summary">{{ frame.summary }}</span>
-						<span v-if="frame.source" class="frame-source">{{ frame.source }}</span>
+					<div
+						v-for="(frame, index) in orderedFrames(chain)"
+						:key="frame.id"
+						class="frame"
+						:style="{ marginLeft: index * 16 + 'px' }"
+					>
+						<div class="frame-head">
+							<span v-if="index > 0" class="cause-arrow">↳ caused by</span>
+							<span class="frame-summary">{{ frame.summary }}</span>
+							<span v-if="frame.source" class="frame-source">{{ frame.source }}</span>
+						</div>
 						<div v-if="frame.detail" class="frame-detail">{{ frame.detail }}</div>
 					</div>
 				</div>
@@ -315,6 +329,12 @@ function formatTime(timestamp: string): string {
 	gap: 10px;
 }
 
+.chevron {
+	width: 12px;
+	color: #93a4b8;
+	flex-shrink: 0;
+}
+
 .dot {
 	width: 8px;
 	height: 8px;
@@ -388,13 +408,24 @@ function formatTime(timestamp: string): string {
 	padding-left: 8px;
 }
 
+.frame-head {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.cause-arrow {
+	color: #6b7f96;
+	white-space: nowrap;
+}
+
 .frame-summary {
 	color: #d7e0ea;
 }
 
 .frame-source {
 	color: #6b7f96;
-	margin-left: 8px;
 }
 
 .frame-detail {

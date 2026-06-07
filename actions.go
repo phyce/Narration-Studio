@@ -83,6 +83,7 @@ func (app *App) Play(
 		response.Error(util.MessageData{
 			Summary: "Failed to play script",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	} else {
 		response.Success(util.MessageData{
@@ -135,6 +136,7 @@ func (app *App) ProcessScript(script string, profileID string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to process script",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return
 	}
@@ -150,6 +152,7 @@ func (app *App) ProcessScript(script string, profileID string) {
 			response.Error(util.MessageData{
 				Summary: "Failed to expand path",
 				Detail:  err.Error(),
+				Cause:   err,
 			})
 			return
 		}
@@ -172,6 +175,7 @@ func (app *App) ProcessScript(script string, profileID string) {
 			response.Error(util.MessageData{
 				Summary: "Failed to combine wav files",
 				Detail:  err.Error(),
+				Cause:   err,
 			})
 			return
 		}
@@ -182,6 +186,7 @@ func (app *App) ProcessScript(script string, profileID string) {
 				response.Error(util.MessageData{
 					Summary: "Failed to read directory",
 					Detail:  err.Error(),
+					Cause:   err,
 				})
 				return
 			}
@@ -193,6 +198,7 @@ func (app *App) ProcessScript(script string, profileID string) {
 						response.Error(util.MessageData{
 							Summary: "Failed to delete file",
 							Detail:  err.Error(),
+							Cause:   err,
 						})
 						return
 					}
@@ -220,6 +226,7 @@ func (app *App) GetAvailableModels() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get available models",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	}
 	status.Set(status.Ready, "")
@@ -254,6 +261,7 @@ func (app *App) GetSetting(name string) interface{} {
 		response.Error(util.MessageData{
 			Summary: "Failed to get setting",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return ""
 	}
@@ -263,6 +271,7 @@ func (app *App) GetSetting(name string) interface{} {
 		response.Error(util.MessageData{
 			Summary: "Failed to marshal setting",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return ""
 	}
@@ -278,12 +287,14 @@ func (app *App) SaveSettings(settings config.Base) {
 		response.Error(util.MessageData{
 			Summary: "Failed to save settings",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	} else {
 		if err := cache.Initialize(); err != nil {
 			response.Error(util.MessageData{
 				Summary: "Cache initialization error",
 				Detail:  err.Error(),
+				Cause:   err,
 			})
 		} else {
 			response.Success(util.MessageData{
@@ -319,6 +330,7 @@ func (app *App) SelectDirectory(defaultDirectory string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to select directory",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	} else {
 		if directory != "" {
@@ -366,6 +378,7 @@ func (app *App) SelectFile(defaultFile string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to select file",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	} else {
 		if file != "" {
@@ -406,6 +419,7 @@ func (app *App) GetProfiles() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profiles",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "[]"
 	}
@@ -415,6 +429,7 @@ func (app *App) GetProfiles() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to serialize profiles",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "[]"
 	}
@@ -430,6 +445,7 @@ func (app *App) GetProfile(profileID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -439,6 +455,7 @@ func (app *App) GetProfile(profileID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to serialize profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -454,6 +471,7 @@ func (app *App) CreateProfile(id, name, description string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to create profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return ""
 	}
@@ -475,6 +493,7 @@ func (app *App) DeleteProfile(profileID string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to delete profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	} else {
 		response.Success(util.MessageData{
@@ -491,6 +510,7 @@ func (app *App) GetProfileVoices(profileID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -500,6 +520,7 @@ func (app *App) GetProfileVoices(profileID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profile voices",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -515,6 +536,7 @@ func (app *App) SaveProfileVoices(profileID string, voices string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return
 	}
@@ -525,6 +547,7 @@ func (app *App) SaveProfileVoices(profileID string, voices string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to parse voices",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return
 	}
@@ -536,6 +559,7 @@ func (app *App) SaveProfileVoices(profileID string, voices string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to save profile voices",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	} else {
 		response.Success(util.MessageData{
@@ -551,6 +575,7 @@ func (app *App) GetConfigSchema() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get config schema",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -560,6 +585,7 @@ func (app *App) GetConfigSchema() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to serialize config schema",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -575,6 +601,7 @@ func (app *App) GetProfileSettings(profileID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -589,6 +616,7 @@ func (app *App) GetProfileSettings(profileID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to serialize profile settings",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -604,6 +632,7 @@ func (app *App) SaveProfileSettings(profileID, settingsJSON string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return
 	}
@@ -613,6 +642,7 @@ func (app *App) SaveProfileSettings(profileID, settingsJSON string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to parse settings",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return
 	}
@@ -623,6 +653,7 @@ func (app *App) SaveProfileSettings(profileID, settingsJSON string) {
 		response.Error(util.MessageData{
 			Summary: "Failed to save profile settings",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	} else {
 		response.Success(util.MessageData{
@@ -637,6 +668,7 @@ func (app *App) GetProfileSettingsSchema() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get profile settings schema",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -646,6 +678,7 @@ func (app *App) GetProfileSettingsSchema() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to serialize profile settings schema",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "{}"
 	}
@@ -713,6 +746,7 @@ func (app *App) GetEnginesForProfile(profileID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get engines for profile",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "[]"
 	}
@@ -753,6 +787,7 @@ func (app *App) StartDaemonServer(mode string, port int, host string, configFile
 		response.Error(util.MessageData{
 			Summary: "Failed to locate CLI executable",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return jsonError("Failed to locate CLI executable", err.Error())
 	}
@@ -799,6 +834,7 @@ func (app *App) StopDaemonServer() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to locate CLI executable",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return jsonError("Failed to locate CLI executable", err.Error())
 	}
@@ -995,6 +1031,7 @@ func (app *App) GetEngines() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get engines",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return ""
 	}
@@ -1008,6 +1045,7 @@ func (app *App) GetModelVoices(engine string, model string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get voices",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	}
 
@@ -1016,6 +1054,7 @@ func (app *App) GetModelVoices(engine string, model string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to get voices",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 	}
 
@@ -1044,6 +1083,7 @@ func (app *App) PiperFetchAvailableModels() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to fetch Piper models",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		status.Set(status.Ready, "")
 		return "[]"
@@ -1054,6 +1094,7 @@ func (app *App) PiperFetchAvailableModels() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to marshal Piper models",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		status.Set(status.Ready, "")
 		return "[]"
@@ -1069,6 +1110,7 @@ func (app *App) PiperDownloadModel(modelJSON string) string {
 		response.Error(util.MessageData{
 			Summary: "Invalid model payload",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return err.Error()
 	}
@@ -1078,6 +1120,7 @@ func (app *App) PiperDownloadModel(modelJSON string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to download model " + model.Name,
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		status.Set(status.Ready, "")
 		return err.Error()
@@ -1097,6 +1140,7 @@ func (app *App) PiperDeleteModel(modelID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to delete model " + modelID,
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		status.Set(status.Ready, "")
 		return err.Error()
@@ -1139,6 +1183,7 @@ func (app *App) EnginePackFetchAvailable() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to fetch engine packs",
 			Detail:  firstErr.Error(),
+			Cause:   firstErr,
 		})
 		return "[]"
 	}
@@ -1148,6 +1193,7 @@ func (app *App) EnginePackFetchAvailable() string {
 		response.Error(util.MessageData{
 			Summary: "Failed to marshal engine pack list",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return "[]"
 	}
@@ -1160,6 +1206,7 @@ func (app *App) EnginePackInstall(packJSON string) string {
 		response.Error(util.MessageData{
 			Summary: "Invalid engine pack payload",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return err.Error()
 	}
@@ -1171,6 +1218,7 @@ func (app *App) EnginePackInstall(packJSON string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to install " + availablePack.Manifest.Name,
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return err.Error()
 	}
@@ -1189,6 +1237,7 @@ func (app *App) EnginePackUninstall(engineID string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to uninstall " + engineID,
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return err.Error()
 	}
@@ -1216,6 +1265,7 @@ func (app *App) EnginePackImport(filePath string) string {
 		response.Error(util.MessageData{
 			Summary: "File not found",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return err.Error()
 	}
@@ -1225,6 +1275,7 @@ func (app *App) EnginePackImport(filePath string) string {
 		response.Error(util.MessageData{
 			Summary: "Invalid engine pack",
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return err.Error()
 	}
@@ -1258,6 +1309,7 @@ func (app *App) EnginePackImport(filePath string) string {
 		response.Error(util.MessageData{
 			Summary: "Failed to import " + manifest.Name,
 			Detail:  err.Error(),
+			Cause:   err,
 		})
 		return err.Error()
 	}

@@ -57,7 +57,13 @@ func Error(data util.MessageData) error {
 	data.Life = 50000
 	log.Error(data.Summary, data.Detail)
 
-	record(activity.SeverityError, data.Summary, data.Detail)
+	chainID := uint64(0)
+	var existing *recordedError
+	if data.Cause != nil && errors.As(data.Cause, &existing) {
+		chainID = existing.chainID
+	}
+
+	record(activity.SeverityError, data.Summary, data.Detail, chainID)
 	emitEvent("notification.send", data, true)
 	return trace(errors.New(data.Summary))
 }
@@ -71,6 +77,7 @@ func Alert(message string, err error) error {
 	Error(util.MessageData{
 		Summary: message,
 		Detail:  err.Error(),
+		Cause:   err,
 	})
 
 	return trace(err)

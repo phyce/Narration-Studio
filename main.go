@@ -39,7 +39,7 @@ func main() {
 
 	activityLogWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:             "activitylog",
-		Title:            "Activity Log",
+		Title:            "Narration Studio - Activity Log",
 		Width:            1000,
 		Height:           700,
 		Hidden:           true,

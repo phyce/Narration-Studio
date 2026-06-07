@@ -93,11 +93,11 @@ func (cacheManager *CacheManager) loadProfileCache(profileID string) (*ProfileCa
 	data, err := os.ReadFile(cacheFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, response.Err(err)
+			return nil, response.Err("%w", err)
 		}
 	} else {
 		if err := json.Unmarshal(data, &cache.Characters); err != nil {
-			return nil, response.Err(fmt.Errorf("Failed to parse cache file: %v", err))
+			return nil, response.Err("Failed to parse cache file: %v", err)
 		}
 	}
 
@@ -110,7 +110,7 @@ func (cacheManager *CacheManager) loadProfileCache(profileID string) (*ProfileCa
 func (cacheManager *CacheManager) saveProfileCache(profileID string, profileCache *ProfileCache) error {
 	cacheDirectory := cacheManager.getProfileCacheDirectory(profileID)
 	if err := os.MkdirAll(cacheDirectory, 0755); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	profileCache.mutex.RLock()
@@ -118,12 +118,12 @@ func (cacheManager *CacheManager) saveProfileCache(profileID string, profileCach
 	profileCache.mutex.RUnlock()
 
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	cacheFile := cacheManager.getCharacterCacheFile(profileID)
 	if err := os.WriteFile(cacheFile, data, 0644); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return nil
@@ -140,7 +140,7 @@ func (cacheManager *CacheManager) ClearProfileCache(profileID string) error {
 
 	cacheDirectory := cacheManager.getProfileCacheDirectory(profileID)
 	if err := os.RemoveAll(cacheDirectory); err != nil && !os.IsNotExist(err) {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return nil
@@ -204,7 +204,7 @@ func (cacheManager *CacheManager) GetCachedAudio(profileID, character, text stri
 func (cacheManager *CacheManager) CacheAudio(profileID, characterName, text, voiceKey string, rawAudio []byte) error {
 	profileCache, err := cacheManager.loadProfileCache(profileID)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	profileCache.mutex.Lock()
@@ -231,20 +231,20 @@ func (cacheManager *CacheManager) CacheAudio(profileID, characterName, text, voi
 
 	audioDir := cacheManager.getCharacterAudioDir(profileID, characterName)
 	if err := os.MkdirAll(audioDir, 0755); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	audioPath := filepath.Join(audioDir, filename)
 	outputFile, err := os.Create(audioPath)
 	if err != nil {
 		fmt.Printf("[Cache] CacheAudio: Error creating file: %v\n", err)
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	defer outputFile.Close()
 
 	_, err = outputFile.Write(rawAudio)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	profileCache.mutex.Lock()
@@ -265,7 +265,7 @@ func (cacheManager *CacheManager) ClearCharacterCache(profileID, character strin
 
 	profileCache, err := cacheManager.loadProfileCache(profileID)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	profileCache.mutex.Lock()

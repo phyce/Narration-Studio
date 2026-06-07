@@ -2,7 +2,6 @@ package mssapi5
 
 import (
 	"encoding/json"
-	"fmt"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
@@ -42,12 +41,12 @@ func (sapi *MsSapi5) Play(message util.CharacterMessage) error {
 	}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	audioClip, err := sapi.Generate(message.Voice.Model, jsonPayload)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	audio.PlayRawAudioBytes(audioClip)
@@ -61,11 +60,11 @@ func (sapi *MsSapi5) Save(messages []util.CharacterMessage, play bool) error {
 
 	err, outputPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	if err := os.MkdirAll(outputPath, os.ModePerm); err != nil {
-		return response.Err(fmt.Errorf("failed to create output directory: %w", err))
+		return response.Err("failed to create output directory: %w", err)
 	}
 
 	for _, message := range messages {
@@ -81,17 +80,17 @@ func (sapi *MsSapi5) Save(messages []util.CharacterMessage, play bool) error {
 		}
 		jsonPayload, err := json.Marshal(payload)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		audioClip, err := sapi.Generate(message.Voice.Model, jsonPayload)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		err = os.WriteFile(outputFilename, audioClip, 0644)
 		if err != nil {
-			return response.Err(fmt.Errorf("failed to write audio to file '%s': %w", outputFilename, err))
+			return response.Err("failed to write audio to file '%s': %w", outputFilename, err)
 		}
 
 		if play {
@@ -105,21 +104,21 @@ func (sapi *MsSapi5) Save(messages []util.CharacterMessage, play bool) error {
 func (sapi *MsSapi5) Generate(model string, payload []byte) ([]byte, error) {
 	var ttsPayload MsSapi5Request
 	if err := json.Unmarshal(payload, &ttsPayload); err != nil {
-		return nil, response.Err(fmt.Errorf("failed to unmarshal payload: %w", err))
+		return nil, response.Err("failed to unmarshal payload: %w", err)
 	}
 
 	if ttsPayload.Voice == "" {
-		return nil, response.Err(fmt.Errorf("voice field is required in payload"))
+		return nil, response.Err("voice field is required in payload")
 	}
 
 	if ttsPayload.Text == "" {
-		return nil, response.Err(fmt.Errorf("text field is required in payload"))
+		return nil, response.Err("text field is required in payload")
 	}
 
 	cfg := config.GetEngine().Local.MsSapi5
 	wavBytes, err := synthesize(ttsPayload.Voice, ttsPayload.Text, cfg.Rate, cfg.Volume)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return wavBytes, nil
@@ -151,7 +150,7 @@ func (sapi *MsSapi5) GetVoices(model string) ([]engine.Voice, error) {
 
 	voices, err := enumerateVoices()
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	sapi.voiceCache = voices

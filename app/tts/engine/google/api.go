@@ -18,12 +18,12 @@ func (google *Google) sendRequest(data GoogleRequest) ([]byte, error) {
 	ctx := context.Background()
 	apiKey := config.GetEngine().Api.Google.ApiKey
 	if apiKey == "" {
-		return nil, response.Err(fmt.Errorf("Google Cloud API key is not set"))
+		return nil, response.Err("Google Cloud API key is not set")
 	}
 
 	client, err := texttospeech.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to create Google TTS client: %v", err))
+		return nil, response.Err("Failed to create Google TTS client: %v", err)
 	}
 	defer client.Close()
 
@@ -69,7 +69,7 @@ func (google *Google) sendRequest(data GoogleRequest) ([]byte, error) {
 
 	synthesisResponse, err := client.SynthesizeSpeech(ctx, request)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Google TTS request failed: %v", err))
+		return nil, response.Err("Google TTS request failed: %v", err)
 	}
 
 	response.Success(util.MessageData{
@@ -105,19 +105,19 @@ func (google *Google) fetchVoices(model string) ([]engine.Voice, error) {
 	ctx := context.Background()
 	apiKey := config.GetEngine().Api.Google.ApiKey
 	if apiKey == "" {
-		return nil, response.Err(fmt.Errorf("Google Cloud API key is not set"))
+		return nil, response.Err("Google Cloud API key is not set")
 	}
 
 	client, err := texttospeech.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to create Google TTS client: %v", err))
+		return nil, response.Err("Failed to create Google TTS client: %v", err)
 	}
 	defer client.Close()
 
 	request := &texttospeechpb.ListVoicesRequest{}
 	dataResponse, err := client.ListVoices(ctx, request)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to list voices: %v", err))
+		return nil, response.Err("Failed to list voices: %v", err)
 	}
 
 	// Initialize cache map if nil (safety check)

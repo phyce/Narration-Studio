@@ -20,14 +20,14 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
 
 	httpRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	httpRequest.Header.Set("Content-Type", "application/json")
@@ -35,7 +35,7 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 	client := &http.Client{Timeout: 30 * time.Second}
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 	defer httpResponse.Body.Close()
 
@@ -46,7 +46,7 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 
 	var geminiResponse GeminiResponse
 	if err := json.NewDecoder(httpResponse.Body).Decode(&geminiResponse); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	if len(geminiResponse.Candidates) == 0 || len(geminiResponse.Candidates[0].Content.Parts) == 0 {
@@ -60,7 +60,7 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 
 	audioData, err := base64.StdEncoding.DecodeString(base64Data)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return audioData, nil

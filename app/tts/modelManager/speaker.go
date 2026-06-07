@@ -4,7 +4,6 @@ package modelManager
 
 import (
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
 	"time"
 
 	"github.com/gopxl/beep"
@@ -19,9 +18,6 @@ func initSpeaker() {
 	}
 
 	if err := speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10)); err != nil {
-		response.Error(util.MessageData{
-			Summary: "failed to initialize speaker",
-			Detail:  err.Error(),
-		})
+		response.Err("failed to initialize speaker: %w", err)
 	}
 }

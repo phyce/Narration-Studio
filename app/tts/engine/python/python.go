@@ -49,15 +49,15 @@ func New(manifest Manifest, bundlePath string) *Python {
 
 func (pythonEngine *Python) Initialize() error {
 	if pythonEngine.BundlePath == "" {
-		return response.Err(fmt.Errorf("python engine has no bundle path"))
+		return response.Err("python engine has no bundle path")
 	}
 	interpreterPath := filepath.Join(pythonEngine.BundlePath, filepath.FromSlash(pythonEngine.Manifest.Runtime.Python))
 	if _, err := os.Stat(interpreterPath); err != nil {
-		return response.Err(fmt.Errorf("bundle missing python interpreter at %s: %w", interpreterPath, err))
+		return response.Err("bundle missing python interpreter at %s: %w", interpreterPath, err)
 	}
 	entrypointPath := filepath.Join(pythonEngine.BundlePath, filepath.FromSlash(pythonEngine.Manifest.Runtime.Entrypoint))
 	if _, err := os.Stat(entrypointPath); err != nil {
-		return response.Err(fmt.Errorf("bundle missing runner entrypoint at %s: %w", entrypointPath, err))
+		return response.Err("bundle missing runner entrypoint at %s: %w", entrypointPath, err)
 	}
 	return nil
 }
@@ -95,7 +95,7 @@ func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, erro
 
 	var synthPayload SynthPayload
 	if err := json.Unmarshal(payload, &synthPayload); err != nil {
-		return nil, response.Err(fmt.Errorf("python: invalid synth payload: %w", err))
+		return nil, response.Err("python: invalid synth payload: %w", err)
 	}
 
 	if resolvedVoicePath, found := voicepack.ResolvePath(pythonEngine.Manifest.ID, synthPayload.Voice); found {
@@ -104,7 +104,7 @@ func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, erro
 
 	outputPath, err := temporaryWAVPath(pythonEngine.Manifest.ID)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 	defer os.Remove(outputPath)
 
@@ -118,15 +118,15 @@ func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, erro
 	}
 	synthResponse, err := pythonEngine.runner.send(synthRequest, time.Duration(defaultGenerateTimeoutSec)*time.Second)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("python synth: %w", err))
+		return nil, response.Err("python synth: %w", err)
 	}
 	if !synthResponse.Ok {
-		return nil, response.Err(fmt.Errorf("python synth: %s", synthResponse.Error))
+		return nil, response.Err("python synth: %s", synthResponse.Error)
 	}
 
 	wavBytes, err := os.ReadFile(outputPath)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("python synth: read output: %w", err))
+		return nil, response.Err("python synth: read output: %w", err)
 	}
 	return wavBytes, nil
 }
@@ -142,7 +142,7 @@ func (pythonEngine *Python) GenerateAudio(model string, payload []byte) (*audio.
 func (pythonEngine *Python) Play(message util.CharacterMessage) error {
 	payload, err := buildSynthPayload(message)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	wavBytes, err := pythonEngine.Generate(message.Voice.Model, payload)
@@ -151,7 +151,7 @@ func (pythonEngine *Python) Play(message util.CharacterMessage) error {
 	}
 
 	if err := audio.PlayWAVBytes(wavBytes); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	return nil
 }
@@ -161,7 +161,7 @@ func (pythonEngine *Python) Save(messages []util.CharacterMessage, play bool) er
 	if settings := config.GetSettings(); settings.OutputPath != "" {
 		err, expandedOutputPath := util.ExpandPath(settings.OutputPath)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 		outputPath = expandedOutputPath
 	}
@@ -169,7 +169,7 @@ func (pythonEngine *Python) Save(messages []util.CharacterMessage, play bool) er
 	for _, message := range messages {
 		payload, err := buildSynthPayload(message)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		wavBytes, err := pythonEngine.Generate(message.Voice.Model, payload)
@@ -180,13 +180,13 @@ func (pythonEngine *Python) Save(messages []util.CharacterMessage, play bool) er
 		if outputPath != "" {
 			outputFilePath := util.GenerateFilename(message, fileIndex.Get(), outputPath)
 			if err := os.WriteFile(outputFilePath, wavBytes, 0o644); err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 		}
 
 		if play {
 			if err := audio.PlayWAVBytes(wavBytes); err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 		}
 	}
@@ -205,7 +205,7 @@ func (pythonEngine *Python) GetVoices(model string) ([]engine.Voice, error) {
 		}
 	}
 	if !modelFound {
-		return nil, response.Err(fmt.Errorf("python: model %q not found in manifest %q", model, pythonEngine.Manifest.ID))
+		return nil, response.Err("python: model %q not found in manifest %q", model, pythonEngine.Manifest.ID)
 	}
 
 	if packVoices, err := voicepack.AllVoices(pythonEngine.Manifest.ID); err == nil {
@@ -235,7 +235,7 @@ func (pythonEngine *Python) ensureModelLoaded(model string) error {
 
 	if pythonEngine.runner != nil && pythonEngine.currentModel != model {
 		if err := pythonEngine.runner.close(time.Duration(defaultShutdownGraceSec) * time.Second); err != nil {
-			response.Err(err)
+			response.Err("%w", err)
 		}
 		pythonEngine.runner = nil
 		pythonEngine.currentModel = ""
@@ -249,7 +249,7 @@ func (pythonEngine *Python) ensureModelLoaded(model string) error {
 	newlyStartedRunner, err := newRunner(pythonEngine.Manifest.ID, pythonEngine.BundlePath, &pythonEngine.Manifest)
 	if err != nil {
 		status.Set(status.Ready, "")
-		return response.Err(fmt.Errorf("python: spawn runner: %w", err))
+		return response.Err("python: spawn runner: %w", err)
 	}
 
 	installedVoicePaths := pythonEngine.allInstalledVoicePaths()
@@ -262,12 +262,12 @@ func (pythonEngine *Python) ensureModelLoaded(model string) error {
 	if err != nil {
 		_ = newlyStartedRunner.close(time.Second)
 		status.Set(status.Ready, "")
-		return response.Err(fmt.Errorf("python: load model %q: %w", model, err))
+		return response.Err("python: load model %q: %w", model, err)
 	}
 	if !loadResponse.Ok {
 		_ = newlyStartedRunner.close(time.Second)
 		status.Set(status.Ready, "")
-		return response.Err(fmt.Errorf("python: load model %q: %s", model, loadResponse.Error))
+		return response.Err("python: load model %q: %s", model, loadResponse.Error)
 	}
 
 	pythonEngine.runner = newlyStartedRunner

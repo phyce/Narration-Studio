@@ -51,21 +51,21 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 
 		voice, err := profileManager.GetOrAllocateVoice(profileID, message.Character)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		message.Voice = *voice
 
 		selectedEngineInstance, releaseFunc, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
 		if !ok {
-			return response.Err(fmt.Errorf("Failed to retrieve engine instance: %s/%s", voice.Engine, voice.Model))
+			return response.Err("Failed to retrieve engine instance: %s/%s", voice.Engine, voice.Model)
 		}
 
 		if saveOutput {
 			err := selectedEngineInstance.Save([]util.CharacterMessage{message}, false)
 			releaseFunc()
 			if err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 
 			// Cache the generated audio if enabled
@@ -77,13 +77,13 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 
 			payload, err := preparePayload(message)
 			if err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 
 			rawAudio, err = selectedEngineInstance.Generate(message.Voice.Model, payload)
 			releaseFunc()
 			if err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 
 			playEngineOutput(rawAudio)
@@ -106,7 +106,7 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 func GenerateAudio(voice *util.CharacterVoice, text string) (*audio.Audio, error) {
 	engineInstance, releaseFunc, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
 	if !ok {
-		return nil, response.Err(fmt.Errorf("failed to get engine instance: %s/%s", voice.Engine, voice.Model))
+		return nil, response.Err("failed to get engine instance: %s/%s", voice.Engine, voice.Model)
 	}
 	defer releaseFunc()
 
@@ -119,12 +119,12 @@ func GenerateAudio(voice *util.CharacterVoice, text string) (*audio.Audio, error
 
 	payload, err := preparePayload(message)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	audioObj, err := engineInstance.GenerateAudio(message.Voice.Model, payload)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return audioObj, nil

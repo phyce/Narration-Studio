@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"nstudio/app/common/response"
 	serverHTTP "nstudio/app/server/http"
 	"nstudio/app/server/stats"
@@ -52,7 +51,7 @@ func StartServer(serverConfig ServerConfig) error {
 	case ModeFileSystem:
 		return startFileSystemServer(serverConfig)
 	default:
-		return response.Err(fmt.Errorf("Unsupported server mode: %s", serverConfig.Mode))
+		return response.Err("Unsupported server mode: %s", serverConfig.Mode)
 	}
 }
 
@@ -65,21 +64,21 @@ func startHTTPServer(config ServerConfig) error {
 }
 
 func startWebSocketServer(config ServerConfig) error {
-	return response.Err(fmt.Errorf("WebSocket server not yet implemented"))
+	return response.Err("WebSocket server not yet implemented")
 }
 
 func startGRPCServer(config ServerConfig) error {
-	return response.Err(fmt.Errorf("gRPC server not yet implemented"))
+	return response.Err("gRPC server not yet implemented")
 }
 
 func startTCPServer(config ServerConfig) error {
-	return response.Err(fmt.Errorf("TCP server not yet implemented"))
+	return response.Err("TCP server not yet implemented")
 }
 
 func startNamedPipeServer(config ServerConfig) error {
-	return response.Err(fmt.Errorf("Named pipe server not yet implemented"))
+	return response.Err("Named pipe server not yet implemented")
 }
 
 func startFileSystemServer(config ServerConfig) error {
-	return response.Err(fmt.Errorf("File system server not yet implemented"))
+	return response.Err("File system server not yet implemented")
 }

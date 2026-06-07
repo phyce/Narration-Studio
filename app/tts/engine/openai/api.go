@@ -14,17 +14,17 @@ import (
 func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 	apiKey := config.GetEngine().Api.OpenAI.ApiKey
 	if apiKey == "" {
-		return nil, response.Err(fmt.Errorf("OpenAI API key is not set"))
+		return nil, response.Err("OpenAI API key is not set")
 	}
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to marshal httpRequest body: %v", err))
+		return nil, response.Err("Failed to marshal httpRequest body: %v", err)
 	}
 
 	httpRequest, err := http.NewRequest("POST", "https://api.openai.com/v1/audio/speech", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to create HTTP httpRequest: %v", err))
+		return nil, response.Err("Failed to create HTTP httpRequest: %v", err)
 	}
 
 	httpRequest.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
@@ -35,18 +35,18 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to send HTTP httpRequest: %v", err))
+		return nil, response.Err("Failed to send HTTP httpRequest: %v", err)
 	}
 	defer httpResponse.Body.Close()
 
 	if httpResponse.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(httpResponse.Body)
-		return nil, response.Err(fmt.Errorf("HttpRequest failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes)))
+		return nil, response.Err("HttpRequest failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes))
 	}
 
 	responseData, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to read response body: %v", err))
+		return nil, response.Err("Failed to read response body: %v", err)
 	}
 
 	response.Success(util.MessageData{

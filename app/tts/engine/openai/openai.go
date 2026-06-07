@@ -57,12 +57,12 @@ func (openAI *OpenAI) Play(message util.CharacterMessage) error {
 
 	audioClip, err := openAI.sendRequest(input)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	err = audio.PlayFLACAudioBytes(audioClip)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return response.Success(util.MessageData{
@@ -77,7 +77,7 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 
 	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	for _, message := range messages {
@@ -91,7 +91,7 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 
 		audioClip, err := openAI.sendRequest(input)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		filename := util.GenerateFilename(
@@ -102,13 +102,13 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 
 		err = audio.SaveFLACAsWAV(audioClip, filename)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if play {
 			err = audio.PlayFLACAudioBytes(audioClip)
 			if err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 		}
 	}
@@ -119,7 +119,7 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
 	var request OpenAIRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	request.Model = model
@@ -128,7 +128,7 @@ func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
 
 	flacData, err := openAI.sendRequest(request)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return flacData, nil

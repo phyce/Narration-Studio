@@ -21,7 +21,7 @@ func InitializeProfileDirectory(baseDirectory string) error {
 	if baseDirectory == "" {
 		currentWorkingDirectory, err := os.Getwd()
 		if err != nil {
-			return response.Err(fmt.Errorf("failed to get working directory: %v", err))
+			return response.Err("failed to get working directory: %v", err)
 		}
 		profileDirectory = filepath.Join(currentWorkingDirectory, defaultProfileDir)
 	} else {
@@ -29,19 +29,19 @@ func InitializeProfileDirectory(baseDirectory string) error {
 	}
 
 	if err := os.MkdirAll(profileDirectory, 0755); err != nil {
-		return response.Err(fmt.Errorf("failed to create profile directory: %v", err))
+		return response.Err("failed to create profile directory: %v", err)
 	}
 
 	profiles, err := listProfileFiles()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	if len(profiles) == 0 {
 		defaultProfile := NewProfile("default", "Default Profile")
 		defaultProfile.Description = "Default voice configuration profile"
 		if err := SaveProfile(defaultProfile); err != nil {
-			return response.Err(fmt.Errorf("failed to create default profile: %v", err))
+			return response.Err("failed to create default profile: %v", err)
 		}
 	}
 
@@ -67,12 +67,12 @@ func LoadProfile(profileID string) (*Profile, error) {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("profile not found: %s", profileID)
 		}
-		return nil, response.Err(fmt.Errorf("failed to read profile file: %v", err))
+		return nil, response.Err("failed to read profile file: %v", err)
 	}
 
 	var profile Profile
 	if err := json.Unmarshal(data, &profile); err != nil {
-		return nil, response.Err(fmt.Errorf("failed to parse profile file: %v", err))
+		return nil, response.Err("failed to parse profile file: %v", err)
 	}
 
 	return &profile, nil
@@ -91,12 +91,12 @@ func SaveProfile(profile *Profile) error {
 
 	data, err := json.MarshalIndent(profile, "", "  ")
 	if err != nil {
-		return response.Err(fmt.Errorf("failed to serialize profile: %v", err))
+		return response.Err("failed to serialize profile: %v", err)
 	}
 
 	filePath := getProfileFilePath(profile.ID)
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		return response.Err(fmt.Errorf("failed to write profile file: %v", err))
+		return response.Err("failed to write profile file: %v", err)
 	}
 
 	return nil
@@ -112,7 +112,7 @@ func DeleteProfile(profileID string) error {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("profile not found: %s", profileID)
 		}
-		return response.Err(fmt.Errorf("failed to delete profile: %v", err))
+		return response.Err("failed to delete profile: %v", err)
 	}
 
 	return nil
@@ -124,7 +124,7 @@ func listProfileFiles() ([]string, error) {
 	pattern := filepath.Join(dir, "*"+profileFileExtension)
 	files, err := filepath.Glob(pattern)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to list profile files: %v", err))
+		return nil, response.Err("failed to list profile files: %v", err)
 	}
 
 	return files, nil
@@ -133,7 +133,7 @@ func listProfileFiles() ([]string, error) {
 func ListProfiles() ([]ProfileMetadata, error) {
 	files, err := listProfileFiles()
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	profiles := make([]ProfileMetadata, 0, len(files))

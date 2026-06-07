@@ -34,16 +34,16 @@ func initializeApp(configFile string) error {
 		err = config.Initialize(Info())
 	}
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	profileDir := filepath.Join(config.GetCurrentConfigPath(), "profiles")
 	if err := profile.InitializeProfileDirectory(profileDir); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	if err := cache.Initialize(); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return nil
@@ -68,7 +68,7 @@ func registerEngines() {
 
 	err := modelManager.RegisterEngine(piperEngine)
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	openAIEngine := engine.Engine{
@@ -82,7 +82,7 @@ func registerEngines() {
 
 	err = modelManager.RegisterEngine(openAIEngine)
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	models, err := elevenlabs.FetchModels()
@@ -101,7 +101,7 @@ func registerEngines() {
 
 	err = modelManager.RegisterEngine(elevenLabsEngine)
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	googleEngine := engine.Engine{
@@ -115,7 +115,7 @@ func registerEngines() {
 
 	err = modelManager.RegisterEngine(googleEngine)
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	geminiEngine := engine.Engine{
@@ -129,7 +129,7 @@ func registerEngines() {
 
 	err = modelManager.RegisterEngine(geminiEngine)
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	if runtime.GOOS == "windows" {
@@ -144,7 +144,7 @@ func registerEngines() {
 
 		err = modelManager.RegisterEngine(msSapi4Engine)
 		if err != nil {
-			response.Err(err)
+			response.Err("%w", err)
 		}
 
 		msSapi5Engine := engine.Engine{
@@ -158,18 +158,18 @@ func registerEngines() {
 
 		err = modelManager.RegisterEngine(msSapi5Engine)
 		if err != nil {
-			response.Err(err)
+			response.Err("%w", err)
 		}
 	}
 
 	if installedPacks, err := pack.ScanInstalled(); err == nil {
 		for _, installedPack := range installedPacks {
 			if err := modelManager.RegisterEngine(python.ToEngine(installedPack.Manifest, installedPack.BundlePath)); err != nil {
-				response.Err(err)
+				response.Err("%w", err)
 			}
 		}
 	} else {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	modelManager.ReloadModels()

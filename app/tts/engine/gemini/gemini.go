@@ -57,14 +57,14 @@ func (gemini *Gemini) Play(message util.CharacterMessage) error {
 
 	audioClip, err := gemini.sendRequest(input, message.Voice.Model)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	// Assuming 24kHz 1 channel 16 bit PCM as per common Gemini/Google TTS defaults for "raw PCM"
 	// Adjust if necessary based on actual API response or documentation updates.
 	err = audio.PlayPCMAudioBytes(audioClip)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return response.Success(util.MessageData{
@@ -79,7 +79,7 @@ func (gemini *Gemini) Save(messages []util.CharacterMessage, play bool) error {
 
 	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	for _, message := range messages {
@@ -102,7 +102,7 @@ func (gemini *Gemini) Save(messages []util.CharacterMessage, play bool) error {
 
 		audioClip, err := gemini.sendRequest(input, message.Voice.Model)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		filename := util.GenerateFilename(
@@ -113,13 +113,13 @@ func (gemini *Gemini) Save(messages []util.CharacterMessage, play bool) error {
 
 		err = audio.SaveWAVFile(audioClip, filename)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if play {
 			err = audio.PlayPCMAudioBytes(audioClip)
 			if err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 		}
 	}
@@ -130,12 +130,12 @@ func (gemini *Gemini) Save(messages []util.CharacterMessage, play bool) error {
 func (gemini *Gemini) Generate(model string, payload []byte) ([]byte, error) {
 	var request GeminiRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	pcmData, err := gemini.sendRequest(request, model)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return pcmData, nil

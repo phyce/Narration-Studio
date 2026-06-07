@@ -61,7 +61,7 @@ func (manager *ProfileManager) CreateProfile(id, name, description string) (*Pro
 	profile.Description = description
 
 	if err := SaveProfile(profile); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	manager.mutex.Lock()
@@ -73,7 +73,7 @@ func (manager *ProfileManager) CreateProfile(id, name, description string) (*Pro
 
 func (manager *ProfileManager) SaveProfile(profile *Profile) error {
 	if err := SaveProfile(profile); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	manager.mutex.Lock()
@@ -138,7 +138,7 @@ func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (
 	if strings.HasPrefix(character, "::") {
 		allocatedVoice, err := manager.AllocateVoiceForProfile(character, profileID)
 		if err != nil {
-			return nil, response.Err(fmt.Errorf("failed to allocate voice: %v", err))
+			return nil, response.Err("failed to allocate voice: %v", err)
 		}
 		return &allocatedVoice, nil
 	}
@@ -148,10 +148,10 @@ func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (
 		if !ProfileExists(profileID) {
 			profile, err = manager.CreateProfile(profileID, profileID, "")
 			if err != nil {
-				return nil, response.Err(err)
+				return nil, response.Err("%w", err)
 			}
 		} else {
-			return nil, response.Err(err)
+			return nil, response.Err("%w", err)
 		}
 	}
 
@@ -162,12 +162,12 @@ func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (
 
 	allocatedVoice, err := manager.AllocateVoiceForProfile(character, profileID)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to allocate voice: %v", err))
+		return nil, response.Err("failed to allocate voice: %v", err)
 	}
 
 	profile.SetVoice(character, &allocatedVoice)
 	if err := manager.SaveProfile(profile); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return &allocatedVoice, nil
@@ -189,9 +189,7 @@ func (manager *ProfileManager) AllocateVoiceForProfile(name string, profileID st
 			}
 			return characterVoice, nil
 		} else {
-			return util.CharacterVoice{}, response.Err(
-				fmt.Errorf("Invalid line could not be processed: " + name),
-			)
+			return util.CharacterVoice{}, response.Err("Invalid line could not be processed: %s", name)
 		}
 	}
 
@@ -203,12 +201,12 @@ func (manager *ProfileManager) AllocateVoiceForProfile(name string, profileID st
 		if profileErr == nil && profile.GetModelToggles() != nil && len(profile.GetModelToggles()) > 0 {
 			selectedEngine, err = calculateProfileEngine(name, profileID)
 			if err != nil {
-				return util.CharacterVoice{}, response.Err(err)
+				return util.CharacterVoice{}, response.Err("%w", err)
 			}
 
 			model, voice, err := calculateProfileVoice(selectedEngine, name, profileID)
 			if err != nil {
-				return util.CharacterVoice{}, response.Err(err)
+				return util.CharacterVoice{}, response.Err("%w", err)
 			}
 
 			return util.CharacterVoice{
@@ -222,12 +220,12 @@ func (manager *ProfileManager) AllocateVoiceForProfile(name string, profileID st
 
 	selectedEngine, err = calculateEngine(name)
 	if err != nil {
-		return util.CharacterVoice{}, response.Err(err)
+		return util.CharacterVoice{}, response.Err("%w", err)
 	}
 
 	model, voice, err := calculateVoice(selectedEngine, name)
 	if err != nil {
-		return util.CharacterVoice{}, response.Err(err)
+		return util.CharacterVoice{}, response.Err("%w", err)
 	}
 
 	return util.CharacterVoice{

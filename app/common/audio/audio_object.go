@@ -3,7 +3,6 @@ package audio
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"nstudio/app/common/response"
 	"strings"
@@ -67,11 +66,11 @@ func NewAudioFromMP3(mp3Data []byte) *Audio {
 
 func NewAudioFromWAV(wavData []byte) (*Audio, error) {
 	if len(wavData) < 44 {
-		return nil, response.Err(fmt.Errorf("invalid WAV file: too small"))
+		return nil, response.Err("invalid WAV file: too small")
 	}
 
 	if string(wavData[0:4]) != "RIFF" || string(wavData[8:12]) != "WAVE" {
-		return nil, response.Err(fmt.Errorf("invalid WAV file: missing RIFF/WAVE header"))
+		return nil, response.Err("invalid WAV file: missing RIFF/WAVE header")
 	}
 
 	channels := int(binary.LittleEndian.Uint16(wavData[22:24]))
@@ -120,7 +119,7 @@ func (a *Audio) ToPCM() ([]byte, error) {
 		return extractPCMFromWAV(a.Data)
 
 	default:
-		return nil, response.Err(fmt.Errorf("unsupported format conversion: %s to PCM", a.Metadata.Format))
+		return nil, response.Err("unsupported format conversion: %s to PCM", a.Metadata.Format)
 	}
 }
 
@@ -164,7 +163,7 @@ func (a *Audio) ToFormat(format string) ([]byte, error) {
 	case "mp3":
 		return a.ToMP3()
 	default:
-		return nil, response.Err(fmt.Errorf("unsupported output format: %s", format))
+		return nil, response.Err("unsupported output format: %s", format)
 	}
 }
 
@@ -254,7 +253,7 @@ func decodeFLACToPCM(flacData []byte) ([]byte, int, int, int, error) {
 	reader := bytes.NewReader(flacData)
 	stream, err := flac.New(reader)
 	if err != nil {
-		return nil, 0, 0, 0, response.Err(err)
+		return nil, 0, 0, 0, response.Err("%w", err)
 	}
 
 	var pcmBuffer bytes.Buffer
@@ -268,7 +267,7 @@ func decodeFLACToPCM(flacData []byte) ([]byte, int, int, int, error) {
 			break
 		}
 		if err != nil {
-			return nil, 0, 0, 0, response.Err(err)
+			return nil, 0, 0, 0, response.Err("%w", err)
 		}
 
 		// FLAC stores samples interleaved by subframe (channel), we need to interleave them
@@ -290,7 +289,7 @@ func decodeMP3ToPCM(mp3Data []byte) ([]byte, int, int, int, error) {
 	reader := io.NopCloser(bytes.NewReader(mp3Data))
 	streamer, format, err := beepMp3.Decode(reader)
 	if err != nil {
-		return nil, 0, 0, 0, response.Err(err)
+		return nil, 0, 0, 0, response.Err("%w", err)
 	}
 	defer streamer.Close()
 
@@ -319,7 +318,7 @@ func decodeMP3ToPCM(mp3Data []byte) ([]byte, int, int, int, error) {
 
 func extractPCMFromWAV(wavData []byte) ([]byte, error) {
 	if len(wavData) < 44 {
-		return nil, response.Err(fmt.Errorf("invalid WAV file: too small"))
+		return nil, response.Err("invalid WAV file: too small")
 	}
 	return wavData[44:], nil
 }
@@ -348,7 +347,7 @@ func pcmBytesToIntBuffer(pcmData []byte, metadata AudioMetadata) (*audio.IntBuff
 			if err == io.EOF {
 				break
 			}
-			return nil, response.Err(err)
+			return nil, response.Err("%w", err)
 		}
 		buffer.Data[i] = int(sample)
 	}

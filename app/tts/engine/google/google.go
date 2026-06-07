@@ -63,12 +63,12 @@ func (google *Google) Play(message util.CharacterMessage) error {
 
 	audioClip, err := google.sendRequest(input)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	err = audio.PlayMP3AudioBytes(audioClip)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return response.Success(util.MessageData{
@@ -83,7 +83,7 @@ func (google *Google) Save(messages []util.CharacterMessage, play bool) error {
 
 	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	for _, message := range messages {
@@ -108,7 +108,7 @@ func (google *Google) Save(messages []util.CharacterMessage, play bool) error {
 
 		audioClip, err := google.sendRequest(input)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		filename := util.GenerateFilename(
@@ -119,13 +119,13 @@ func (google *Google) Save(messages []util.CharacterMessage, play bool) error {
 
 		err = audio.SaveWAVFile(audioClip, filename)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if play {
 			err = audio.PlayPCMAudioBytes(audioClip)
 			if err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 		}
 	}
@@ -137,14 +137,14 @@ func (google *Google) Generate(model string, payload []byte) ([]byte, error) {
 	fmt.Println(string(payload))
 	var request GoogleRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	request.AudioConfig.AudioEncoding = "LINEAR16"
 
 	pcmData, err := google.sendRequest(request)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return pcmData, nil

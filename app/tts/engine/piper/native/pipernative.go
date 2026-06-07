@@ -31,7 +31,7 @@ func (piper *Piper) Initialize() error {
 	}
 
 	if settings.ModelsDirectory == "" {
-		return response.Err(fmt.Errorf("piper models directory is not set"))
+		return response.Err("piper models directory is not set")
 	}
 	piper.modelsDir = settings.ModelsDirectory
 	piper.useGPU = settings.UseGPU
@@ -47,7 +47,7 @@ func (piper *Piper) Initialize() error {
 	if espeakDir == "" {
 		exePath, err := os.Executable()
 		if err != nil {
-			return response.Err(fmt.Errorf("could not determine executable path: %w", err))
+			return response.Err("could not determine executable path: %w", err)
 		}
 		exeDir := filepath.Dir(exePath)
 
@@ -66,7 +66,7 @@ func (piper *Piper) Initialize() error {
 	}
 
 	if espeakDir == "" {
-		return response.Err(fmt.Errorf("espeak-ng-data not found"))
+		return response.Err("espeak-ng-data not found")
 	}
 	piper.espeakDataDir = espeakDir
 
@@ -93,7 +93,7 @@ func (piper *Piper) Start(modelName string) error {
 		if setErr := config.Set(configuration); setErr != nil {
 			return setErr
 		}
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	if _, exists := piper.models[modelName]; exists {
@@ -112,12 +112,12 @@ func (piper *Piper) Start(modelName string) error {
 
 	data, err := os.ReadFile(metadataPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	var voices []engine.Voice
 	if err := json.Unmarshal(data, &voices); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	// Create synthesizer
@@ -131,7 +131,7 @@ func (piper *Piper) Start(modelName string) error {
 
 	synth, err := NewSynthesizer(onnxPath, configPath, piper.espeakDataDir, piper.useGPU)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	piper.models[modelName] = &PiperNativeInstance{
@@ -180,12 +180,12 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	audio.PlayRawAudioBytes(audioClip)
@@ -203,7 +203,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 
 	err, outputPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	for _, message := range messages {
@@ -222,21 +222,21 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 
 		jsonBytes, err := json.Marshal(input)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		audioObj, err := piper.GenerateAudio(message.Voice.Model, jsonBytes)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		wavData, err := audioObj.ToWAV()
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if err := os.WriteFile(outputFilename, wavData, 0644); err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if play {
@@ -253,14 +253,14 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	instance, exists := piper.models[model]
 	if !exists {
 		if !config.GetEngineToggles()["piper"][model] {
-			return nil, response.Err(fmt.Errorf("model is not enabled: piper:%s", model))
+			return nil, response.Err("model is not enabled: piper:%s", model)
 		}
 
 		response.NewWarn("piper model is not running: " + model)
 
 		err := piper.Start(model)
 		if err != nil {
-			return nil, response.Err(fmt.Errorf("failed to start piper model %s: %v", model, err))
+			return nil, response.Err("failed to start piper model %s: %v", model, err)
 		}
 
 		instance = piper.models[model]
@@ -268,7 +268,7 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 
 	var input PiperInput
 	if err := json.Unmarshal(payload, &input); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	response.Debug(util.MessageData{
@@ -284,7 +284,7 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 
 	pcmBytes, _, err := instance.synth.Synthesize(input.Text, &opts)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return pcmBytes, nil
@@ -302,7 +302,7 @@ func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, e
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	instance, exists := piper.models[model]
 	if !exists {
-		return nil, response.Err(fmt.Errorf("piper model %s is not initialized", model))
+		return nil, response.Err("piper model %s is not initialized", model)
 	}
 
 	return instance.Voices, nil

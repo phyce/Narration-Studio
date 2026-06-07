@@ -17,6 +17,7 @@ const (
 
 type Entry struct {
 	ID          uint64    `json:"id"`
+	ChainID     uint64    `json:"chainId"`
 	Timestamp   time.Time `json:"timestamp"`
 	Severity    Severity  `json:"severity"`
 	Summary     string    `json:"summary"`
@@ -55,6 +56,9 @@ func Record(entry Entry) Entry {
 	bufferMutex.Lock()
 	lastID++
 	entry.ID = lastID
+	if entry.ChainID == 0 {
+		entry.ChainID = entry.ID
+	}
 
 	recentEntries = append(recentEntries, entry)
 	if len(recentEntries) > maxRecentInMemory {

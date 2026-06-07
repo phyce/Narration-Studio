@@ -3,7 +3,6 @@ package audio
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"nstudio/app/common/response"
 	"os"
 	"path/filepath"
@@ -17,10 +16,10 @@ import (
 func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration, sampleRate, channelCount, bitDepth int) error {
 	wavFiles, err := filepath.Glob(filepath.Join(dirPath, "*.wav"))
 	if err != nil {
-		return response.Err(fmt.Errorf("Failed to list WAV files: %v", err))
+		return response.Err("Failed to list WAV files: %v", err)
 	}
 	if len(wavFiles) == 0 {
-		return response.Err(fmt.Errorf("No WAV files found in the directory"))
+		return response.Err("No WAV files found in the directory")
 	}
 
 	sort.Strings(wavFiles)
@@ -47,32 +46,32 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 
 		decoder := wav.NewDecoder(file)
 		if !decoder.IsValidFile() {
-			return response.Err(fmt.Errorf("Invalid WAV file: " + wavPath))
+			return response.Err("Invalid WAV file: %s", wavPath)
 		}
 
 		pcmBuffer, err := decoder.FullPCMBuffer()
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if pcmBuffer.Format.SampleRate != sampleRate {
 			pcmBuffer, err = ResampleBuffer(pcmBuffer, sampleRate)
 			if err != nil {
-				response.Err(err)
+				response.Err("%w", err)
 			}
 		}
 
 		if pcmBuffer.Format.NumChannels != channelCount {
 			pcmBuffer, err = ChangeChannelCount(pcmBuffer, channelCount)
 			if err != nil {
-				response.Err(err)
+				response.Err("%w", err)
 			}
 		}
 
 		if pcmBuffer.SourceBitDepth != bitDepth {
 			pcmBuffer, err = ChangeBitDepth(pcmBuffer, bitDepth)
 			if err != nil {
-				response.Err(err)
+				response.Err("%w", err)
 			}
 		}
 
@@ -94,19 +93,19 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 	outputPath := filepath.Join(dirPath, outputFilename)
 	combinedFile, err := os.Create(outputPath)
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 	defer combinedFile.Close()
 
 	encoder := wav.NewEncoder(combinedFile, sampleRate, bitDepth, channelCount, 1)
 	err = encoder.Write(combinedBuffer)
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	err = encoder.Close()
 	if err != nil {
-		response.Err(err)
+		response.Err("%w", err)
 	}
 
 	return nil
@@ -168,7 +167,7 @@ func ChangeChannelCount(buffer *audio.IntBuffer, targetChannelCount int) (*audio
 			}
 		}
 	} else {
-		return nil, response.Err(fmt.Errorf("Unsupported channel conversion"))
+		return nil, response.Err("Unsupported channel conversion")
 	}
 
 	convertedBuf := &audio.IntBuffer{

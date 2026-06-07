@@ -20,8 +20,23 @@ func emitEvent(name string, data util.MessageData, log bool) {
 	}
 }
 
-func record(severity activity.Severity, summary, detail string) {
+type recordedError struct {
+	err     error
+	chainID uint64
+}
+
+func (e *recordedError) Error() string { return e.err.Error() }
+
+func (e *recordedError) Unwrap() error { return e.err }
+
+func record(severity activity.Severity, summary, detail string, chainID ...uint64) activity.Entry {
 	currentStatus := status.Get()
+
+	entryChainID := uint64(0)
+	if len(chainID) > 0 {
+		entryChainID = chainID[0]
+	}
+
 	entry := activity.Record(activity.Entry{
 		Severity:    severity,
 		Summary:     summary,
@@ -29,8 +44,10 @@ func record(severity activity.Severity, summary, detail string) {
 		StatusID:    int(currentStatus.Status),
 		StatusLabel: status.Label(currentStatus.Status),
 		Source:      callerSource(3),
+		ChainID:     entryChainID,
 	})
 	eventManager.GetInstance().EmitEvent("activity.appended", entry)
+	return entry
 }
 
 func callerSource(skip int) string {

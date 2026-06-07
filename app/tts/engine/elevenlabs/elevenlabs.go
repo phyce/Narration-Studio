@@ -26,7 +26,7 @@ func (labs *ElevenLabs) Initialize() error {
 	var err error
 	voices, err = FetchVoices()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	labs.outputType = "pcm_24000"
@@ -61,12 +61,12 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 
 	audioClip, err := labs.sendRequest(message.Voice.Voice, input)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	err = commonAudio.PlayPCMAudioBytes(audioClip)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return response.Success(util.MessageData{
@@ -83,7 +83,7 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 
 	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	for _, message := range messages {
@@ -98,7 +98,7 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 
 		audioClip, err := labs.sendRequest(message.Voice.Voice, input)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		filename := util.GenerateFilename(
@@ -109,13 +109,13 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 
 		err = commonAudio.SaveWAVFile(audioClip, filename)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if play {
 			err = commonAudio.PlayPCMAudioBytes(audioClip)
 			if err != nil {
-				return response.Err(err)
+				return response.Err("%w", err)
 			}
 		}
 	}
@@ -126,12 +126,12 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
 	var request ElevenLabsRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	pcmData, err := labs.sendRequest(request.VoiceID, request)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	return pcmData, nil
@@ -158,19 +158,13 @@ func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
 
 	models, err := FetchModels()
 	if err != nil {
-		response.Error(util.MessageData{
-			Summary: "Failed to fetch elevenlabs models",
-			Detail:  err.Error(),
-		})
+		response.Err("Failed to fetch elevenlabs models: %w", err)
 		return make(map[string]engine.Model)
 	}
 
 	voices, err = FetchVoices()
 	if err != nil {
-		response.Error(util.MessageData{
-			Summary: "Failed to fetch elevenlabs voices",
-			Detail:  err.Error(),
-		})
+		response.Err("Failed to fetch elevenlabs voices: %w", err)
 		return make(map[string]engine.Model)
 	}
 
@@ -183,19 +177,19 @@ func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
 func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]byte, error) {
 	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
 	if apiKey == "" {
-		return nil, response.Err(fmt.Errorf("Elevenlabs API Key is not set"))
+		return nil, response.Err("Elevenlabs API Key is not set")
 	}
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to marshal request body: %v", err))
+		return nil, response.Err("failed to marshal request body: %v", err)
 	}
 
 	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=%s", voiceID, labs.outputType)
 
 	httpRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to create HTTP request: %v", err))
+		return nil, response.Err("failed to create HTTP request: %v", err)
 	}
 
 	httpRequest.Header.Set("xi-api-key", apiKey)
@@ -206,18 +200,18 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to send HTTP request: %v", err))
+		return nil, response.Err("failed to send HTTP request: %v", err)
 	}
 	defer httpResponse.Body.Close()
 
 	if httpResponse.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(httpResponse.Body)
-		return nil, response.Err(fmt.Errorf("request failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes)))
+		return nil, response.Err("request failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes))
 	}
 
 	responseData, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to read response body: %v", err))
+		return nil, response.Err("failed to read response body: %v", err)
 	}
 
 	response.Success(util.MessageData{

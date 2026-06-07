@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"io"
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
 	"os"
 
 	"github.com/go-audio/audio"
@@ -38,10 +37,7 @@ func PlayPCMAudioBytes(audioClip []byte) error {
 			var sample int16
 			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
 			if err != nil {
-				response.Error(util.MessageData{
-					Summary: "Error reading PCM data",
-					Detail:  err.Error(),
-				})
+				response.Err("Error reading PCM data: %w", err)
 				return sampleIndex, false
 			}
 
@@ -167,7 +163,7 @@ func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
 
 	stream, err := flac.New(reader)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	var buffer audio.IntBuffer
@@ -182,7 +178,7 @@ func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
 			break
 		}
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 		for _, subframe := range frame.Subframes {
 			for _, sample := range subframe.Samples {
@@ -193,16 +189,16 @@ func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
 
 	outputFile, err := os.Create(filename)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	defer outputFile.Close()
 
 	encoder := wav.NewEncoder(outputFile, buffer.Format.SampleRate, int(stream.Info.BitsPerSample), buffer.Format.NumChannels, 1)
 	if err := encoder.Write(&buffer); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	if err := encoder.Close(); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	return nil

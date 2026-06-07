@@ -98,7 +98,7 @@ func (voice *Voice) UnmarshalJSON(data []byte) error {
 
 	var tempStruct tempVoice
 	if err := json.Unmarshal(data, &tempStruct); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	voice.ID = fmt.Sprintf("%d", tempStruct.VoiceID+tempStruct.PiperVoiceID)

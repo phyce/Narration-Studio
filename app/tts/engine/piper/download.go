@@ -224,24 +224,24 @@ func FetchAvailableModels() ([]AvailableModel, error) {
 	client := &http.Client{Timeout: 20 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, piperModelsReleasesURL, nil)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, response.Err(fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, string(body)))
+		return nil, response.Err("GitHub API returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var releases []githubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	modelsDir, _ := getModelsDir()
@@ -329,18 +329,18 @@ func FetchAvailableModels() ([]AvailableModel, error) {
 
 func downloadFile(url, destPath string, reader *progressReader) error {
 	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get(url)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return response.Err(fmt.Errorf("download failed (%d) for %s", resp.StatusCode, url))
+		return response.Err("download failed (%d) for %s", resp.StatusCode, url)
 	}
 
 	var src io.Reader = resp.Body
@@ -352,23 +352,23 @@ func downloadFile(url, destPath string, reader *progressReader) error {
 	tmpPath := destPath + ".part"
 	out, err := os.Create(tmpPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	_, err = io.Copy(out, src)
 	closeErr := out.Close()
 	if err != nil {
 		_ = os.Remove(tmpPath)
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	if closeErr != nil {
 		_ = os.Remove(tmpPath)
-		return response.Err(closeErr)
+		return response.Err("%w", closeErr)
 	}
 
 	if err := os.Rename(tmpPath, destPath); err != nil {
 		_ = os.Remove(tmpPath)
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	return nil
 }
@@ -376,7 +376,7 @@ func downloadFile(url, destPath string, reader *progressReader) error {
 func DownloadModel(model AvailableModel) error {
 	modelsDir, err := ensureWritableModelsDir()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	folder := filepath.Join(modelsDir, model.ID)
@@ -415,11 +415,11 @@ func DownloadModel(model AvailableModel) error {
 func DeleteModel(modelID string) error {
 	modelsDir, err := getModelsDir()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	if modelID == "" {
-		return response.Err(fmt.Errorf("model ID is required"))
+		return response.Err("model ID is required")
 	}
 
 	folder := filepath.Join(modelsDir, modelID)
@@ -427,7 +427,7 @@ func DeleteModel(modelID string) error {
 	absModelsDir, _ := filepath.Abs(modelsDir)
 	absFolder, _ := filepath.Abs(folder)
 	if !strings.HasPrefix(absFolder, absModelsDir+string(os.PathSeparator)) {
-		return response.Err(fmt.Errorf("refusing to delete outside models directory"))
+		return response.Err("refusing to delete outside models directory")
 	}
 
 	if _, err := os.Stat(folder); os.IsNotExist(err) {
@@ -435,7 +435,7 @@ func DeleteModel(modelID string) error {
 	}
 
 	if err := os.RemoveAll(folder); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	return nil
 }

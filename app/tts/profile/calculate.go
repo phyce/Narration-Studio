@@ -50,7 +50,7 @@ func calculateVoice(engine engine.Engine, name string) (string, string, error) {
 		segments := strings.Split(name, ":")
 
 		if len(segments) < 2 {
-			return "", "", response.Err(fmt.Errorf("Failed to parse voice name:" + name))
+			return "", "", response.Err("Failed to parse voice name: %s", name)
 		}
 
 		return segments[0], segments[1], nil
@@ -77,9 +77,7 @@ func calculateVoice(engine engine.Engine, name string) (string, string, error) {
 	voices, err := modelManager.GetModelVoices(engine.ID, selectedModel)
 
 	if err != nil || len(voices) == 0 {
-		return "", "", response.Err(
-			fmt.Errorf("No voices found for engine: %s", engine.Name),
-		)
+		return "", "", response.Err("No voices found for engine: %s", engine.Name)
 	}
 	selectedVoice := voices[rand.Intn(len(voices)-1)]
 
@@ -113,7 +111,7 @@ func calculateProfileEngine(name string, profileID string) (engine.Engine, error
 	manager := GetManager()
 	profile, err := manager.GetProfile(profileID)
 	if err != nil {
-		return engine.Engine{}, response.Err(err)
+		return engine.Engine{}, response.Err("%w", err)
 	}
 
 	profileToggles := profile.GetModelToggles()
@@ -152,7 +150,7 @@ func calculateProfileVoice(eng engine.Engine, name string, profileID string) (st
 		segments := strings.Split(name, ":")
 
 		if len(segments) < 2 {
-			return "", "", response.Err(fmt.Errorf("Failed to parse voice name:" + name))
+			return "", "", response.Err("Failed to parse voice name: %s", name)
 		}
 
 		return segments[0], segments[1], nil
@@ -161,7 +159,7 @@ func calculateProfileVoice(eng engine.Engine, name string, profileID string) (st
 	manager := GetManager()
 	profile, err := manager.GetProfile(profileID)
 	if err != nil {
-		return "", "", response.Err(err)
+		return "", "", response.Err("%w", err)
 	}
 
 	profileToggles := profile.GetModelToggles()
@@ -193,9 +191,7 @@ func calculateProfileVoice(eng engine.Engine, name string, profileID string) (st
 	voices, err := modelManager.GetModelVoices(eng.ID, selectedModel)
 
 	if err != nil || len(voices) == 0 {
-		return "", "", response.Err(
-			fmt.Errorf("No voices found for engine: %s", eng.Name),
-		)
+		return "", "", response.Err("No voices found for engine: %s", eng.Name)
 	}
 	selectedVoice := voices[rand.Intn(len(voices)-1)]
 

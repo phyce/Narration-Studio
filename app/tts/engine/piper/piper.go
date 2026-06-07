@@ -75,11 +75,11 @@ func (piper *Piper) Initialize() error {
 	settings := config.GetEngine().Local.Piper
 
 	if settings.Location == "" {
-		return response.Err(fmt.Errorf("Piper executable location is not set"))
+		return response.Err("Piper executable location is not set")
 	}
 
 	if settings.ModelsDirectory == "" {
-		return response.Err(fmt.Errorf("Piper model location is not set"))
+		return response.Err("Piper model location is not set")
 	}
 
 	if piper.models == nil {
@@ -104,7 +104,7 @@ func (piper *Piper) Start(modelName string) error {
 		if err != nil {
 			return err
 		}
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	modelProcessID := piper.GetProcessID(modelName)
@@ -118,7 +118,7 @@ func (piper *Piper) Start(modelName string) error {
 
 	err, modelPath := util.ExpandPath(config.GetEngine().Local.Piper.ModelsDirectory)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	metadataPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
@@ -129,12 +129,12 @@ func (piper *Piper) Start(modelName string) error {
 
 	data, err := os.ReadFile(metadataPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	var voices []engine.Voice
 	if err := json.Unmarshal(data, &voices); err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	onnxPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.onnx", modelName))
@@ -143,7 +143,7 @@ func (piper *Piper) Start(modelName string) error {
 
 	err, piperPath := util.ExpandPath(config.GetEngine().Local.Piper.Location)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	command := exec.Command(piperPath, commandArguments...)
@@ -165,22 +165,22 @@ func (piper *Piper) Start(modelName string) error {
 
 	instance.stdin, err = instance.command.StdinPipe()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	instance.stderr, err = instance.command.StderrPipe()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	instance.stdout, err = instance.command.StdoutPipe()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	err = instance.command.Start()
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	piper.StartAudioCapture(instance)
@@ -211,7 +211,7 @@ func (piper *Piper) Stop(modelName string) error {
 
 	if err := instance.command.Process.Signal(os.Interrupt); err != nil {
 		if killErr := instance.command.Process.Kill(); killErr != nil {
-			return response.Err(fmt.Errorf("Failed to kill process for model %s: %v, original issue: %v", modelName, killErr, err))
+			return response.Err("Failed to kill process for model %s: %v, original issue: %v", modelName, killErr, err)
 		}
 	}
 
@@ -228,7 +228,7 @@ func (piper *Piper) Stop(modelName string) error {
 					if signal == os.Interrupt || signal == os.Kill || signal == syscall.SIGTERM || signal == syscall.Signal(-1) {
 						err = nil
 					} else {
-						return response.Err(fmt.Errorf("Process for model %s exited with unexpected signal: %v", modelName, signal))
+						return response.Err("Process for model %s exited with unexpected signal: %v", modelName, signal)
 					}
 				} else {
 					// On Windows, killed processes often exit with status code 1
@@ -241,23 +241,23 @@ func (piper *Piper) Stop(modelName string) error {
 		}
 
 		if err != nil {
-			return response.Err(fmt.Errorf("Process for model %s exited with issue: %v", modelName, err))
+			return response.Err("Process for model %s exited with issue: %v", modelName, err)
 		}
 	}
 
 	if instance.stdin != nil {
 		if err := instance.stdin.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
-			return response.Err(fmt.Errorf("Failed to close stdin for model %s: %v", modelName, err))
+			return response.Err("Failed to close stdin for model %s: %v", modelName, err)
 		}
 	}
 	if instance.stdout != nil {
 		if err := instance.stdout.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
-			return response.Err(fmt.Errorf("Failed to close stdout for model %s: %v", modelName, err))
+			return response.Err("Failed to close stdout for model %s: %v", modelName, err)
 		}
 	}
 	if instance.stderr != nil {
 		if err := instance.stderr.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
-			return response.Err(fmt.Errorf("Failed to close stderr for model %s: %v", modelName, err))
+			return response.Err("Failed to close stderr for model %s: %v", modelName, err)
 		}
 	}
 
@@ -287,13 +287,13 @@ func (piper *Piper) Play(message util.CharacterMessage) error {
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 	jsonBytes = append(jsonBytes, '\n')
 
 	audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	audio.PlayRawAudioBytes(audioClip)
@@ -315,7 +315,7 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 
 	err, outputPath := util.ExpandPath(config.GetSettings().OutputPath)
 	if err != nil {
-		return response.Err(err)
+		return response.Err("%w", err)
 	}
 
 	for _, message := range messages {
@@ -335,13 +335,13 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 
 		jsonBytes, err := json.Marshal(input)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 		jsonBytes = append(jsonBytes, '\n')
 
 		audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
 		if err != nil {
-			return response.Err(err)
+			return response.Err("%w", err)
 		}
 
 		if play {
@@ -360,7 +360,7 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	log.Info("generating in piper")
 	if piper.GetProcessID(model) == 0 {
 		if !config.GetEngineToggles()["piper"][model] {
-			return make([]byte, 0), response.Err(fmt.Errorf("Model is not enabled:" + model))
+			return make([]byte, 0), response.Err("Model is not enabled: %s", model)
 		}
 
 		//no need to return, simply send error
@@ -368,19 +368,19 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 
 		err := piper.Start(model)
 		if err != nil {
-			response.Err(fmt.Errorf("Failed to start model %s: %v", model, err))
+			response.Err("Failed to start model %s: %v", model, err)
 		}
 	}
 
 	if !utf8.Valid(payload) {
-		return nil, response.Err(fmt.Errorf("Input JSON is not valid UTF-8"))
+		return nil, response.Err("Input JSON is not valid UTF-8")
 	}
 
 	response.Debug(util.MessageData{
 		Summary: fmt.Sprintf("Sending to piper model: %s payload: %s", model, string(payload)),
 	})
 	if _, err := piper.models[model].stdin.Write(payload); err != nil {
-		return nil, response.Err(err)
+		return nil, response.Err("%w", err)
 	}
 
 	endSignal := make(chan bool)
@@ -430,7 +430,7 @@ func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 
 	modelData, exists := piper.models[model]
 	if !exists {
-		return nil, response.Err(fmt.Errorf("Model %s is not initialized", model))
+		return nil, response.Err("Model %s is not initialized", model)
 	}
 
 	return modelData.Voices, nil
@@ -447,10 +447,7 @@ func (piper *Piper) StartAudioCapture(instance PiperInstance) {
 	go func() {
 		_, err := io.Copy(instance.audioData, instance.stdout)
 		if err != nil {
-			response.Error(util.MessageData{
-				Summary: "Failed to start capturing audio",
-				Detail:  instance.command.String() + "\n" + err.Error(),
-			})
+			response.Err("Failed to start capturing audio: %s\n%w", instance.command.String(), err)
 		}
 	}()
 }

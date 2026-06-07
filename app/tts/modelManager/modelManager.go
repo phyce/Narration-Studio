@@ -86,19 +86,13 @@ func restartEngine(engineName string) {
 
 		for _, instance := range modelPool.Instances {
 			if err := instance.Stop(modelID); err != nil {
-				response.Error(util.MessageData{
-					Summary: fmt.Sprintf("Failed to stop model %s:%s", engineName, modelID),
-					Detail:  err.Error(),
-				})
+				response.Err("Failed to stop model %s:%s: %w", engineName, modelID, err)
 			}
 		}
 
 		for _, instance := range modelPool.Instances {
 			if err := instance.Start(modelID); err != nil {
-				response.Error(util.MessageData{
-					Summary: fmt.Sprintf("Failed to restart model %s:%s", engineName, modelID),
-					Detail:  err.Error(),
-				})
+				response.Err("Failed to restart model %s:%s: %w", engineName, modelID, err)
 			}
 		}
 	}
@@ -195,20 +189,12 @@ func RefreshModels() error {
 						if enabled {
 							err := instance.Start(modelID)
 							if err != nil {
-								response.Err(err)
-								response.Error(util.MessageData{
-									Summary: "Failed to start model:" + modelID,
-									Detail:  err.Error(),
-								})
+								response.Err("Failed to start model %s: %w", modelID, err)
 							}
 						} else {
 							err := instance.Stop(modelID)
 							if err != nil {
-								response.Err(err)
-								response.Debug(util.MessageData{
-									Summary: "Failed to stop model:" + modelID,
-									Detail:  err.Error(),
-								})
+								response.Err("Failed to stop model %s: %w", modelID, err)
 							}
 						}
 					}
@@ -222,11 +208,7 @@ func RefreshModels() error {
 
 					pool, err := createModelPool(engineID, modelID)
 					if err != nil {
-						response.Err(err)
-						response.Error(util.MessageData{
-							Summary: fmt.Sprintf("Failed to create pool for %s/%s", engineID, modelID),
-							Detail:  err.Error(),
-						})
+						response.Err("Failed to create pool for %s/%s: %w", engineID, modelID, err)
 						continue
 					}
 
@@ -234,11 +216,7 @@ func RefreshModels() error {
 
 					for _, instance := range pool.Instances {
 						if err := instance.Start(modelID); err != nil {
-							response.Err(err)
-							response.Error(util.MessageData{
-								Summary: "Failed to start model:" + modelID,
-								Detail:  err.Error(),
-							})
+							response.Err("Failed to start model %s: %w", modelID, err)
 						}
 					}
 
@@ -299,10 +277,7 @@ func RegisterEngine(baseEngine tts.Engine) error {
 
 		pool, err := createModelPool(engineID, modelID)
 		if err != nil {
-			response.Error(util.MessageData{
-				Summary: fmt.Sprintf("Failed to create pool for %s/%s", engineID, modelID),
-				Detail:  err.Error(),
-			})
+			response.Err("Failed to create pool for %s/%s: %w", engineID, modelID, err)
 			continue
 		}
 
@@ -330,7 +305,7 @@ func UnregisterEngine(engineID string) error {
 	for modelID, pool := range engineEntry.Models {
 		for _, instance := range pool.Instances {
 			if err := instance.Stop(modelID); err != nil {
-				response.Err(err)
+				response.Err("%w", err)
 			}
 		}
 	}
@@ -366,10 +341,7 @@ func RegisterModel(model tts.Model) {
 			for _, instance := range modelPool.Instances {
 				err := instance.Start(model.ID)
 				if err != nil {
-					response.Error(util.MessageData{
-						Summary: "Failed to start model:" + model.ID,
-						Detail:  err.Error(),
-					})
+					response.Err("Failed to start model %s: %w", model.ID, err)
 				}
 			}
 		}
@@ -515,7 +487,7 @@ func GetModelVoices(engineName string, modelID string) ([]tts.Voice, error) {
 	selectedEngine, exists := manager.Engines[engineName]
 
 	if !exists {
-		return nil, response.Err(fmt.Errorf("Engine %s not found", engineName))
+		return nil, response.Err("Engine %s not found", engineName)
 	}
 
 	if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists && len(modelPool.Instances) > 0 {
@@ -527,7 +499,7 @@ func GetModelVoices(engineName string, modelID string) ([]tts.Voice, error) {
 		return selectedEngine.Engine.Engine.GetVoices(modelID)
 	}
 
-	return nil, response.Err(fmt.Errorf("Model %s not found for engine %s", modelID, engineName))
+	return nil, response.Err("Model %s not found for engine %s", modelID, engineName)
 }
 
 func GetInstanceCount(engineID string, modelID string) int {

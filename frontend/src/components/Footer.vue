@@ -3,7 +3,7 @@ import '../css/footer.css';
 import {Status, StatusDisplayNames} from "./enums/status";
 import {computed, onMounted, onUnmounted, ref} from "vue";
 import {eventManager} from "../util/eventManager";
-import {GetStatus} from "../../bindings/nstudio/app";
+import {GetStatus, OpenActivityLog} from "../../bindings/nstudio/app";
 
 const status = ref<number>(Status.Unknown);
 const title = ref<string>("");
@@ -30,5 +30,5 @@ const currentStatus = computed(() => StatusDisplayNames[status.value as Status])
 </script>
 
 <template>
-	<footer class="footer" :title="title" v-html="currentStatus"/>
+	<footer class="footer" :title="title" @click="OpenActivityLog" v-html="currentStatus"/>
 </template>

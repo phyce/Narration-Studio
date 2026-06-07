@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"nstudio/app/cache"
+	"nstudio/app/common/activity"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/issue"
@@ -726,7 +727,7 @@ func (app *App) GetEnginesForProfile(profileID string) string {
 func getCliExecutablePath() (string, error) {
 	err, executablePath := util.ExpandPath(os.Args[0])
 	if err != nil {
-		return "", err
+		return "", response.Err("%w", err)
 	}
 
 	executableDirectory := filepath.Dir(executablePath)
@@ -740,7 +741,7 @@ func getCliExecutablePath() (string, error) {
 	cliExecutablePath := filepath.Join(executableDirectory, cliExecutableName)
 
 	if _, err := os.Stat(cliExecutablePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("CLI executable not found at: %s", cliExecutablePath)
+		return "", response.Err("CLI executable not found at: %s", cliExecutablePath)
 	}
 
 	return cliExecutablePath, nil
@@ -1276,6 +1277,37 @@ func (app *App) EventSubscribe(eventName string, handler func(data interface{}))
 
 func (app *App) EventTrigger(eventName string, data interface{}) {
 	eventManager.GetInstance().TriggerEvent(eventName, data)
+}
+
+// </editor-fold>
+
+// <editor-fold desc="Activity Log">
+func (app *App) OpenActivityLog() {
+	if window, exists := application.Get().Window.GetByName("activitylog"); exists {
+		window.Show()
+		window.Focus()
+	}
+}
+
+func (app *App) GetActivityLog() string {
+	entries := activity.Recent(1000)
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+func (app *App) GetActivityLogOlder(beforeID int, limit int) string {
+	entries, err := activity.ReadOlder(uint64(beforeID), limit)
+	if err != nil {
+		return "[]"
+	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
 }
 
 // </editor-fold>

@@ -57,13 +57,14 @@ func Set(status ID, message string) {
 	eventManager.GetInstance().EmitEvent("status", currentStatus)
 
 	label := Label(status)
-	activity.Record(activity.Entry{
+	entry := activity.Record(activity.Entry{
 		Severity:    activity.SeverityStatus,
 		Summary:     "Status: " + label,
 		Detail:      message,
 		StatusID:    int(status),
 		StatusLabel: label,
 	})
+	eventManager.GetInstance().EmitEvent("activity.appended", entry)
 }
 
 func Get() StatusEvent {

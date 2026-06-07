@@ -48,6 +48,14 @@ export function GenerateServerCommand(mode: string, port: number, host: string, 
     return $Call.ByID(3955993466, mode, port, host, configFile);
 }
 
+export function GetActivityLog(): $CancellablePromise<string> {
+    return $Call.ByID(3144845124);
+}
+
+export function GetActivityLogOlder(beforeID: number, limit: number): $CancellablePromise<string> {
+    return $Call.ByID(1091100914, beforeID, limit);
+}
+
 export function GetAvailableModels(): $CancellablePromise<string> {
     return $Call.ByID(2005304584);
 }
@@ -118,6 +126,13 @@ export function GetStatus(): $CancellablePromise<string> {
 
 export function IsPiperGPUAvailable(): $CancellablePromise<boolean> {
     return $Call.ByID(1493357084);
+}
+
+/**
+ * <editor-fold desc="Activity Log">
+ */
+export function OpenActivityLog(): $CancellablePromise<void> {
+    return $Call.ByID(4430194);
 }
 
 export function PiperDeleteModel(modelID: string): $CancellablePromise<string> {

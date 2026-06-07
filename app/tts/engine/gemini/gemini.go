@@ -144,7 +144,7 @@ func (gemini *Gemini) Generate(model string, payload []byte) ([]byte, error) {
 func (gemini *Gemini) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
 	pcmData, err := gemini.Generate(model, payload)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	// Assuming 24kHz, 1 channel, 16 bit

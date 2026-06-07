@@ -23,6 +23,7 @@ func emitEvent(name string, data util.MessageData, log bool) {
 type recordedError struct {
 	err     error
 	chainID uint64
+	message string
 }
 
 func (e *recordedError) Error() string { return e.err.Error() }

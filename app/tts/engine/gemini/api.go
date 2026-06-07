@@ -15,7 +15,7 @@ import (
 func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]byte, error) {
 	apiKey := config.GetEngine().Api.Gemini.ApiKey
 	if apiKey == "" {
-		return nil, fmt.Errorf("Gemini API key is not configured")
+		return nil, response.Err("Gemini API key is not configured")
 	}
 
 	jsonData, err := json.Marshal(request)
@@ -41,7 +41,7 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 
 	if httpResponse.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(httpResponse.Body)
-		return nil, fmt.Errorf("Gemini API error: %s - %s", httpResponse.Status, string(bodyBytes))
+		return nil, response.Err("Gemini API error: %s - %s", httpResponse.Status, string(bodyBytes))
 	}
 
 	var geminiResponse GeminiResponse
@@ -50,12 +50,12 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 	}
 
 	if len(geminiResponse.Candidates) == 0 || len(geminiResponse.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("no content in Gemini response")
+		return nil, response.Err("no content in Gemini response")
 	}
 
 	base64Data := geminiResponse.Candidates[0].Content.Parts[0].InlineData.Data
 	if base64Data == "" {
-		return nil, fmt.Errorf("no audio data in Gemini response")
+		return nil, response.Err("no audio data in Gemini response")
 	}
 
 	audioData, err := base64.StdEncoding.DecodeString(base64Data)

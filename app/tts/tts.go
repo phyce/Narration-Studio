@@ -134,7 +134,7 @@ func GenerateRawAudio(voice *util.CharacterVoice, text string) ([]byte, error) {
 	// Use new GenerateAudio function and convert to raw PCM for backward compatibility
 	audioObj, err := GenerateAudio(voice, text)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	return audioObj.ToPCM()
@@ -150,7 +150,7 @@ func preparePayload(message util.CharacterMessage) ([]byte, error) {
 		}
 		result, err := json.Marshal(payload)
 		if err != nil {
-			return nil, err
+			return nil, response.Err("%w", err)
 		}
 
 		return append(result, '\n'), nil

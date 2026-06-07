@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"nstudio/app/common/response"
 	customMiddleware "nstudio/app/server/http/middleware"
 	configRoute "nstudio/app/server/http/routes/config"
 	"nstudio/app/server/http/routes/engines"
@@ -59,7 +60,7 @@ func StartHTTPServer(config ServerConfig) error {
 	defer cancel()
 
 	if err := echoServer.Shutdown(ctx); err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	fmt.Println("Server stopped")

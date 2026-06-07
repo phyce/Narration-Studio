@@ -3,10 +3,10 @@ package pack
 import (
 	"archive/zip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"nstudio/app/common/eventManager"
+	"nstudio/app/common/response"
 	"nstudio/app/tts/engine/python"
 	"nstudio/app/tts/modelManager"
 	"os"
@@ -76,15 +76,15 @@ func (progress *progressReader) emitProgressIfDue(force bool) {
 
 func Install(availablePack AvailablePack) error {
 	if availablePack.Manifest.ID == "" {
-		return fmt.Errorf("install: pack manifest has no id")
+		return response.Err("install: pack manifest has no id")
 	}
 	if availablePack.BundleURL == "" {
-		return fmt.Errorf("install: pack %s has no bundle URL", availablePack.Manifest.ID)
+		return response.Err("install: pack %s has no bundle URL", availablePack.Manifest.ID)
 	}
 
 	rootPath, err := ensurePacksRootPath()
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	archivePath := filepath.Join(rootPath, availablePack.Manifest.ID+".nstudio")
@@ -94,30 +94,30 @@ func Install(availablePack AvailablePack) error {
 	progress.emitProgressIfDue(true)
 
 	if err := downloadBundle(availablePack.BundleURL, archivePath, progress); err != nil {
-		return fmt.Errorf("install: download: %w", err)
+		return response.Err("install: download: %w", err)
 	}
 
 	if _, err := os.Stat(bundlePath); err == nil {
 		if err := os.RemoveAll(bundlePath); err != nil {
-			return fmt.Errorf("install: clear stale bundle: %w", err)
+			return response.Err("install: clear stale bundle: %w", err)
 		}
 	}
 
 	if err := extractZip(archivePath, bundlePath); err != nil {
 		_ = os.RemoveAll(bundlePath)
-		return fmt.Errorf("install: extract: %w", err)
+		return response.Err("install: extract: %w", err)
 	}
 	_ = os.Remove(archivePath)
 
 	manifest, err := readManifest(bundlePath)
 	if err != nil {
 		_ = os.RemoveAll(bundlePath)
-		return fmt.Errorf("install: read manifest: %w", err)
+		return response.Err("install: read manifest: %w", err)
 	}
 
 	if err := validateManifest(manifest, bundlePath); err != nil {
 		_ = os.RemoveAll(bundlePath)
-		return fmt.Errorf("install: validate: %w", err)
+		return response.Err("install: validate: %w", err)
 	}
 
 	if runtime.GOOS != "windows" {
@@ -126,7 +126,7 @@ func Install(availablePack AvailablePack) error {
 	}
 
 	if err := modelManager.RegisterEngine(python.ToEngine(*manifest, bundlePath)); err != nil {
-		return fmt.Errorf("install: register: %w", err)
+		return response.Err("install: register: %w", err)
 	}
 	_ = modelManager.ReloadModels()
 
@@ -147,31 +147,31 @@ func Install(availablePack AvailablePack) error {
 
 func Uninstall(engineID string) error {
 	if engineID == "" {
-		return fmt.Errorf("uninstall: engineID is required")
+		return response.Err("uninstall: engineID is required")
 	}
 
 	if err := modelManager.UnregisterEngine(engineID); err != nil {
-		return fmt.Errorf("uninstall: unregister: %w", err)
+		return response.Err("uninstall: unregister: %w", err)
 	}
 
 	bundlePath, err := installedPackPath(engineID)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	rootPath, err := packsRootPath()
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	absolutePacksRootPath, _ := filepath.Abs(rootPath)
 	absoluteBundlePath, _ := filepath.Abs(bundlePath)
 	if !strings.HasPrefix(absoluteBundlePath, absolutePacksRootPath+string(os.PathSeparator)) {
-		return fmt.Errorf("uninstall: refusing to delete outside packs root: %s", absoluteBundlePath)
+		return response.Err("uninstall: refusing to delete outside packs root: %s", absoluteBundlePath)
 	}
 
 	if _, err := os.Stat(bundlePath); !os.IsNotExist(err) {
 		if err := os.RemoveAll(bundlePath); err != nil {
-			return fmt.Errorf("uninstall: remove bundle: %w", err)
+			return response.Err("uninstall: remove bundle: %w", err)
 		}
 	}
 
@@ -191,7 +191,7 @@ func isLocalBundlePath(bundleSource string) bool {
 
 func downloadBundle(bundleURL, destinationPath string, progress *progressReader) error {
 	if err := os.MkdirAll(filepath.Dir(destinationPath), 0o755); err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	if isLocalBundlePath(bundleURL) {
@@ -201,12 +201,12 @@ func downloadBundle(bundleURL, destinationPath string, progress *progressReader)
 	httpClient := &http.Client{Timeout: 60 * time.Minute}
 	downloadResponse, err := httpClient.Get(bundleURL)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	defer downloadResponse.Body.Close()
 
 	if downloadResponse.StatusCode != http.StatusOK {
-		return fmt.Errorf("download %s: status %d", bundleURL, downloadResponse.StatusCode)
+		return response.Err("download %s: status %d", bundleURL, downloadResponse.StatusCode)
 	}
 
 	if progress.totalBytes == 0 && downloadResponse.ContentLength > 0 {
@@ -220,7 +220,7 @@ func downloadBundle(bundleURL, destinationPath string, progress *progressReader)
 func copyLocalBundle(sourcePath, destinationPath string, progress *progressReader) error {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
-		return fmt.Errorf("open local bundle %s: %w", sourcePath, err)
+		return response.Err("open local bundle %s: %w", sourcePath, err)
 	}
 	defer sourceFile.Close()
 
@@ -236,22 +236,22 @@ func writeThroughTemporaryFile(sourceReader io.Reader, destinationPath string) e
 	temporaryFilePath := destinationPath + ".part"
 	temporaryFile, err := os.Create(temporaryFilePath)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	if _, err := io.Copy(temporaryFile, sourceReader); err != nil {
 		temporaryFile.Close()
 		_ = os.Remove(temporaryFilePath)
-		return err
+		return response.Err("%w", err)
 	}
 	if err := temporaryFile.Close(); err != nil {
 		_ = os.Remove(temporaryFilePath)
-		return err
+		return response.Err("%w", err)
 	}
 
 	if err := os.Rename(temporaryFilePath, destinationPath); err != nil {
 		_ = os.Remove(temporaryFilePath)
-		return err
+		return response.Err("%w", err)
 	}
 	return nil
 }
@@ -259,47 +259,47 @@ func writeThroughTemporaryFile(sourceReader io.Reader, destinationPath string) e
 func extractZip(sourcePath, destinationPath string) error {
 	zipReader, err := zip.OpenReader(sourcePath)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	defer zipReader.Close()
 
 	if err := os.MkdirAll(destinationPath, 0o755); err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	absoluteDestinationPath, err := filepath.Abs(destinationPath)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	for _, zipEntry := range zipReader.File {
 		cleanedEntryName := filepath.FromSlash(zipEntry.Name)
 		if strings.Contains(cleanedEntryName, "..") || filepath.IsAbs(cleanedEntryName) {
-			return fmt.Errorf("zip entry rejected (path traversal): %q", zipEntry.Name)
+			return response.Err("zip entry rejected (path traversal): %q", zipEntry.Name)
 		}
 		entryTargetPath := filepath.Join(destinationPath, cleanedEntryName)
 		absoluteTargetPath, err := filepath.Abs(entryTargetPath)
 		if err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 		if absoluteTargetPath != absoluteDestinationPath && !strings.HasPrefix(absoluteTargetPath, absoluteDestinationPath+string(os.PathSeparator)) {
-			return fmt.Errorf("zip entry rejected (escapes destination): %q", zipEntry.Name)
+			return response.Err("zip entry rejected (escapes destination): %q", zipEntry.Name)
 		}
 
 		if zipEntry.FileInfo().IsDir() {
 			if err := os.MkdirAll(entryTargetPath, 0o755); err != nil {
-				return err
+				return response.Err("%w", err)
 			}
 			continue
 		}
 
 		if err := os.MkdirAll(filepath.Dir(entryTargetPath), 0o755); err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 
 		entryReader, err := zipEntry.Open()
 		if err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 
 		entryMode := zipEntry.Mode() & 0o777
@@ -309,12 +309,12 @@ func extractZip(sourcePath, destinationPath string) error {
 		targetFile, err := os.OpenFile(entryTargetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, entryMode)
 		if err != nil {
 			entryReader.Close()
-			return err
+			return response.Err("%w", err)
 		}
 		if _, err := io.Copy(targetFile, entryReader); err != nil {
 			entryReader.Close()
 			targetFile.Close()
-			return err
+			return response.Err("%w", err)
 		}
 		entryReader.Close()
 		targetFile.Close()
@@ -325,7 +325,7 @@ func extractZip(sourcePath, destinationPath string) error {
 func ReadManifestFromBundle(bundlePath string) (*python.Manifest, error) {
 	zipReader, err := zip.OpenReader(bundlePath)
 	if err != nil {
-		return nil, fmt.Errorf("open bundle %s: %w", bundlePath, err)
+		return nil, response.Err("open bundle %s: %w", bundlePath, err)
 	}
 	defer zipReader.Close()
 
@@ -335,58 +335,58 @@ func ReadManifestFromBundle(bundlePath string) (*python.Manifest, error) {
 		}
 		entryReader, err := zipEntry.Open()
 		if err != nil {
-			return nil, err
+			return nil, response.Err("%w", err)
 		}
 		rawManifest, err := io.ReadAll(entryReader)
 		entryReader.Close()
 		if err != nil {
-			return nil, err
+			return nil, response.Err("%w", err)
 		}
 		var manifest python.Manifest
 		if err := json.Unmarshal(rawManifest, &manifest); err != nil {
-			return nil, fmt.Errorf("parse manifest.json in bundle: %w", err)
+			return nil, response.Err("parse manifest.json in bundle: %w", err)
 		}
 		return &manifest, nil
 	}
-	return nil, fmt.Errorf("bundle %s has no manifest.json at its root", bundlePath)
+	return nil, response.Err("bundle %s has no manifest.json at its root", bundlePath)
 }
 
 func readManifest(bundlePath string) (*python.Manifest, error) {
 	manifestPath := filepath.Join(bundlePath, "manifest.json")
 	rawManifest, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	var manifest python.Manifest
 	if err := json.Unmarshal(rawManifest, &manifest); err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	return &manifest, nil
 }
 
 func validateManifest(manifest *python.Manifest, bundlePath string) error {
 	if manifest.SchemaVersion != 1 {
-		return fmt.Errorf("unsupported manifest schemaVersion %d", manifest.SchemaVersion)
+		return response.Err("unsupported manifest schemaVersion %d", manifest.SchemaVersion)
 	}
 	if manifest.ID == "" {
-		return fmt.Errorf("manifest missing id")
+		return response.Err("manifest missing id")
 	}
 	if manifest.OS != "" && manifest.OS != runtime.GOOS {
-		return fmt.Errorf("bundle is for %s, current OS is %s", manifest.OS, runtime.GOOS)
+		return response.Err("bundle is for %s, current OS is %s", manifest.OS, runtime.GOOS)
 	}
 	if manifest.Arch != "" && manifest.Arch != runtime.GOARCH {
-		return fmt.Errorf("bundle is for %s, current arch is %s", manifest.Arch, runtime.GOARCH)
+		return response.Err("bundle is for %s, current arch is %s", manifest.Arch, runtime.GOARCH)
 	}
 	if manifest.Runtime.Python == "" || manifest.Runtime.Entrypoint == "" {
-		return fmt.Errorf("manifest runtime is missing python or entrypoint")
+		return response.Err("manifest runtime is missing python or entrypoint")
 	}
 	interpreterPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Python))
 	if _, err := os.Stat(interpreterPath); err != nil {
-		return fmt.Errorf("bundle missing python at %s: %w", interpreterPath, err)
+		return response.Err("bundle missing python at %s: %w", interpreterPath, err)
 	}
 	entrypointPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Entrypoint))
 	if _, err := os.Stat(entrypointPath); err != nil {
-		return fmt.Errorf("bundle missing entrypoint at %s: %w", entrypointPath, err)
+		return response.Err("bundle missing entrypoint at %s: %w", entrypointPath, err)
 	}
 	return nil
 }

@@ -1,7 +1,7 @@
 package player
 
 import (
-	"fmt"
+	"nstudio/app/common/response"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,12 +17,12 @@ import (
 
 func PlayAudioFile(filePath string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return fmt.Errorf("file not found: %s", filePath)
+		return response.Err("file not found: %s", filePath)
 	}
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return response.Err("failed to open file: %w", err)
 	}
 	defer file.Close()
 
@@ -40,11 +40,11 @@ func PlayAudioFile(filePath string) error {
 	case ".flac":
 		streamer, format, err = flac.Decode(file)
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: .wav, .mp3, .ogg, .flac)", ext)
+		return response.Err("unsupported format: %s (supported: .wav, .mp3, .ogg, .flac)", ext)
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to decode: %w", err)
+		return response.Err("failed to decode: %w", err)
 	}
 	defer streamer.Close()
 

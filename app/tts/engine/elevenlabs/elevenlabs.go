@@ -140,7 +140,7 @@ func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
 func (labs *ElevenLabs) GenerateAudio(model string, payload []byte) (*commonAudio.Audio, error) {
 	pcmData, err := labs.Generate(model, payload)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	return commonAudio.NewAudioFromPCM(pcmData, 24000, 1, 16), nil

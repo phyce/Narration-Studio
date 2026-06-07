@@ -98,16 +98,21 @@ func NewWarn(message string) error {
 // <editor-fold desc="Logging">
 func Err(format string, args ...interface{}) error {
 	err := fmt.Errorf(format, args...)
-	log.Error(err)
 
-	chainID := uint64(0)
 	var existing *recordedError
 	if errors.As(err, &existing) {
-		chainID = existing.chainID
+		if err.Error() == existing.message {
+			return &recordedError{err: err, chainID: existing.chainID, message: existing.message}
+		}
+
+		log.Error(err)
+		entry := record(activity.SeverityError, err.Error(), "", existing.chainID)
+		return &recordedError{err: err, chainID: entry.ChainID, message: err.Error()}
 	}
 
-	entry := record(activity.SeverityError, err.Error(), "", chainID)
-	return &recordedError{err: err, chainID: entry.ChainID}
+	log.Error(err)
+	entry := record(activity.SeverityError, err.Error(), "")
+	return &recordedError{err: err, chainID: entry.ChainID, message: err.Error()}
 }
 
 func LogInfo(message string) {

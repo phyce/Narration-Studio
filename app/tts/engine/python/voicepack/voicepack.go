@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	"nstudio/app/common/response"
 	"nstudio/app/tts/engine"
 )
 
@@ -38,13 +39,13 @@ func PacksRootPath(engineID string) (string, error) {
 	if runtime.GOOS == "windows" {
 		userHomePath, err := os.UserHomeDir()
 		if err != nil {
-			return "", err
+			return "", response.Err("%w", err)
 		}
 		return filepath.Join(userHomePath, "Narration Studio", "voices", engineID), nil
 	}
 	userConfigPath, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return "", response.Err("%w", err)
 	}
 	return filepath.Join(userConfigPath, "Narration Studio", "voices", engineID), nil
 }
@@ -52,7 +53,7 @@ func PacksRootPath(engineID string) (string, error) {
 func ScanInstalled(engineID string) ([]Pack, error) {
 	rootPath, err := PacksRootPath(engineID)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	entries, err := os.ReadDir(rootPath)
 	if err != nil {
@@ -88,7 +89,7 @@ func ScanInstalled(engineID string) ([]Pack, error) {
 func AllVoices(engineID string) ([]engine.Voice, error) {
 	packs, err := ScanInstalled(engineID)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	var voices []engine.Voice
 	for _, pack := range packs {

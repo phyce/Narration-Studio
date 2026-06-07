@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"nstudio/app/common/response"
 	"nstudio/app/tts/engine/python"
 )
 
@@ -16,7 +17,7 @@ type InstalledPack struct {
 func ScanInstalled() ([]InstalledPack, error) {
 	rootPath, err := packsRootPath()
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	entries, err := os.ReadDir(rootPath)
 	if err != nil {

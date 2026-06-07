@@ -1,6 +1,6 @@
 package http
 
-import "fmt"
+import "nstudio/app/common/response"
 
 type ProfileTTSRequest struct {
 	Profile   string                 `json:"profile" validate:"required"`
@@ -21,7 +21,7 @@ func (r *ProfileTTSRequest) GetAudioOptions() (*AudioOptions, error) {
 
 	audioMap, ok := audioOpts.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("invalid audio options format")
+		return nil, response.Err("invalid audio options format")
 	}
 
 	opts := &AudioOptions{

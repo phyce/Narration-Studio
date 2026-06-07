@@ -3,7 +3,7 @@ package audio
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"nstudio/app/common/response"
 	"os"
 	"strings"
 )
@@ -18,7 +18,7 @@ func ConvertRawToFormat(rawAudio []byte, format string) ([]byte, error) {
 	case "ogg":
 		return ConvertRawToOGG(rawAudio)
 	default:
-		return nil, fmt.Errorf("unsupported format: %s", format)
+		return nil, response.Err("unsupported format: %s", format)
 	}
 }
 
@@ -60,7 +60,7 @@ func ConvertRawToWAV(rawAudio []byte) ([]byte, error) {
 func ConvertRawToFLAC(rawAudio []byte) ([]byte, error) {
 	wavData, err := ConvertRawToWAV(rawAudio)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	tempWavFile := "/tmp/temp_audio.wav"
@@ -68,7 +68,7 @@ func ConvertRawToFLAC(rawAudio []byte) ([]byte, error) {
 
 	err = os.WriteFile(tempWavFile, wavData, 0644)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	defer os.Remove(tempWavFile)
 
@@ -90,7 +90,7 @@ func ConvertRawToOGG(rawAudio []byte) ([]byte, error) {
 	// Create temporary WAV file
 	wavData, err := ConvertRawToWAV(rawAudio)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	// Since we can't rely on external commands in this environment,

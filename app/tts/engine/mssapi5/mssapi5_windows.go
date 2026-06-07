@@ -3,7 +3,7 @@
 package mssapi5
 
 import (
-	"fmt"
+	"nstudio/app/common/response"
 	"nstudio/app/tts/engine"
 	"os"
 	"path/filepath"
@@ -22,7 +22,7 @@ func comInit() error {
 	if err != nil {
 		oleErr, ok := err.(*ole.OleError)
 		if !ok {
-			return err
+			return response.Err("%w", err)
 		}
 		code := oleErr.Code()
 		if code == 0x00000001 { // S_FALSE — already initialized, OK
@@ -35,11 +35,11 @@ func comInit() error {
 				if ok && oleErr2.Code() == 0x00000001 {
 					return nil // already initialized
 				}
-				return err2
+				return response.Err("%w", err2)
 			}
 			return nil
 		}
-		return err
+		return response.Err("%w", err)
 	}
 	return nil
 }
@@ -53,31 +53,31 @@ func enumerateVoices() ([]engine.Voice, error) {
 	defer runtime.UnlockOSThread()
 
 	if err := comInit(); err != nil {
-		return nil, fmt.Errorf("COM init failed: %w", err)
+		return nil, response.Err("COM init failed: %w", err)
 	}
 
 	unknown, err := oleutil.CreateObject("SAPI.SpVoice")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SAPI.SpVoice: %w", err)
+		return nil, response.Err("failed to create SAPI.SpVoice: %w", err)
 	}
 	defer unknown.Release()
 
 	voice, err := unknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get IDispatch for SpVoice: %w", err)
+		return nil, response.Err("failed to get IDispatch for SpVoice: %w", err)
 	}
 	defer voice.Release()
 
 	tokensResult, err := oleutil.CallMethod(voice, "GetVoices", "", "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to call GetVoices: %w", err)
+		return nil, response.Err("failed to call GetVoices: %w", err)
 	}
 	tokens := tokensResult.ToIDispatch()
 	defer tokens.Release()
 
 	countResult, err := oleutil.GetProperty(tokens, "Count")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get voice count: %w", err)
+		return nil, response.Err("failed to get voice count: %w", err)
 	}
 	count := int(countResult.Val)
 
@@ -137,33 +137,33 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	defer runtime.UnlockOSThread()
 
 	if err := comInit(); err != nil {
-		return nil, fmt.Errorf("COM init failed: %w", err)
+		return nil, response.Err("COM init failed: %w", err)
 	}
 
 	// Create SpVoice
 	voiceUnknown, err := oleutil.CreateObject("SAPI.SpVoice")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SAPI.SpVoice: %w", err)
+		return nil, response.Err("failed to create SAPI.SpVoice: %w", err)
 	}
 	defer voiceUnknown.Release()
 
 	voice, err := voiceUnknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get IDispatch for SpVoice: %w", err)
+		return nil, response.Err("failed to get IDispatch for SpVoice: %w", err)
 	}
 	defer voice.Release()
 
 	// Find and set the desired voice
 	tokensResult, err := oleutil.CallMethod(voice, "GetVoices", "", "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get voices: %w", err)
+		return nil, response.Err("failed to get voices: %w", err)
 	}
 	tokens := tokensResult.ToIDispatch()
 	defer tokens.Release()
 
 	countResult, err := oleutil.GetProperty(tokens, "Count")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get voice count: %w", err)
+		return nil, response.Err("failed to get voice count: %w", err)
 	}
 	count := int(countResult.Val)
 
@@ -188,7 +188,7 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 			_, err = oleutil.PutPropertyRef(voice, "Voice", token)
 			if err != nil {
 				token.Release()
-				return nil, fmt.Errorf("failed to set voice: %w", err)
+				return nil, response.Err("failed to set voice: %w", err)
 			}
 			voiceSet = true
 			token.Release()
@@ -198,7 +198,7 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	}
 
 	if !voiceSet {
-		return nil, fmt.Errorf("voice '%s' not found", voiceID)
+		return nil, response.Err("voice '%s' not found", voiceID)
 	}
 
 	// Set rate and volume
@@ -212,20 +212,20 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	// Create SpFileStream for output
 	streamUnknown, err := oleutil.CreateObject("SAPI.SpFileStream")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SAPI.SpFileStream: %w", err)
+		return nil, response.Err("failed to create SAPI.SpFileStream: %w", err)
 	}
 	defer streamUnknown.Release()
 
 	stream, err := streamUnknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get IDispatch for SpFileStream: %w", err)
+		return nil, response.Err("failed to get IDispatch for SpFileStream: %w", err)
 	}
 	defer stream.Release()
 
 	// Create temp file for WAV output
 	tempDir, err := os.MkdirTemp("", "mssapi5-*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+		return nil, response.Err("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
@@ -234,13 +234,13 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	// Set audio format (22050 Hz, 16-bit, mono)
 	formatUnknown, err := oleutil.CreateObject("SAPI.SpAudioFormat")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SpAudioFormat: %w", err)
+		return nil, response.Err("failed to create SpAudioFormat: %w", err)
 	}
 	defer formatUnknown.Release()
 
 	format, err := formatUnknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get IDispatch for SpAudioFormat: %w", err)
+		return nil, response.Err("failed to get IDispatch for SpAudioFormat: %w", err)
 	}
 	defer format.Release()
 
@@ -252,21 +252,21 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	// SSFMCreateForWrite = 3
 	_, err = oleutil.CallMethod(stream, "Open", tempFile, 3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open output stream: %w", err)
+		return nil, response.Err("failed to open output stream: %w", err)
 	}
 
 	// Set the output stream
 	_, err = oleutil.PutPropertyRef(voice, "AudioOutputStream", stream)
 	if err != nil {
 		oleutil.CallMethod(stream, "Close")
-		return nil, fmt.Errorf("failed to set audio output stream: %w", err)
+		return nil, response.Err("failed to set audio output stream: %w", err)
 	}
 
 	// Speak synchronously (SVSFDefault = 0)
 	_, err = oleutil.CallMethod(voice, "Speak", text, 0)
 	if err != nil {
 		oleutil.CallMethod(stream, "Close")
-		return nil, fmt.Errorf("SAPI5 Speak failed: %w", err)
+		return nil, response.Err("SAPI5 Speak failed: %w", err)
 	}
 
 	// Close stream
@@ -275,7 +275,7 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	// Read the generated WAV file
 	wavBytes, err := os.ReadFile(tempFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read generated WAV: %w", err)
+		return nil, response.Err("failed to read generated WAV: %w", err)
 	}
 
 	return wavBytes, nil

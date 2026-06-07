@@ -153,7 +153,7 @@ func (google *Google) Generate(model string, payload []byte) ([]byte, error) {
 func (google *Google) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
 	pcmData, err := google.Generate(model, payload)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	return audio.NewAudioFromPCM(pcmData, 24000, 1, 16), nil

@@ -2,12 +2,12 @@ package pack
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
+	"nstudio/app/common/response"
 	"nstudio/app/tts/engine/python"
 )
 
@@ -20,7 +20,7 @@ func FetchAvailableFromPath(localPacksPath string) ([]AvailablePack, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("scan local engine packs path %q: %w", localPacksPath, err)
+		return nil, response.Err("scan local engine packs path %q: %w", localPacksPath, err)
 	}
 
 	metadataPathByBaseName := make(map[string]string)

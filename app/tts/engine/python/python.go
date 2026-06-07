@@ -90,7 +90,7 @@ func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, erro
 	defer pythonEngine.mutex.Unlock()
 
 	if err := pythonEngine.ensureModelLoaded(model); err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	var synthPayload SynthPayload
@@ -134,7 +134,7 @@ func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, erro
 func (pythonEngine *Python) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
 	wavBytes, err := pythonEngine.Generate(model, payload)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	return audio.NewAudioFromWAV(wavBytes)
 }
@@ -147,7 +147,7 @@ func (pythonEngine *Python) Play(message util.CharacterMessage) error {
 
 	wavBytes, err := pythonEngine.Generate(message.Voice.Model, payload)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	if err := audio.PlayWAVBytes(wavBytes); err != nil {
@@ -174,7 +174,7 @@ func (pythonEngine *Python) Save(messages []util.CharacterMessage, play bool) er
 
 		wavBytes, err := pythonEngine.Generate(message.Voice.Model, payload)
 		if err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 
 		if outputPath != "" {
@@ -220,7 +220,7 @@ func (pythonEngine *Python) FetchModels() map[string]engine.Model {
 
 func (pythonEngine *Python) ensureModelLoaded(model string) error {
 	if model == "" {
-		return fmt.Errorf("python: model name is empty")
+		return response.Err("python: model name is empty")
 	}
 
 	if pythonEngine.runner != nil && pythonEngine.runner.exited.Load() {
@@ -242,7 +242,7 @@ func (pythonEngine *Python) ensureModelLoaded(model string) error {
 	}
 
 	if !pythonEngine.allowRestart() {
-		return fmt.Errorf("python: runner has crashed %d times in the last %s; refusing to restart (disable and re-enable the engine to retry)", maxRestartsPerWindow, restartWindow)
+		return response.Err("python: runner has crashed %d times in the last %s; refusing to restart (disable and re-enable the engine to retry)", maxRestartsPerWindow, restartWindow)
 	}
 
 	status.Set(status.Loading, fmt.Sprintf("Starting %s engine...", pythonEngine.Manifest.Name))
@@ -329,7 +329,7 @@ func temporaryWAVPath(engineID string) (string, error) {
 	}
 	engineOutputPath := filepath.Join(cacheRootPath, "Narration Studio", "python-tts", engineID)
 	if err := os.MkdirAll(engineOutputPath, 0o755); err != nil {
-		return "", err
+		return "", response.Err("%w", err)
 	}
 	return filepath.Join(engineOutputPath, uuid.NewString()+".wav"), nil
 }

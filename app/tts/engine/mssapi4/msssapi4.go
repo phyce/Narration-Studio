@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+
 	//"time"
 
 	"github.com/charmbracelet/log"
@@ -216,7 +217,7 @@ func (sapi *MsSapi4) Generate(model string, payload []byte) ([]byte, error) {
 func (sapi *MsSapi4) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
 	wavBytes, err := sapi.Generate(model, payload)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	return audio.NewAudioFromWAV(wavBytes)

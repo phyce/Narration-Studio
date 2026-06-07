@@ -41,7 +41,7 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 		file, err := os.Open(wavPath)
 		defer file.Close()
 		if err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 
 		decoder := wav.NewDecoder(file)
@@ -224,14 +224,14 @@ func SaveWAVFile(audioClip []byte, filename string) error {
 	for i := 0; i < sampleCount; i++ {
 		var sample int16
 		if err := binary.Read(reader, binary.LittleEndian, &sample); err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 		buffer.Data[i] = int(sample)
 	}
 
 	outputFile, err := os.Create(filename)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	defer outputFile.Close()
 
@@ -239,11 +239,11 @@ func SaveWAVFile(audioClip []byte, filename string) error {
 	defer encoder.Close()
 
 	if err := encoder.Write(buffer); err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	if err := encoder.Close(); err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	return nil

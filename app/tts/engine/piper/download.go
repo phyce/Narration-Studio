@@ -2,7 +2,6 @@ package piper
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"nstudio/app/common/eventManager"
@@ -137,11 +136,11 @@ func modelIDFromName(name string) string {
 func getModelsDir() (string, error) {
 	dir := config.GetEngine().Local.Piper.ModelsDirectory
 	if dir == "" {
-		return "", fmt.Errorf("piper models directory is not set")
+		return "", response.Err("piper models directory is not set")
 	}
 	err, expanded := util.ExpandPath(dir)
 	if err != nil {
-		return "", err
+		return "", response.Err("%w", err)
 	}
 	return expanded, nil
 }
@@ -154,14 +153,14 @@ func userModelsDir() (string, error) {
 	if runtime.GOOS == "windows" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", err
+			return "", response.Err("%w", err)
 		}
 		return filepath.Join(home, "Narration Studio", "piper", "models"), nil
 	}
 
 	base, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return "", response.Err("%w", err)
 	}
 	return filepath.Join(base, "Narration Studio", "piper", "models"), nil
 }
@@ -191,18 +190,18 @@ func ensureWritableModelsDir() (string, error) {
 
 	fallback, err := userModelsDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve writable models directory: %w", err)
+		return "", response.Err("failed to resolve writable models directory: %w", err)
 	}
 
 	if err := os.MkdirAll(fallback, 0o755); err != nil {
-		return "", fmt.Errorf("failed to create %s: %w", fallback, err)
+		return "", response.Err("failed to create %s: %w", fallback, err)
 	}
 
 	newCfg := config.Get()
 	if newCfg.Engine.Local.Piper.ModelsDirectory != fallback {
 		newCfg.Engine.Local.Piper.ModelsDirectory = fallback
 		if err := config.Set(newCfg); err != nil {
-			return "", fmt.Errorf("failed to update models directory config: %w", err)
+			return "", response.Err("failed to update models directory config: %w", err)
 		}
 	}
 
@@ -398,7 +397,7 @@ func DownloadModel(model AvailableModel) error {
 	for _, f := range files {
 		dest := filepath.Join(folder, f.name)
 		if err := downloadFile(f.url, dest, reader); err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 	}
 

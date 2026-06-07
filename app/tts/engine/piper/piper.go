@@ -102,7 +102,7 @@ func (piper *Piper) Start(modelName string) error {
 
 		err := config.Set(configuration)
 		if err != nil {
-			return err
+			return response.Err("%w", err)
 		}
 		return response.Err("%w", err)
 	}
@@ -417,7 +417,7 @@ func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, e
 
 	rawBytes, err := piper.Generate(model, payload)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	return audio.NewAudioFromPCM(rawBytes, 22050, 1, 16), nil

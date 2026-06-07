@@ -102,11 +102,11 @@ func PlayRawAudioBytesAt(audioClip []byte, sourceSampleRate int) {
 func PlayWAVBytes(wavData []byte) error {
 	clip, err := NewAudioFromWAV(wavData)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	pcm, err := clip.ToPCM()
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	PlayRawAudioBytesAt(pcm, clip.Metadata.SampleRate)
 	return nil
@@ -117,7 +117,7 @@ func PlayFLACAudioBytes(audioClip []byte) error {
 
 	streamer, format, err := beepFlac.Decode(audioReader)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	defer streamer.Close()
 
@@ -140,7 +140,7 @@ func PlayMP3AudioBytes(audioClip []byte) error {
 
 	streamer, format, err := beepMp3.Decode(audioReader)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 	defer streamer.Close()
 

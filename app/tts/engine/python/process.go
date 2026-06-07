@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"nstudio/app/common/process"
+	"nstudio/app/common/response"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -66,19 +67,19 @@ func newRunner(engineID, bundlePath string, manifest *Manifest) (*runner, error)
 
 	stdin, err := command.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("stdin pipe: %w", err)
+		return nil, response.Err("stdin pipe: %w", err)
 	}
 	stdout, err := command.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("stdout pipe: %w", err)
+		return nil, response.Err("stdout pipe: %w", err)
 	}
 	stderr, err := command.StderrPipe()
 	if err != nil {
-		return nil, fmt.Errorf("stderr pipe: %w", err)
+		return nil, response.Err("stderr pipe: %w", err)
 	}
 
 	if err := command.Start(); err != nil {
-		return nil, fmt.Errorf("start %s: %w", interpreterPath, err)
+		return nil, response.Err("start %s: %w", interpreterPath, err)
 	}
 
 	pythonRunner.command = command
@@ -106,16 +107,16 @@ func (pythonRunner *runner) waitForReady(bootTimeout time.Duration) error {
 	select {
 	case readyEvent := <-pythonRunner.readyChannel():
 		if !readyEvent.Ok && readyEvent.Error != "" {
-			return fmt.Errorf("runner failed to start: %s", readyEvent.Error)
+			return response.Err("runner failed to start: %s", readyEvent.Error)
 		}
 		return nil
 	case <-pythonRunner.readerDone:
 		if err, _ := pythonRunner.exitError.Load().(error); err != nil {
-			return err
+			return response.Err("%w", err)
 		}
-		return ErrRunnerExited
+		return response.Err("%w", ErrRunnerExited)
 	case <-time.After(bootTimeout):
-		return fmt.Errorf("runner boot timed out after %s", bootTimeout)
+		return response.Err("runner boot timed out after %s", bootTimeout)
 	}
 }
 
@@ -212,7 +213,7 @@ func (pythonRunner *runner) dispatch(responseMessage rpcResponse) {
 func (pythonRunner *runner) send(request rpcRequest, timeout time.Duration) (rpcResponse, error) {
 	if pythonRunner.exited.Load() {
 		if err, _ := pythonRunner.exitError.Load().(error); err != nil {
-			return rpcResponse{}, fmt.Errorf("%w: %s", ErrRunnerExited, err.Error())
+			return rpcResponse{}, response.Err("%w: %s", ErrRunnerExited, err.Error())
 		}
 		return rpcResponse{}, ErrRunnerExited
 	}
@@ -229,7 +230,7 @@ func (pythonRunner *runner) send(request rpcRequest, timeout time.Duration) (rpc
 	requestPayload, err := json.Marshal(request)
 	if err != nil {
 		pythonRunner.cancelPending(request.ID)
-		return rpcResponse{}, fmt.Errorf("marshal request: %w", err)
+		return rpcResponse{}, response.Err("marshal request: %w", err)
 	}
 	requestPayload = append(requestPayload, '\n')
 
@@ -238,7 +239,7 @@ func (pythonRunner *runner) send(request rpcRequest, timeout time.Duration) (rpc
 	pythonRunner.mutex.Unlock()
 	if writeErr != nil {
 		pythonRunner.cancelPending(request.ID)
-		return rpcResponse{}, fmt.Errorf("stdin write: %w", writeErr)
+		return rpcResponse{}, response.Err("stdin write: %w", writeErr)
 	}
 
 	select {
@@ -289,7 +290,7 @@ func (pythonRunner *runner) kill() error {
 		return nil
 	}
 	if err := pythonRunner.command.Process.Kill(); err != nil {
-		return fmt.Errorf("kill runner: %w", err)
+		return response.Err("kill runner: %w", err)
 	}
 	return nil
 }

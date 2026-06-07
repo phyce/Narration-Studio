@@ -96,7 +96,7 @@ func (a *Audio) ToPCM() ([]byte, error) {
 	case FormatFLAC:
 		pcmData, sampleRate, channels, bitDepth, err := decodeFLACToPCM(a.Data)
 		if err != nil {
-			return nil, err
+			return nil, response.Err("%w", err)
 		}
 
 		a.Metadata.SampleRate = sampleRate
@@ -107,7 +107,7 @@ func (a *Audio) ToPCM() ([]byte, error) {
 	case FormatMP3:
 		pcmData, sampleRate, channels, bitDepth, err := decodeMP3ToPCM(a.Data)
 		if err != nil {
-			return nil, err
+			return nil, response.Err("%w", err)
 		}
 
 		a.Metadata.SampleRate = sampleRate
@@ -126,7 +126,7 @@ func (a *Audio) ToPCM() ([]byte, error) {
 func (a *Audio) ToWAV() ([]byte, error) {
 	pcmData, err := a.ToPCM()
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	return buildWAVFile(pcmData, a.Metadata.SampleRate, a.Metadata.Channels, a.Metadata.BitDepth)
@@ -174,17 +174,17 @@ func (a *Audio) Resample(targetSampleRate int) error {
 
 	pcmData, err := a.ToPCM()
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	buffer, err := pcmBytesToIntBuffer(pcmData, a.Metadata)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	resampled, err := ResampleBuffer(buffer, targetSampleRate)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	a.Data = intBufferToPCMBytes(resampled)
@@ -201,17 +201,17 @@ func (a *Audio) ChangeChannels(targetChannels int) error {
 
 	pcmData, err := a.ToPCM()
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	buffer, err := pcmBytesToIntBuffer(pcmData, a.Metadata)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	converted, err := ChangeChannelCount(buffer, targetChannels)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	a.Data = intBufferToPCMBytes(converted)
@@ -294,24 +294,24 @@ func decodeMP3ToPCM(mp3Data []byte) ([]byte, int, int, int, error) {
 	defer streamer.Close()
 
 	var pcmBuffer bytes.Buffer
-    
-    buf := make([][2]float64, 1024)
-    for {
-        n, ok := streamer.Stream(buf)
-        
-        for i := 0; i < n; i++ {
-             sampleL := int16(buf[i][0] * 32767)
-             binary.Write(&pcmBuffer, binary.LittleEndian, sampleL)
-             
-             if format.NumChannels == 2 {
-                 sampleR := int16(buf[i][1] * 32767)
-                 binary.Write(&pcmBuffer, binary.LittleEndian, sampleR)
-             }
-        }
-        if !ok {
-            break
-        }
-    }
+
+	buf := make([][2]float64, 1024)
+	for {
+		n, ok := streamer.Stream(buf)
+
+		for i := 0; i < n; i++ {
+			sampleL := int16(buf[i][0] * 32767)
+			binary.Write(&pcmBuffer, binary.LittleEndian, sampleL)
+
+			if format.NumChannels == 2 {
+				sampleR := int16(buf[i][1] * 32767)
+				binary.Write(&pcmBuffer, binary.LittleEndian, sampleR)
+			}
+		}
+		if !ok {
+			break
+		}
+	}
 
 	return pcmBuffer.Bytes(), int(format.SampleRate), format.NumChannels, 16, nil
 }

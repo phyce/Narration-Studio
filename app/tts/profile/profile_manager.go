@@ -1,7 +1,6 @@
 package profile
 
 import (
-	"fmt"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 	"nstudio/app/tts/engine"
@@ -34,7 +33,7 @@ func (manager *ProfileManager) GetProfile(profileID string) (*Profile, error) {
 
 	profile, err := LoadProfile(profileID)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	manager.mutex.Lock()
@@ -50,11 +49,11 @@ func (manager *ProfileManager) GetAllProfiles() ([]ProfileMetadata, error) {
 
 func (manager *ProfileManager) CreateProfile(id, name, description string) (*Profile, error) {
 	if id == "" {
-		return nil, fmt.Errorf("profile ID cannot be empty")
+		return nil, response.Err("profile ID cannot be empty")
 	}
 
 	if ProfileExists(id) {
-		return nil, fmt.Errorf("profile already exists: %s", id)
+		return nil, response.Err("profile already exists: %s", id)
 	}
 
 	profile := NewProfile(id, name)
@@ -85,7 +84,7 @@ func (manager *ProfileManager) SaveProfile(profile *Profile) error {
 
 func (manager *ProfileManager) DeleteProfile(profileID string) error {
 	if err := DeleteProfile(profileID); err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	manager.mutex.Lock()
@@ -98,12 +97,12 @@ func (manager *ProfileManager) DeleteProfile(profileID string) error {
 func (manager *ProfileManager) GetVoiceConfig(profileID, character string) (*util.CharacterVoice, error) {
 	profile, err := manager.GetProfile(profileID)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	voice, exists := profile.GetVoice(character)
 	if !exists {
-		return nil, fmt.Errorf("character not found in profile: %s", character)
+		return nil, response.Err("character not found in profile: %s", character)
 	}
 
 	return voice, nil
@@ -112,7 +111,7 @@ func (manager *ProfileManager) GetVoiceConfig(profileID, character string) (*uti
 func (manager *ProfileManager) SetVoiceConfig(profileID, character string, voice *util.CharacterVoice) error {
 	profile, err := manager.GetProfile(profileID)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	profile.SetVoice(character, voice)
@@ -123,11 +122,11 @@ func (manager *ProfileManager) SetVoiceConfig(profileID, character string, voice
 func (manager *ProfileManager) RemoveVoiceConfig(profileID, character string) error {
 	profile, err := manager.GetProfile(profileID)
 	if err != nil {
-		return err
+		return response.Err("%w", err)
 	}
 
 	if !profile.RemoveVoice(character) {
-		return fmt.Errorf("character not found in profile: %s", character)
+		return response.Err("character not found in profile: %s", character)
 	}
 
 	return manager.SaveProfile(profile)
@@ -245,7 +244,7 @@ func (manager *ProfileManager) ClearCache() {
 func (manager *ProfileManager) ReloadProfile(profileID string) (*Profile, error) {
 	profile, err := LoadProfile(profileID)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	manager.mutex.Lock()

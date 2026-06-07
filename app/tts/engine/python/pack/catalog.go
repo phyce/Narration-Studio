@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"nstudio/app/common/response"
 	"nstudio/app/tts/engine/python"
 )
 
@@ -39,24 +40,24 @@ func FetchAvailable() ([]AvailablePack, error) {
 	httpClient := &http.Client{Timeout: 20 * time.Second}
 	catalogRequest, err := http.NewRequest(http.MethodGet, CatalogURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	catalogRequest.Header.Set("Accept", "application/vnd.github+json")
 
 	catalogResponse, err := httpClient.Do(catalogRequest)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	defer catalogResponse.Body.Close()
 
 	if catalogResponse.StatusCode != http.StatusOK {
 		errorBody, _ := io.ReadAll(catalogResponse.Body)
-		return nil, fmt.Errorf("github API returned %d: %s", catalogResponse.StatusCode, string(errorBody))
+		return nil, response.Err("github API returned %d: %s", catalogResponse.StatusCode, string(errorBody))
 	}
 
 	var releases []githubRelease
 	if err := json.NewDecoder(catalogResponse.Body).Decode(&releases); err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	platformSuffix := strings.ToLower(fmt.Sprintf("-%s-%s", runtime.GOOS, runtime.GOARCH))
@@ -109,15 +110,15 @@ func fetchMetadata(metadataURL string) (*python.Manifest, error) {
 	httpClient := &http.Client{Timeout: 20 * time.Second}
 	metadataResponse, err := httpClient.Get(metadataURL)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	defer metadataResponse.Body.Close()
 	if metadataResponse.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("metadata %s: status %d", metadataURL, metadataResponse.StatusCode)
+		return nil, response.Err("metadata %s: status %d", metadataURL, metadataResponse.StatusCode)
 	}
 	var manifest python.Manifest
 	if err := json.NewDecoder(metadataResponse.Body).Decode(&manifest); err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 	return &manifest, nil
 }

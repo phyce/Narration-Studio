@@ -137,7 +137,7 @@ func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
 func (openAI *OpenAI) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
 	flacData, err := openAI.Generate(model, payload)
 	if err != nil {
-		return nil, err
+		return nil, response.Err("%w", err)
 	}
 
 	return audio.NewAudioFromFLAC(flacData), nil

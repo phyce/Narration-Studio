@@ -151,13 +151,13 @@ func createModelPool(engineID, modelID string) (*ModelPool, error) {
 		default:
 			engineEntry, exists := manager.Engines[engineID]
 			if !exists || engineEntry.Engine.NewInstance == nil {
-				return nil, fmt.Errorf("unknown engine: %s", engineID)
+				return nil, response.Err("unknown engine: %s", engineID)
 			}
 			engine = engineEntry.Engine.NewInstance()
 		}
 
 		if err := engine.Initialize(); err != nil {
-			return nil, err
+			return nil, response.Err("%w", err)
 		}
 
 		instances = append(instances, engine)

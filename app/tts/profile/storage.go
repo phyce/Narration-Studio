@@ -65,7 +65,7 @@ func LoadProfile(profileID string) (*Profile, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("profile not found: %s", profileID)
+			return nil, response.Err("profile not found: %s", profileID)
 		}
 		return nil, response.Err("failed to read profile file: %v", err)
 	}
@@ -80,11 +80,11 @@ func LoadProfile(profileID string) (*Profile, error) {
 
 func SaveProfile(profile *Profile) error {
 	if profile.ID == "" {
-		return fmt.Errorf("profile ID cannot be empty")
+		return response.Err("profile ID cannot be empty")
 	}
 
 	if strings.ContainsAny(profile.ID, "/\\:*?\"<>|") {
-		return fmt.Errorf("invalid profile ID: contains forbidden characters")
+		return response.Err("invalid profile ID: contains forbidden characters")
 	}
 
 	profile.UpdatedAt = util.GetCurrentTimestamp()
@@ -104,13 +104,13 @@ func SaveProfile(profile *Profile) error {
 
 func DeleteProfile(profileID string) error {
 	if profileID == "default" {
-		return fmt.Errorf("cannot delete default profile")
+		return response.Err("cannot delete default profile")
 	}
 
 	filePath := getProfileFilePath(profileID)
 	if err := os.Remove(filePath); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("profile not found: %s", profileID)
+			return response.Err("profile not found: %s", profileID)
 		}
 		return response.Err("failed to delete profile: %v", err)
 	}

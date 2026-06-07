@@ -3,9 +3,9 @@ package response
 import (
 	"errors"
 	"fmt"
+	"nstudio/app/common/activity"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/util"
-	"nstudio/app/config"
 
 	"github.com/charmbracelet/log"
 )
@@ -26,19 +26,13 @@ func Initialize() {
 
 // <editor-fold desc="Notification Actions">
 func Debug(data util.MessageData) {
-	if config.Debug() {
-		data.Severity = "info"
-		data.Life = 2500
-		emitEvent("notification.send", data, true)
-	}
+	log.Debug(data.Summary, data.Detail)
+	record(activity.SeverityInfo, data.Summary, data.Detail)
 }
 
 func Info(data util.MessageData) error {
-	data.Severity = "info"
-	data.Life = 10000
 	log.Info(data.Summary, data.Detail)
-
-	emitEvent("notification.send", data, false)
+	record(activity.SeverityInfo, data.Summary, data.Detail)
 	return nil
 }
 
@@ -47,16 +41,14 @@ func Success(data util.MessageData) error {
 	data.Life = 3500
 	log.Info(data.Summary, data.Detail)
 
+	record(activity.SeveritySuccess, data.Summary, data.Detail)
 	emitEvent("notification.send", data, false)
 	return nil
 }
 
 func Warning(data util.MessageData) error {
-	data.Severity = "warning"
-	data.Life = 5500
 	log.Warn(data.Summary, data.Detail)
-
-	emitEvent("notification.send", data, false)
+	record(activity.SeverityWarning, data.Summary, data.Detail)
 	return nil
 }
 
@@ -65,6 +57,7 @@ func Error(data util.MessageData) error {
 	data.Life = 50000
 	log.Error(data.Summary, data.Detail)
 
+	record(activity.SeverityError, data.Summary, data.Detail)
 	emitEvent("notification.send", data, true)
 	return trace(errors.New(data.Summary))
 }
@@ -83,34 +76,20 @@ func Alert(message string, err error) error {
 	return trace(err)
 }
 
-// Send user notifcation only in debug mode
 func Warn(message string, err error) error {
 	message = fmt.Sprintf(message, err)
 	log.Warn(message)
 	log.Info(err)
 
-	if config.Debug() {
-		Warning(util.MessageData{
-			Summary: message,
-			Detail:  err.Error(),
-		})
-	}
-
+	record(activity.SeverityWarning, message, err.Error())
 	return trace(err)
 }
 
 func NewWarn(message string) error {
-	err := fmt.Errorf(message)
+	err := errors.New(message)
 	log.Warn(err)
 
-	if config.Debug() {
-		eventManager.GetInstance().EmitEvent("notification.send", message)
-		Warning(util.MessageData{
-			Summary: "Warning",
-			Detail:  message,
-		})
-	}
-
+	record(activity.SeverityWarning, message, "")
 	return trace(err)
 }
 
@@ -119,11 +98,13 @@ func NewWarn(message string) error {
 // <editor-fold desc="Logging">
 func Err(err error) error {
 	log.Error(err)
+	record(activity.SeverityError, err.Error(), "")
 	return trace(err)
 }
 
 func LogInfo(message string) {
 	log.Info(message)
+	record(activity.SeverityInfo, message, "")
 }
 
 // </editor-fold>

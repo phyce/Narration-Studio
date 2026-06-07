@@ -40,7 +40,7 @@ var (
 	flushSignal    = make(chan struct{}, 1)
 )
 
-func Record(entry Entry) {
+func Record(entry Entry) Entry {
 	defer func() {
 		_ = recover()
 	}()
@@ -68,6 +68,8 @@ func Record(entry Entry) {
 	if overThreshold {
 		signalFlush()
 	}
+
+	return entry
 }
 
 func Recent(limit int) []Entry {

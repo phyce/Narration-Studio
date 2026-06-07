@@ -2,7 +2,9 @@ package response
 
 import (
 	"fmt"
+	"nstudio/app/common/activity"
 	"nstudio/app/common/eventManager"
+	"nstudio/app/common/status"
 	"nstudio/app/common/util"
 	"nstudio/app/config"
 	"runtime"
@@ -16,6 +18,27 @@ func emitEvent(name string, data util.MessageData, log bool) {
 	if notificationEnabled {
 		eventManager.GetInstance().EmitEvent(name, data)
 	}
+}
+
+func record(severity activity.Severity, summary, detail string) {
+	currentStatus := status.Get()
+	entry := activity.Record(activity.Entry{
+		Severity:    severity,
+		Summary:     summary,
+		Detail:      detail,
+		StatusID:    int(currentStatus.Status),
+		StatusLabel: status.Label(currentStatus.Status),
+		Source:      callerSource(3),
+	})
+	eventManager.GetInstance().EmitEvent("activity.appended", entry)
+}
+
+func callerSource(skip int) string {
+	_, file, line, ok := runtime.Caller(skip)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", shortFileName(file), line)
 }
 
 func trace(err error) error {

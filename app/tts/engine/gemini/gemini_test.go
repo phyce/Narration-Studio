@@ -3,6 +3,7 @@ package gemini_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"nstudio/app/config"
 	"nstudio/app/tts/engine/enginetest"
@@ -22,6 +23,7 @@ func TestGeminiEngine(t *testing.T) {
 		Model:      model,
 		OutputPath: outputPath,
 		Character:  "Tester",
+		Pace:       30 * time.Second,
 		NewPayload: func(voiceID string) []byte {
 			payload, _ := json.Marshal(gemini.GeminiRequest{
 				Model:    model,

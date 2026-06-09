@@ -3,6 +3,7 @@ package openai_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"nstudio/app/config"
 	"nstudio/app/tts/engine/enginetest"
@@ -21,6 +22,7 @@ func TestOpenAIEngine(t *testing.T) {
 		Model:      "tts-1",
 		OutputPath: outputPath,
 		Character:  "Tester",
+		Pace:       2 * time.Second,
 		NewPayload: func(voiceID string) []byte {
 			payload, _ := json.Marshal(openai.OpenAIRequest{
 				Model: "tts-1",

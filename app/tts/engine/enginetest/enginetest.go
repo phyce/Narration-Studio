@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"nstudio/app/common/util"
 	"nstudio/app/config"
@@ -53,6 +54,9 @@ type Case struct {
 	OutputPath string
 	Character  string
 	NewPayload func(voiceID string) []byte
+	// Pace is slept between synthesis calls so rate-limited APIs
+	// (e.g. Gemini preview TTS at 3 requests/minute) don't return 429.
+	Pace time.Duration
 }
 
 func RunInterfaceTests(t *testing.T, c Case) {
@@ -108,6 +112,11 @@ func RunInterfaceTests(t *testing.T, c Case) {
 	}
 
 	payload := c.NewPayload(voiceID)
+	pace := func() {
+		if c.Pace > 0 {
+			time.Sleep(c.Pace)
+		}
+	}
 
 	t.Run("Generate", func(t *testing.T) {
 		audioClip, err := c.Engine.Generate(c.Model, payload)
@@ -120,6 +129,7 @@ func RunInterfaceTests(t *testing.T, c Case) {
 	})
 
 	t.Run("GenerateAudio", func(t *testing.T) {
+		pace()
 		audioObject, err := c.Engine.GenerateAudio(c.Model, payload)
 		if err != nil {
 			t.Fatalf("GenerateAudio: %v", err)
@@ -136,6 +146,7 @@ func RunInterfaceTests(t *testing.T, c Case) {
 	}
 
 	t.Run("Save", func(t *testing.T) {
+		pace()
 		if err := c.Engine.Save([]util.CharacterMessage{message}, false); err != nil {
 			t.Fatalf("Save: %v", err)
 		}
@@ -146,6 +157,7 @@ func RunInterfaceTests(t *testing.T, c Case) {
 
 	if PlayEnabled() {
 		t.Run("Play", func(t *testing.T) {
+			pace()
 			if err := c.Engine.Play(message); err != nil {
 				t.Errorf("Play: %v", err)
 			}

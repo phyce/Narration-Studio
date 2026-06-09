@@ -3,22 +3,23 @@
     Runs the Go test suite and prints a clean, flat tick/cross line per test.
 
 .DESCRIPTION
-    By default runs ALL tests. The API engine tests (OpenAI, ElevenLabs, Google,
-    Gemini) make real, BILLABLE calls using the keys in your app config or the
-    matching *_API_KEY environment variables, and are skipped when no key is set.
+    By default skips the API engine tests (OpenAI, ElevenLabs, Google, Gemini) —
+    they make real, BILLABLE calls using the keys in your app config or the
+    matching *_API_KEY environment variables, and the Gemini suite paces itself
+    against rate limits so it is also slow.
 
-    -Free   Skip the paid API engines; run only the free tests (UI page handlers
-            + local Piper/SAPI5 engines).
+    -All    Run everything, including the API engine tests.
     -Run    Pass a `go test -run` pattern to run a subset (e.g. -Run TestSettingsPage).
+            The API skip is not applied, so API engine tests can be targeted directly.
     -Play   Also run the Play subtests, which emit real audio (NSTUDIO_TEST_PLAY=1).
 
 .EXAMPLE
-    .\scripts\test.ps1            # everything (API tests cost money)
+    .\scripts\test.ps1            # free tests only
 .EXAMPLE
-    .\scripts\test.ps1 -Free     # only the free tests
+    .\scripts\test.ps1 -All      # everything (API tests cost money)
 #>
 param(
-    [switch]$Free,
+    [switch]$All,
     [string]$Run = "",
     [switch]$Play
 )
@@ -35,11 +36,11 @@ $dash  = [char]::ConvertFromUtf32(0x23ED) # skip (next track)
 Push-Location $ProjectRoot
 try {
     $arguments = @('test', './...', '-json', '-count=1', '-timeout', '300s')
-    if ($Free) {
-        $arguments += @('-run', 'Page|Sapi5|Piper')
-    }
-    elseif ($Run -ne "") {
+    if ($Run -ne "") {
         $arguments += @('-run', $Run)
+    }
+    elseif (-not $All) {
+        $arguments += @('-skip', 'TestOpenAIEngine|TestElevenLabsEngine|TestGoogleEngine|TestGeminiEngine')
     }
     if ($Play) {
         $env:NSTUDIO_TEST_PLAY = "1"

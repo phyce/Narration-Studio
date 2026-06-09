@@ -3,6 +3,7 @@ package elevenlabs_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"nstudio/app/config"
 	"nstudio/app/tts/engine/elevenlabs"
@@ -22,6 +23,7 @@ func TestElevenLabsEngine(t *testing.T) {
 		Model:      model,
 		OutputPath: outputPath,
 		Character:  "Tester",
+		Pace:       2 * time.Second,
 		NewPayload: func(voiceID string) []byte {
 			payload, _ := json.Marshal(elevenlabs.ElevenLabsRequest{
 				Text:    "Testing one two three.",

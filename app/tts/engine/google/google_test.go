@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"nstudio/app/config"
 	"nstudio/app/tts/engine/enginetest"
@@ -22,6 +23,7 @@ func TestGoogleEngine(t *testing.T) {
 		Model:      "standard",
 		OutputPath: outputPath,
 		Character:  "Tester",
+		Pace:       2 * time.Second,
 		NewPayload: func(voiceID string) []byte {
 			languageCode := "en-US"
 			if parts := strings.Split(voiceID, "-"); len(parts) >= 2 {

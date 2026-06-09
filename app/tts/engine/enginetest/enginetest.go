@@ -1,4 +1,3 @@
-// Package enginetest provides shared helpers for engine integration tests.
 package enginetest
 
 import (
@@ -11,17 +10,16 @@ import (
 	"nstudio/app/common/util"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
+
+	"github.com/charmbracelet/log"
 )
 
 const appName = "Narration Studio"
 
-// Configure sets up an isolated, temporary config for an engine test and returns the
-// temporary output directory. API keys and local-engine settings are resolved from
-// environment variables first, then the user's real config file, so the tests run on a
-// developer machine that already has keys configured without any extra setup. The user's
-// real config is never modified (everything is written to a temp file).
 func Configure(t *testing.T) string {
 	t.Helper()
+
+	log.SetLevel(log.FatalLevel)
 
 	info := config.Info{Name: appName, OS: runtime.GOOS}
 	realConfig := readRealConfig(info)
@@ -48,20 +46,15 @@ func Configure(t *testing.T) string {
 	return outputPath
 }
 
-// Case describes one engine to exercise through the full Base interface.
 type Case struct {
 	Engine     engine.Base
 	EngineID   string
 	Model      string
 	OutputPath string
 	Character  string
-	// NewPayload builds the Generate/GenerateAudio payload for the given voice ID.
 	NewPayload func(voiceID string) []byte
 }
 
-// RunInterfaceTests exercises every engine.Base method as independent subtests, so a
-// failure in one (e.g. Generate hitting an API quota) doesn't hide that the others
-// (FetchModels, GetVoices, Save) work. Audio output is asserted to be non-empty.
 func RunInterfaceTests(t *testing.T, c Case) {
 	t.Helper()
 
@@ -160,7 +153,6 @@ func RunInterfaceTests(t *testing.T, c Case) {
 	}
 }
 
-// EnableModel turns on a model toggle ("engine:model") in the active test config.
 func EnableModel(t *testing.T, key string) {
 	t.Helper()
 	base := config.Get()
@@ -173,7 +165,6 @@ func EnableModel(t *testing.T, key string) {
 	}
 }
 
-// AudioFileCount returns the number of non-empty files anywhere under dir.
 func AudioFileCount(dir string) int {
 	count := 0
 	_ = filepath.Walk(dir, func(path string, fileInfo os.FileInfo, err error) error {
@@ -185,8 +176,6 @@ func AudioFileCount(dir string) int {
 	return count
 }
 
-// PlayEnabled reports whether playback-exercising tests should run. Playback emits real
-// audio, so it is opt-in via NSTUDIO_TEST_PLAY to keep normal test runs silent.
 func PlayEnabled() bool {
 	return os.Getenv("NSTUDIO_TEST_PLAY") != ""
 }

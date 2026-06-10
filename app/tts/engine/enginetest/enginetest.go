@@ -7,9 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
-	"nstudio/app/common/util"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 
@@ -49,15 +47,9 @@ func Configure(t *testing.T) string {
 }
 
 type Case struct {
-	Engine     engine.Base
-	EngineID   string
-	Model      string
-	OutputPath string
-	Character  string
-	NewPayload func(voiceID string) []byte
-	// Pace is slept between synthesis calls so rate-limited APIs
-	// (e.g. Gemini preview TTS at 3 requests/minute) don't return 429.
-	Pace time.Duration
+	Engine   engine.Base
+	EngineID string
+	Model    string
 }
 
 func RunInterfaceTests(t *testing.T, c Case) {
@@ -112,36 +104,7 @@ func RunInterfaceTests(t *testing.T, c Case) {
 		return
 	}
 
-	payload := c.NewPayload(voiceID)
-	pace := func() {
-		if c.Pace > 0 {
-			time.Sleep(c.Pace)
-		}
-	}
-
-	t.Run("Generate", func(t *testing.T) {
-		audioClip, err := c.Engine.Generate(c.Model, payload)
-		if err != nil {
-			t.Fatalf("Generate: %v", err)
-		}
-		if len(audioClip) == 0 {
-			t.Error("Generate returned empty audio")
-		}
-	})
-
-	t.Run("GenerateAudio", func(t *testing.T) {
-		pace()
-		audioObject, err := c.Engine.GenerateAudio(c.Model, payload)
-		if err != nil {
-			t.Fatalf("GenerateAudio: %v", err)
-		}
-		if audioObject == nil || len(audioObject.Data) == 0 {
-			t.Error("GenerateAudio returned empty audio")
-		}
-	})
-
 	t.Run("Synthesize", func(t *testing.T) {
-		pace()
 		stream, err := c.Engine.Synthesize(context.Background(), engine.SpeechRequest{
 			Model: c.Model,
 			Voice: voiceID,
@@ -161,31 +124,6 @@ func RunInterfaceTests(t *testing.T, c Case) {
 			t.Errorf("Synthesize returned invalid sample rate %d", audioObject.Metadata.SampleRate)
 		}
 	})
-
-	message := util.CharacterMessage{
-		Character: c.Character,
-		Text:      "Saving audio test.",
-		Voice:     util.CharacterVoice{Model: c.Model, Voice: voiceID},
-	}
-
-	t.Run("Save", func(t *testing.T) {
-		pace()
-		if err := c.Engine.Save([]util.CharacterMessage{message}, false); err != nil {
-			t.Fatalf("Save: %v", err)
-		}
-		if AudioFileCount(c.OutputPath) == 0 {
-			t.Error("Save did not write any audio file")
-		}
-	})
-
-	if PlayEnabled() {
-		t.Run("Play", func(t *testing.T) {
-			pace()
-			if err := c.Engine.Play(message); err != nil {
-				t.Errorf("Play: %v", err)
-			}
-		})
-	}
 }
 
 func EnableModel(t *testing.T, key string) {
@@ -209,10 +147,6 @@ func AudioFileCount(dir string) int {
 		return nil
 	})
 	return count
-}
-
-func PlayEnabled() bool {
-	return os.Getenv("NSTUDIO_TEST_PLAY") != ""
 }
 
 func resolveKey(environmentVariable, fallback string) string {

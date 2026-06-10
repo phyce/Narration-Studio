@@ -11,7 +11,6 @@ import (
 	"nstudio/app/common/process"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
-	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/piper/native"
@@ -315,90 +314,6 @@ func (piper *Piper) Stop(modelName string) error {
 	return nil
 }
 
-func (piper *Piper) Play(message util.CharacterMessage) error {
-	if piper.isNativeMode() {
-		return piper.getNative().Play(message)
-	}
-
-	response.Debug(util.MessageData{
-		Summary: "Piper playing:" + message.Character,
-		Detail:  message.Text,
-	})
-
-	speakerID, _ := strconv.Atoi(message.Voice.Voice)
-
-	input := PiperInputLite{
-		Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
-		SpeakerID: speakerID,
-	}
-
-	jsonBytes, err := json.Marshal(input)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	jsonBytes = append(jsonBytes, '\n')
-
-	audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	audio.PlayRawAudioBytes(audioClip)
-	response.Debug(util.MessageData{
-		Summary: "Finshed playing audio for:" + message.Character,
-		Detail:  message.Text,
-	})
-	return nil
-}
-
-func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
-	if piper.isNativeMode() {
-		return piper.getNative().Save(messages, play)
-	}
-
-	response.Debug(util.MessageData{
-		Summary: "Piper saving messages",
-	})
-
-	err, outputPath := util.ExpandPath(config.GetSettings().OutputPath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	for _, message := range messages {
-		speakerID, _ := strconv.Atoi(message.Voice.Voice)
-
-		outputFilename := util.GenerateFilename(
-			message,
-			fileIndex.Get(),
-			outputPath,
-		)
-
-		input := PiperInput{
-			Text:       strings.ReplaceAll(message.Text, `"`, `\"`),
-			SpeakerID:  speakerID,
-			OutputFile: outputFilename,
-		}
-
-		jsonBytes, err := json.Marshal(input)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-		jsonBytes = append(jsonBytes, '\n')
-
-		audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		if play {
-			audio.PlayRawAudioBytes(audioClip)
-		}
-	}
-
-	return nil
-}
-
 func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
 	if piper.isNativeMode() {
 		return piper.getNative().Synthesize(ctx, request)
@@ -415,32 +330,6 @@ func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest
 	payload = append(payload, '\n')
 
 	return piper.streamUtterance(request.Model, payload)
-}
-
-func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
-	if piper.isNativeMode() {
-		return piper.getNative().Generate(model, payload)
-	}
-
-	audioObject, err := piper.GenerateAudio(model, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	return audioObject.Data, nil
-}
-
-func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
-	if piper.isNativeMode() {
-		return piper.getNative().GenerateAudio(model, payload)
-	}
-
-	stream, err := piper.streamUtterance(model, payload)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return stream.ReadAll()
 }
 
 // streamUtterance sends one json-input line to the piper process and returns a

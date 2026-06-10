@@ -7,13 +7,11 @@ import (
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
-	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/charmbracelet/log"
 )
@@ -166,88 +164,6 @@ func (piper *Piper) Stop(modelName string) error {
 	return nil
 }
 
-func (piper *Piper) Play(message util.CharacterMessage) error {
-	response.Debug(util.MessageData{
-		Summary: "piper playing: " + message.Character,
-		Detail:  message.Text,
-	})
-
-	speakerID, _ := strconv.Atoi(message.Voice.Voice)
-
-	input := PiperInput{
-		Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
-		SpeakerID: speakerID,
-	}
-
-	jsonBytes, err := json.Marshal(input)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	audioClip, err := piper.Generate(message.Voice.Model, jsonBytes)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	audio.PlayRawAudioBytes(audioClip)
-	response.Debug(util.MessageData{
-		Summary: "piper finished playing audio for: " + message.Character,
-		Detail:  message.Text,
-	})
-	return nil
-}
-
-func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
-	response.Debug(util.MessageData{
-		Summary: "piper saving messages",
-	})
-
-	err, outputPath := util.ExpandPath(config.GetSettings().OutputPath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	for _, message := range messages {
-		speakerID, _ := strconv.Atoi(message.Voice.Voice)
-
-		outputFilename := util.GenerateFilename(
-			message,
-			fileIndex.Get(),
-			outputPath,
-		)
-
-		input := PiperInput{
-			Text:      strings.ReplaceAll(message.Text, `"`, `\"`),
-			SpeakerID: speakerID,
-		}
-
-		jsonBytes, err := json.Marshal(input)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		audioObj, err := piper.GenerateAudio(message.Voice.Model, jsonBytes)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		wavData, err := audioObj.ToWAV()
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		if err := os.WriteFile(outputFilename, wavData, 0644); err != nil {
-			return response.Err("%w", err)
-		}
-
-		if play {
-			audio.PlayRawAudioBytes(audioObj.Data)
-		}
-	}
-
-	return nil
-}
-
 func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
 	speakerID, _ := strconv.Atoi(request.Voice)
 
@@ -257,30 +173,6 @@ func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest
 	}
 
 	return audio.NewBufferedStream(audio.StreamFormat{SampleRate: sampleRate, Channels: 1, BitDepth: 16}, pcmBytes), nil
-}
-
-func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
-	var input PiperInput
-	if err := json.Unmarshal(payload, &input); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	pcmBytes, _, err := piper.synthesizePCM(model, input.Text, input.SpeakerID)
-	return pcmBytes, err
-}
-
-func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
-	var input PiperInput
-	if err := json.Unmarshal(payload, &input); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	pcmBytes, sampleRate, err := piper.synthesizePCM(model, input.Text, input.SpeakerID)
-	if err != nil {
-		return nil, err
-	}
-
-	return audio.NewAudioFromPCM(pcmBytes, sampleRate, 1, 16), nil
 }
 
 func (piper *Piper) synthesizePCM(model, text string, speakerID int) ([]byte, int, error) {

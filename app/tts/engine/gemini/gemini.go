@@ -2,11 +2,8 @@ package gemini
 
 import (
 	"context"
-	"encoding/json"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
-	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"sync"
@@ -30,101 +27,6 @@ func (gemini *Gemini) Start(modelName string) error {
 }
 
 func (gemini *Gemini) Stop(modelName string) error {
-	return nil
-}
-
-func (gemini *Gemini) Play(message util.CharacterMessage) error {
-	response.Debug(util.MessageData{
-		Summary: "Gemini playing:" + message.Character,
-		Detail:  message.Text,
-	})
-
-	input := GeminiRequest{
-		Model: message.Voice.Model,
-		Contents: []Content{
-			{Parts: []Part{{Text: message.Text}}},
-		},
-		GenerationConfig: GenerationConfig{
-			ResponseModalities: []string{"AUDIO"},
-			SpeechConfig: SpeechConfig{
-				VoiceConfig: VoiceConfig{
-					PrebuiltVoiceConfig: PrebuiltVoiceConfig{
-						VoiceName: message.Voice.Voice,
-					},
-				},
-			},
-		},
-	}
-
-	audioClip, err := gemini.sendRequest(context.Background(), input, message.Voice.Model)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	// Assuming 24kHz 1 channel 16 bit PCM as per common Gemini/Google TTS defaults for "raw PCM"
-	// Adjust if necessary based on actual API response or documentation updates.
-	err = audio.PlayPCMAudioBytes(audioClip)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	return response.Success(util.MessageData{
-		Summary: "Gemini finished playing pcm",
-	})
-}
-
-func (gemini *Gemini) Save(messages []util.CharacterMessage, play bool) error {
-	response.Debug(util.MessageData{
-		Summary: "Gemini saving messages",
-	})
-
-	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	for _, message := range messages {
-		input := GeminiRequest{
-			Model: message.Voice.Model,
-			Contents: []Content{
-				{Parts: []Part{{Text: message.Text}}},
-			},
-			GenerationConfig: GenerationConfig{
-				ResponseModalities: []string{"AUDIO"},
-				SpeechConfig: SpeechConfig{
-					VoiceConfig: VoiceConfig{
-						PrebuiltVoiceConfig: PrebuiltVoiceConfig{
-							VoiceName: message.Voice.Voice,
-						},
-					},
-				},
-			},
-		}
-
-		audioClip, err := gemini.sendRequest(context.Background(), input, message.Voice.Model)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		filename := util.GenerateFilename(
-			message,
-			fileIndex.Get(),
-			expandedPath,
-		)
-
-		err = audio.SaveWAVFile(audioClip, filename)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		if play {
-			err = audio.PlayPCMAudioBytes(audioClip)
-			if err != nil {
-				return response.Err("%w", err)
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -152,30 +54,6 @@ func (gemini *Gemini) Synthesize(ctx context.Context, request engine.SpeechReque
 	}
 
 	return audio.NewBufferedStream(audio.StreamFormat{SampleRate: 24000, Channels: 1, BitDepth: 16}, pcmData), nil
-}
-
-func (gemini *Gemini) Generate(model string, payload []byte) ([]byte, error) {
-	var request GeminiRequest
-	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	pcmData, err := gemini.sendRequest(context.Background(), request, model)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return pcmData, nil
-}
-
-func (gemini *Gemini) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
-	pcmData, err := gemini.Generate(model, payload)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	// Assuming 24kHz, 1 channel, 16 bit
-	return audio.NewAudioFromPCM(pcmData, 24000, 1, 16), nil
 }
 
 func (gemini *Gemini) GetVoices(model string) ([]engine.Voice, error) {

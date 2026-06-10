@@ -2,11 +2,8 @@ package openai
 
 import (
 	"context"
-	"encoding/json"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
-	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 )
@@ -42,81 +39,6 @@ func (openAI *OpenAI) Stop(modelName string) error {
 	return nil
 }
 
-func (openAI *OpenAI) Play(message util.CharacterMessage) error {
-	response.Debug(util.MessageData{
-		Summary: "OpenAI playing:" + message.Character,
-		Detail:  message.Text,
-	})
-
-	input := OpenAIRequest{
-		Voice:          message.Voice.Voice,
-		Input:          message.Text,
-		Model:          message.Voice.Model,
-		ResponseFormat: openAI.outputType,
-		Speed:          1,
-	}
-
-	audioClip, err := openAI.sendRequest(context.Background(), input)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	err = audio.PlayFLACAudioBytes(audioClip)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	return response.Success(util.MessageData{
-		Summary: "OpenAI finished playing flac",
-	})
-}
-
-func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
-	response.Debug(util.MessageData{
-		Summary: "Openai saving messages",
-	})
-
-	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	for _, message := range messages {
-		input := OpenAIRequest{
-			Voice:          message.Voice.Voice,
-			Input:          message.Text,
-			Model:          message.Voice.Model,
-			ResponseFormat: openAI.outputType,
-			Speed:          1,
-		}
-
-		audioClip, err := openAI.sendRequest(context.Background(), input)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		filename := util.GenerateFilename(
-			message,
-			fileIndex.Get(),
-			expandedPath,
-		)
-
-		err = audio.SaveFLACAsWAV(audioClip, filename)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		if play {
-			err = audio.PlayFLACAudioBytes(audioClip)
-			if err != nil {
-				return response.Err("%w", err)
-			}
-		}
-	}
-
-	return nil
-}
-
 func (openAI *OpenAI) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
 	input := OpenAIRequest{
 		Voice:          request.Voice,
@@ -132,33 +54,6 @@ func (openAI *OpenAI) Synthesize(ctx context.Context, request engine.SpeechReque
 	}
 
 	return audio.NewStreamFromAudio(audio.NewAudioFromFLAC(flacData))
-}
-
-func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
-	var request OpenAIRequest
-	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	request.Model = model
-	request.ResponseFormat = openAI.outputType
-	request.Speed = 1
-
-	flacData, err := openAI.sendRequest(context.Background(), request)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return flacData, nil
-}
-
-func (openAI *OpenAI) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
-	flacData, err := openAI.Generate(model, payload)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return audio.NewAudioFromFLAC(flacData), nil
 }
 
 func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {

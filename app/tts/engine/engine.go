@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
 	"sort"
 )
 
@@ -42,12 +41,6 @@ type Base interface {
 	Synthesize(ctx context.Context, request SpeechRequest) (*audio.Stream, error)
 	GetVoices(model string) ([]Voice, error)
 	FetchModels() map[string]Model
-
-	// Deprecated
-	Play(message util.CharacterMessage) error
-	Save(messages []util.CharacterMessage, play bool) error
-	Generate(model string, payload []byte) ([]byte, error)
-	GenerateAudio(model string, payload []byte) (*audio.Audio, error)
 }
 
 type Engine struct {

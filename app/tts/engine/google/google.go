@@ -2,12 +2,8 @@ package google
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
-	"nstudio/app/common/util"
-	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"strings"
@@ -33,104 +29,6 @@ func (google *Google) Start(modelName string) error {
 }
 
 func (google *Google) Stop(modelName string) error {
-	return nil
-}
-
-func (google *Google) Play(message util.CharacterMessage) error {
-	response.Debug(util.MessageData{
-		Summary: "Google playing:" + message.Character,
-		Detail:  message.Text,
-	})
-
-	input := GoogleRequest{
-		Input: Input{Text: message.Text},
-		Voice: VoiceSelectionParams{
-			Name:         message.Voice.Voice,
-			LanguageCode: "en-US", // Default
-			ModelName:    message.Voice.Model,
-		},
-		AudioConfig: AudioConfig{
-			AudioEncoding: "MP3",
-			SpeakingRate:  1,
-			Pitch:         0,
-		},
-	}
-
-	// Attempt to extract language code
-	parts := strings.Split(message.Voice.Voice, "-")
-	if len(parts) >= 2 {
-		input.Voice.LanguageCode = parts[0] + "-" + parts[1]
-	}
-
-	audioClip, err := google.sendRequest(context.Background(), input)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	err = audio.PlayMP3AudioBytes(audioClip)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	return response.Success(util.MessageData{
-		Summary: "Google finished playing mp3",
-	})
-}
-
-func (google *Google) Save(messages []util.CharacterMessage, play bool) error {
-	response.Debug(util.MessageData{
-		Summary: "Google saving messages",
-	})
-
-	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	for _, message := range messages {
-		input := GoogleRequest{
-			Input: Input{Text: message.Text},
-			Voice: VoiceSelectionParams{
-				Name:         message.Voice.Voice,
-				LanguageCode: "en-US",
-				ModelName:    message.Voice.Model,
-			},
-			AudioConfig: AudioConfig{
-				AudioEncoding: "LINEAR16",
-				SpeakingRate:  1,
-				Pitch:         0,
-			},
-		}
-
-		parts := strings.Split(message.Voice.Voice, "-")
-		if len(parts) >= 2 {
-			input.Voice.LanguageCode = parts[0] + "-" + parts[1]
-		}
-
-		audioClip, err := google.sendRequest(context.Background(), input)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		filename := util.GenerateFilename(
-			message,
-			fileIndex.Get(),
-			expandedPath,
-		)
-
-		err = audio.SaveWAVFile(audioClip, filename)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		if play {
-			err = audio.PlayPCMAudioBytes(audioClip)
-			if err != nil {
-				return response.Err("%w", err)
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -177,32 +75,6 @@ func languageCodeFromVoice(voice string) string {
 		return parts[0] + "-" + parts[1]
 	}
 	return "en-US"
-}
-
-func (google *Google) Generate(model string, payload []byte) ([]byte, error) {
-	fmt.Println(string(payload))
-	var request GoogleRequest
-	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	request.AudioConfig.AudioEncoding = "LINEAR16"
-
-	pcmData, err := google.sendRequest(context.Background(), request)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return pcmData, nil
-}
-
-func (google *Google) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
-	pcmData, err := google.Generate(model, payload)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return audio.NewAudioFromPCM(pcmData, 24000, 1, 16), nil
 }
 
 func (google *Google) GetVoices(model string) ([]engine.Voice, error) {

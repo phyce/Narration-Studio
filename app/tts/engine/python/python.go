@@ -2,14 +2,10 @@ package python
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
-	"nstudio/app/common/util"
-	"nstudio/app/common/util/fileIndex"
-	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/python/voicepack"
 	"os"
@@ -87,16 +83,11 @@ func (pythonEngine *Python) Stop(modelName string) error {
 }
 
 func (pythonEngine *Python) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
-	payload, err := json.Marshal(SynthPayload{
+	wavBytes, err := pythonEngine.synthesizeToWAV(request.Model, SynthPayload{
 		Voice:  request.Voice,
 		Text:   request.Text,
 		Params: request.Params,
 	})
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	wavBytes, err := pythonEngine.Generate(request.Model, payload)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}
@@ -109,17 +100,12 @@ func (pythonEngine *Python) Synthesize(ctx context.Context, request engine.Speec
 	return audio.NewStreamFromAudio(wavAudio)
 }
 
-func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, error) {
+func (pythonEngine *Python) synthesizeToWAV(model string, synthPayload SynthPayload) ([]byte, error) {
 	pythonEngine.mutex.Lock()
 	defer pythonEngine.mutex.Unlock()
 
 	if err := pythonEngine.ensureModelLoaded(model); err != nil {
 		return nil, response.Err("%w", err)
-	}
-
-	var synthPayload SynthPayload
-	if err := json.Unmarshal(payload, &synthPayload); err != nil {
-		return nil, response.Err("python: invalid synth payload: %w", err)
 	}
 
 	if resolvedVoicePath, found := voicepack.ResolvePath(pythonEngine.Manifest.ID, synthPayload.Voice); found {
@@ -153,69 +139,6 @@ func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, erro
 		return nil, response.Err("python synth: read output: %w", err)
 	}
 	return wavBytes, nil
-}
-
-func (pythonEngine *Python) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
-	wavBytes, err := pythonEngine.Generate(model, payload)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-	return audio.NewAudioFromWAV(wavBytes)
-}
-
-func (pythonEngine *Python) Play(message util.CharacterMessage) error {
-	payload, err := buildSynthPayload(message)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	wavBytes, err := pythonEngine.Generate(message.Voice.Model, payload)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	if err := audio.PlayWAVBytes(wavBytes); err != nil {
-		return response.Err("%w", err)
-	}
-	return nil
-}
-
-func (pythonEngine *Python) Save(messages []util.CharacterMessage, play bool) error {
-	outputPath := ""
-	if settings := config.GetSettings(); settings.OutputPath != "" {
-		err, expandedOutputPath := util.ExpandPath(settings.OutputPath)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-		outputPath = expandedOutputPath
-	}
-
-	for _, message := range messages {
-		payload, err := buildSynthPayload(message)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		wavBytes, err := pythonEngine.Generate(message.Voice.Model, payload)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		if outputPath != "" {
-			outputFilePath := util.GenerateFilename(message, fileIndex.Get(), outputPath)
-			if err := os.WriteFile(outputFilePath, wavBytes, 0o644); err != nil {
-				return response.Err("%w", err)
-			}
-		}
-
-		if play {
-			if err := audio.PlayWAVBytes(wavBytes); err != nil {
-				return response.Err("%w", err)
-			}
-		}
-	}
-
-	return nil
 }
 
 func (pythonEngine *Python) GetVoices(model string) ([]engine.Voice, error) {
@@ -336,14 +259,6 @@ func (pythonEngine *Python) allowRestart() bool {
 	}
 	pythonEngine.recentRestarts = append(pythonEngine.recentRestarts, now)
 	return true
-}
-
-func buildSynthPayload(message util.CharacterMessage) ([]byte, error) {
-	synthPayload := SynthPayload{
-		Voice: message.Voice.Voice,
-		Text:  message.Text,
-	}
-	return json.Marshal(synthPayload)
 }
 
 func temporaryWAVPath(engineID string) (string, error) {

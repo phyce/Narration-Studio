@@ -10,7 +10,6 @@ import (
 	commonAudio "nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
-	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 )
@@ -45,83 +44,6 @@ func (labs *ElevenLabs) Stop(modelName string) error {
 	return nil
 }
 
-func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
-	response.Debug(util.MessageData{
-		Summary: "Elevenlabs playing:" + message.Character,
-		Detail:  message.Text,
-	})
-
-	input := ElevenLabsRequest{
-		Text:    message.Text,
-		ModelID: message.Voice.Model,
-		VoiceSettings: VoiceSettings{
-			Stability:       0.5,
-			SimilarityBoost: 0.5,
-		},
-	}
-
-	audioClip, err := labs.sendRequest(context.Background(), message.Voice.Voice, input)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	err = commonAudio.PlayPCMAudioBytes(audioClip)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	return response.Success(util.MessageData{
-		Summary: "ElevenLabs finished playing audio",
-	})
-}
-
-func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error {
-	response.Debug(util.MessageData{
-		Summary: "Elevenlabs saving messages",
-	})
-
-	err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	for _, message := range messages {
-		input := ElevenLabsRequest{
-			Text:    message.Text,
-			ModelID: message.Voice.Model,
-			VoiceSettings: VoiceSettings{
-				Stability:       0.5,
-				SimilarityBoost: 0.5,
-			},
-		}
-
-		audioClip, err := labs.sendRequest(context.Background(), message.Voice.Voice, input)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		filename := util.GenerateFilename(
-			message,
-			fileIndex.Get(),
-			expandedPath,
-		)
-
-		err = commonAudio.SaveWAVFile(audioClip, filename)
-		if err != nil {
-			return response.Err("%w", err)
-		}
-
-		if play {
-			err = commonAudio.PlayPCMAudioBytes(audioClip)
-			if err != nil {
-				return response.Err("%w", err)
-			}
-		}
-	}
-
-	return nil
-}
-
 func (labs *ElevenLabs) Synthesize(ctx context.Context, request engine.SpeechRequest) (*commonAudio.Stream, error) {
 	input := ElevenLabsRequest{
 		Text:    request.Text,
@@ -139,29 +61,6 @@ func (labs *ElevenLabs) Synthesize(ctx context.Context, request engine.SpeechReq
 	}
 
 	return commonAudio.NewBufferedStream(commonAudio.StreamFormat{SampleRate: 24000, Channels: 1, BitDepth: 16}, pcmData), nil
-}
-
-func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
-	var request ElevenLabsRequest
-	if err := json.Unmarshal(payload, &request); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	pcmData, err := labs.sendRequest(context.Background(), request.VoiceID, request)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return pcmData, nil
-}
-
-func (labs *ElevenLabs) GenerateAudio(model string, payload []byte) (*commonAudio.Audio, error) {
-	pcmData, err := labs.Generate(model, payload)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return commonAudio.NewAudioFromPCM(pcmData, 24000, 1, 16), nil
 }
 
 func (labs *ElevenLabs) GetVoices(model string) ([]engine.Voice, error) {

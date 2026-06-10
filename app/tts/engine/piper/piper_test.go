@@ -2,10 +2,8 @@ package piper_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"nstudio/app/common/util"
@@ -17,7 +15,7 @@ import (
 )
 
 func TestPiperEngine(t *testing.T) {
-	outputPath := enginetest.Configure(t)
+	enginetest.Configure(t)
 
 	settings := config.GetEngine().Local.Piper
 
@@ -102,30 +100,6 @@ func TestPiperEngine(t *testing.T) {
 		return
 	}
 
-	speakerID, _ := strconv.Atoi(voiceID)
-	payload, _ := json.Marshal(piper.PiperInputLite{Text: "Testing one two three.", SpeakerID: speakerID})
-	payload = append(payload, '\n')
-
-	t.Run("Generate", func(t *testing.T) {
-		audioClip, err := piperEngine.Generate(model, payload)
-		if err != nil {
-			t.Fatalf("Generate: %v", err)
-		}
-		if len(audioClip) == 0 {
-			t.Error("Generate returned empty audio")
-		}
-	})
-
-	t.Run("GenerateAudio", func(t *testing.T) {
-		audioObject, err := piperEngine.GenerateAudio(model, payload)
-		if err != nil {
-			t.Fatalf("GenerateAudio: %v", err)
-		}
-		if audioObject == nil || len(audioObject.Data) == 0 {
-			t.Error("GenerateAudio returned empty audio")
-		}
-	})
-
 	t.Run("Synthesize", func(t *testing.T) {
 		stream, err := piperEngine.Synthesize(context.Background(), engine.SpeechRequest{
 			Model: model,
@@ -146,29 +120,6 @@ func TestPiperEngine(t *testing.T) {
 			t.Errorf("Synthesize returned invalid sample rate %d", audioObject.Metadata.SampleRate)
 		}
 	})
-
-	message := util.CharacterMessage{
-		Character: "Tester",
-		Text:      "Saving audio test.",
-		Voice:     util.CharacterVoice{Engine: "piper", Model: model, Voice: voiceID},
-	}
-
-	t.Run("Save", func(t *testing.T) {
-		if err := piperEngine.Save([]util.CharacterMessage{message}, false); err != nil {
-			t.Fatalf("Save: %v", err)
-		}
-		if enginetest.AudioFileCount(outputPath) == 0 {
-			t.Error("Save did not write any audio file")
-		}
-	})
-
-	if enginetest.PlayEnabled() {
-		t.Run("Play", func(t *testing.T) {
-			if err := piperEngine.Play(message); err != nil {
-				t.Errorf("Play: %v", err)
-			}
-		})
-	}
 }
 
 func TestPiperBinarySynthesizeStreams(t *testing.T) {

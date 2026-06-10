@@ -1,8 +1,6 @@
-package audio
+﻿package audio
 
 import (
-	"bytes"
-	"encoding/binary"
 	"nstudio/app/common/response"
 	"os"
 	"path/filepath"
@@ -201,54 +199,4 @@ func ChangeBitDepth(buffer *audio.IntBuffer, targetBitDepth int) (*audio.IntBuff
 		SourceBitDepth: targetBitDepth,
 	}
 	return convertedBuffer, nil
-}
-
-func SaveWAVFile(audioClip []byte, filename string) error {
-	sampleRate := 24000
-	channelCount := 1
-	bitDepth := 16
-	bytesPerSample := bitDepth / 8
-
-	sampleCount := len(audioClip) / bytesPerSample
-
-	buffer := &audio.IntBuffer{
-		Format: &audio.Format{
-			SampleRate:  sampleRate,
-			NumChannels: channelCount,
-		},
-		Data:           make([]int, sampleCount),
-		SourceBitDepth: bitDepth,
-	}
-
-	reader := bytes.NewReader(audioClip)
-	for i := 0; i < sampleCount; i++ {
-		var sample int16
-		if err := binary.Read(reader, binary.LittleEndian, &sample); err != nil {
-			return response.Err("%w", err)
-		}
-		buffer.Data[i] = int(sample)
-	}
-
-	outputFile, err := os.Create(filename)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	defer outputFile.Close()
-
-	encoder := wav.NewEncoder(outputFile, buffer.Format.SampleRate, buffer.SourceBitDepth, buffer.Format.NumChannels, 1)
-	defer encoder.Close()
-
-	if err := encoder.Write(buffer); err != nil {
-		return response.Err("%w", err)
-	}
-
-	if err := encoder.Close(); err != nil {
-		return response.Err("%w", err)
-	}
-
-	return nil
-}
-
-func SaveMP3(audioClip []byte, filename string) error {
-	return os.WriteFile(filename, audioClip, 0644)
 }

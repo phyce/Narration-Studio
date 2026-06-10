@@ -18,29 +18,3 @@ func PlayStream(ctx context.Context, stream *Stream) error {
 
 func SetStreamPaused(paused bool) {
 }
-
-func PlayPCMAudioBytes(audioClip []byte) error {
-	return response.Err("audio playback not available in DLL mode")
-}
-
-func PlayRawAudioBytes(audioClip []byte) {
-}
-
-func PlayRawAudioBytesAt(audioClip []byte, sourceSampleRate int) {
-}
-
-func PlayWAVBytes(wavData []byte) error {
-	return response.Err("audio playback not available in DLL mode")
-}
-
-func PlayFLACAudioBytes(audioClip []byte) error {
-	return response.Err("audio playback not available in DLL mode")
-}
-
-func PlayMP3AudioBytes(audioClip []byte) error {
-	return response.Err("audio playback not available in DLL mode")
-}
-
-func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
-	return response.Err("FLAC to WAV conversion not available in DLL mode")
-}

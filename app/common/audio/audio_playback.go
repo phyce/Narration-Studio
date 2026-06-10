@@ -1,24 +1,16 @@
-//go:build !clib
+﻿//go:build !clib
 
 package audio
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
-	"io"
 	"nstudio/app/common/response"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/go-audio/audio"
-	"github.com/go-audio/wav"
 	"github.com/gopxl/beep"
-	beepFlac "github.com/gopxl/beep/flac"
-	beepMp3 "github.com/gopxl/beep/mp3"
 	"github.com/gopxl/beep/speaker"
-	"github.com/mewkiz/flac"
 )
 
 const (
@@ -189,190 +181,4 @@ func (feeder *playbackFeeder) fill(samples [][2]float64) (int, bool) {
 		samples[index] = [2]float64{}
 	}
 	return len(samples), true
-}
-
-func PlayPCMAudioBytes(audioClip []byte) error {
-	audioDataReader := bytes.NewReader(audioClip)
-
-	//TODO add ability to change format details
-	originalFormat := beep.Format{
-		SampleRate:  24000,
-		NumChannels: 1,
-		Precision:   2,
-	}
-
-	streamer := beep.StreamerFunc(func(samples [][2]float64) (processedSamples int, ok bool) {
-		for sampleIndex := range samples {
-			if audioDataReader.Len() < 2 {
-				return sampleIndex, false
-			}
-
-			var sample int16
-			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
-			if err != nil {
-				response.Err("Error reading PCM data: %w", err)
-				return sampleIndex, false
-			}
-
-			floatSample := float64(sample) / (1 << 15)
-
-			samples[sampleIndex][0] = floatSample
-			samples[sampleIndex][1] = floatSample
-
-			processedSamples++
-		}
-		return len(samples), true
-	})
-
-	resampler := beep.Resample(4, originalFormat.SampleRate, beep.SampleRate(48000), streamer)
-
-	done := make(chan bool)
-
-	speaker.Play(beep.Seq(resampler, beep.Callback(func() {
-		done <- true
-	})))
-
-	<-done
-
-	return nil
-}
-
-func PlayRawAudioBytes(audioClip []byte) {
-	PlayRawAudioBytesAt(audioClip, 22050)
-}
-
-func PlayRawAudioBytesAt(audioClip []byte, sourceSampleRate int) {
-	done := make(chan struct{})
-	audioDataReader := bytes.NewReader(audioClip)
-
-	streamer := beep.StreamerFunc(func(samples [][2]float64) (filledCount int, ok bool) {
-		for index := range samples {
-			if audioDataReader.Len() < 2 {
-				return index, false
-			}
-			var sample int16
-
-			err := binary.Read(audioDataReader, binary.LittleEndian, &sample)
-			if err != nil {
-				return index, false
-			}
-			floatSample := float64(sample) / (1 << 15)
-			samples[index][0] = floatSample
-			samples[index][1] = floatSample
-		}
-		return len(samples), true
-	})
-
-	resampledStreamer := beep.Resample(4, beep.SampleRate(sourceSampleRate), 48000, streamer)
-
-	speaker.Play(beep.Seq(resampledStreamer, beep.Callback(func() {
-		close(done)
-	})))
-
-	<-done
-}
-
-func PlayWAVBytes(wavData []byte) error {
-	clip, err := NewAudioFromWAV(wavData)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	pcm, err := clip.ToPCM()
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	PlayRawAudioBytesAt(pcm, clip.Metadata.SampleRate)
-	return nil
-}
-
-func PlayFLACAudioBytes(audioClip []byte) error {
-	audioReader := io.NopCloser(bytes.NewReader(audioClip))
-
-	streamer, format, err := beepFlac.Decode(audioReader)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	defer streamer.Close()
-
-	sampleRate := beep.SampleRate(48000)
-
-	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
-
-	done := make(chan bool)
-	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
-		done <- true
-	})))
-
-	<-done
-
-	return nil
-}
-
-func PlayMP3AudioBytes(audioClip []byte) error {
-	audioReader := io.NopCloser(bytes.NewReader(audioClip))
-
-	streamer, format, err := beepMp3.Decode(audioReader)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	defer streamer.Close()
-
-	sampleRate := beep.SampleRate(48000)
-
-	resampled := beep.Resample(4, format.SampleRate, sampleRate, streamer)
-
-	done := make(chan bool)
-	speaker.Play(beep.Seq(resampled, beep.Callback(func() {
-		done <- true
-	})))
-
-	<-done
-
-	return nil
-}
-
-func SaveFLACAsWAV(flacAudioClip []byte, filename string) error {
-	reader := bytes.NewReader(flacAudioClip)
-
-	stream, err := flac.New(reader)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	var buffer audio.IntBuffer
-	buffer.Format = &audio.Format{
-		NumChannels: int(stream.Info.NChannels),
-		SampleRate:  int(stream.Info.SampleRate),
-	}
-
-	for {
-		frame, err := stream.ParseNext()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return response.Err("%w", err)
-		}
-		for _, subframe := range frame.Subframes {
-			for _, sample := range subframe.Samples {
-				buffer.Data = append(buffer.Data, int(sample))
-			}
-		}
-	}
-
-	outputFile, err := os.Create(filename)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	defer outputFile.Close()
-
-	encoder := wav.NewEncoder(outputFile, buffer.Format.SampleRate, int(stream.Info.BitsPerSample), buffer.Format.NumChannels, 1)
-	if err := encoder.Write(&buffer); err != nil {
-		return response.Err("%w", err)
-	}
-	if err := encoder.Close(); err != nil {
-		return response.Err("%w", err)
-	}
-
-	return nil
 }

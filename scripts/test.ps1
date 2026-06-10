@@ -11,7 +11,6 @@
     -All    Run everything, including the API engine tests.
     -Run    Pass a `go test -run` pattern to run a subset (e.g. -Run TestSettingsPage).
             The API skip is not applied, so API engine tests can be targeted directly.
-    -Play   Also run the Play subtests, which emit real audio (NSTUDIO_TEST_PLAY=1).
 
 .EXAMPLE
     .\scripts\test.ps1            # free tests only
@@ -20,8 +19,7 @@
 #>
 param(
     [switch]$All,
-    [string]$Run = "",
-    [switch]$Play
+    [string]$Run = ""
 )
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -41,9 +39,6 @@ try {
     }
     elseif (-not $All) {
         $arguments += @('-skip', 'TestOpenAIEngine|TestElevenLabsEngine|TestGoogleEngine|TestGeminiEngine')
-    }
-    if ($Play) {
-        $env:NSTUDIO_TEST_PLAY = "1"
     }
 
     $results = New-Object System.Collections.Generic.List[object]
@@ -109,9 +104,6 @@ try {
     }
 }
 finally {
-    if ($Play) {
-        Remove-Item Env:\NSTUDIO_TEST_PLAY -ErrorAction SilentlyContinue
-    }
     Pop-Location
 }
 

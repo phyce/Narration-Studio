@@ -95,6 +95,14 @@ func (app *App) Play(
 	status.Set(status.Ready, "")
 }
 
+func (app *App) StopPlayback() {
+	tts.Stop()
+}
+
+func (app *App) SetPlaybackPaused(paused bool) {
+	tts.SetPaused(paused)
+}
+
 //</editor-fold>
 
 // <editor-fold desc="Script Editor">
@@ -1339,6 +1347,11 @@ func (app *App) OpenActivityLog() {
 		window.Show()
 		window.Focus()
 	}
+}
+
+func (app *App) OpenActivityLogChain(chainID int) {
+	app.OpenActivityLog()
+	eventManager.GetInstance().EmitEvent("activity.focusChain", chainID)
 }
 
 func (app *App) GetActivityLog() string {

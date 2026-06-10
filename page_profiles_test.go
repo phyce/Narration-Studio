@@ -3,8 +3,13 @@
 package main
 
 import (
+	"runtime"
 	"strings"
 	"testing"
+
+	"nstudio/app/common/util"
+	"nstudio/app/config"
+	"nstudio/app/tts/profile"
 )
 
 func TestProfilesPage(t *testing.T) {
@@ -71,4 +76,55 @@ func TestProfilesPage(t *testing.T) {
 			t.Errorf("DeleteProfile did not remove profile %q", profileID)
 		}
 	})
+}
+
+func TestDisabledVoiceReallocation(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("uses the SAPI5 engine (Windows only)")
+	}
+
+	base := config.Get()
+	originalToggles := base.ModelToggles
+	base.ModelToggles = map[string]bool{"mssapi5:mssapi5": true}
+	if err := config.Set(base); err != nil {
+		t.Fatalf("set toggles: %v", err)
+	}
+	t.Cleanup(func() {
+		restore := config.Get()
+		restore.ModelToggles = originalToggles
+		_ = config.Set(restore)
+	})
+
+	const profileID = "uitestrealloc"
+	manager := profile.GetManager()
+	created, err := manager.CreateProfile(profileID, "Realloc Test", "")
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+	t.Cleanup(func() { _ = manager.DeleteProfile(profileID) })
+
+	created.SetVoice("Hero", &util.CharacterVoice{Name: "Hero", Engine: "openai", Model: "tts-1", Voice: "alloy"})
+	if err := manager.SaveProfile(created); err != nil {
+		t.Fatalf("SaveProfile: %v", err)
+	}
+
+	voice, err := manager.GetOrAllocateVoice(profileID, "Hero")
+	if err != nil {
+		t.Fatalf("GetOrAllocateVoice: %v", err)
+	}
+	if voice.Engine == "openai" {
+		t.Fatal("disabled openai voice was returned instead of a replacement")
+	}
+	if voice.Engine != "mssapi5" {
+		t.Fatalf("replacement voice engine = %q, want mssapi5 (only enabled engine)", voice.Engine)
+	}
+
+	stored, err := manager.GetVoiceConfig(profileID, "Hero")
+	if err != nil {
+		t.Fatalf("GetVoiceConfig: %v", err)
+	}
+	if stored.Engine != voice.Engine || stored.Voice != voice.Voice {
+		t.Fatalf("stored allocation was not overridden: stored %s:%s, returned %s:%s",
+			stored.Engine, stored.Voice, voice.Engine, voice.Voice)
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,15 @@ func (gemini *Gemini) sendRequest(ctx context.Context, request GeminiRequest, mo
 	apiKey := config.GetEngine().Api.Gemini.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("Gemini API key is not configured")
+	}
+
+	for contentIndex := range request.Contents {
+		for partIndex := range request.Contents[contentIndex].Parts {
+			text := request.Contents[contentIndex].Parts[partIndex].Text
+			if text != "" && !strings.HasPrefix(text, "TTS: ") {
+				request.Contents[contentIndex].Parts[partIndex].Text = "TTS: " + text
+			}
+		}
 	}
 
 	jsonData, err := json.Marshal(request)

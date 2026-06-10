@@ -52,5 +52,6 @@ type MessageData struct {
 	Detail   string `json:"detail"`
 	Severity string `json:"severity"`
 	Life     uint   `json:"life"`
+	ChainID  uint64 `json:"chainId,omitempty"`
 	Cause    error  `json:"-"`
 }

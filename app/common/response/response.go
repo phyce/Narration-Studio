@@ -63,7 +63,8 @@ func Error(data util.MessageData) error {
 		chainID = existing.chainID
 	}
 
-	record(activity.SeverityError, data.Summary, data.Detail, chainID)
+	entry := record(activity.SeverityError, data.Summary, data.Detail, chainID)
+	data.ChainID = entry.ChainID
 	emitEvent("notification.send", data, true)
 	return trace(errors.New(data.Summary))
 }

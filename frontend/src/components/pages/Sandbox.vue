@@ -8,7 +8,7 @@ import Checkbox from 'primevue/checkbox';
 import {computed, onMounted, ref} from "vue"
 import {Engine, Model, Voice} from '../interfaces/engine';
 import {useLocalStorage} from '@vueuse/core';
-import {GetEngines, GetModelVoices, Play} from '../../../bindings/nstudio/app';
+import {GetEngines, GetModelVoices, Play, SetPlaybackPaused, StopPlayback} from '../../../bindings/nstudio/app';
 import {formatToTreeSelectData} from "../../util/util";
 import TreeSelect from "primevue/treeselect";
 import Dropdown from "primevue/dropdown";
@@ -22,6 +22,8 @@ const selectedProfile = useLocalStorage<string>('sandboxProfile', 'default');
 const text = useLocalStorage<string>('sandboxText', 'user: hello world');
 const overrideVoices = ref<boolean>(false);
 const saveNewCharacters = ref<boolean>(false);
+const isPlaying = ref<boolean>(false);
+const isPaused = ref<boolean>(false);
 
 const regexes = [
 	{regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence'},
@@ -40,7 +42,23 @@ async function generateSpeech() {
 		voiceID = "::" + Object.keys(selectedModel.value)[0] + ":" + selectedVoice.value.voiceID;
 	}
 
-	await Play(text.value, (!!saveNewCharacters.value), voiceID, selectedProfile.value);
+	isPlaying.value = true;
+	isPaused.value = false;
+	try {
+		await Play(text.value, (!!saveNewCharacters.value), voiceID, selectedProfile.value);
+	} finally {
+		isPlaying.value = false;
+		isPaused.value = false;
+	}
+}
+
+function togglePause() {
+	isPaused.value = !isPaused.value;
+	SetPlaybackPaused(isPaused.value);
+}
+
+function stopPlayback() {
+	StopPlayback();
 }
 
 async function getEngines() {
@@ -72,7 +90,8 @@ onMounted(async () => {
 	<div class="sandbox">
 		<div class="sandbox__panel">
 			<ProfileSelector v-model="selectedProfile"/>
-			<Button class="sandbox__panel__generate mt-2"
+			<Button v-if="!isPlaying"
+					class="sandbox__panel__generate mt-2"
 					title="Play All"
 					aria-label="Play"
 					:disabled="isDisabled"
@@ -81,6 +100,23 @@ onMounted(async () => {
 				<template v-if="isDisabled">select voice</template>
 				<i v-else class="pi pi-play"/>
 			</Button>
+			<div v-else class="sandbox__panel__playback mt-2">
+				<Button class="sandbox__panel__playback-button"
+						:title="isPaused ? 'Resume' : 'Pause'"
+						:aria-label="isPaused ? 'Resume' : 'Pause'"
+						@click="togglePause"
+				>
+					<i :class="isPaused ? 'pi pi-play' : 'pi pi-pause'"/>
+				</Button>
+				<Button class="sandbox__panel__playback-button"
+						title="Stop"
+						aria-label="Stop"
+						severity="danger"
+						@click="stopPlayback"
+				>
+					<i class="pi pi-stop"/>
+				</Button>
+			</div>
 			<TreeSelect class="sandbox__panel__model-tree"
 						:options="modelVoiceTree"
 						v-model="selectedModel"

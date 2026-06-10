@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"fmt"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 	"nstudio/app/tts/engine"
@@ -156,7 +157,13 @@ func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (
 
 	voice, exists := profile.GetVoice(character)
 	if exists && voice.Engine != "" && voice.Model != "" {
-		return voice, nil
+		if storedVoiceUsable(profile, voice) {
+			return voice, nil
+		}
+		response.NewWarn(fmt.Sprintf(
+			"Voice %s:%s assigned to %q is disabled or unavailable — allocating a replacement",
+			voice.Engine, voice.Model, character,
+		))
 	}
 
 	allocatedVoice, err := manager.AllocateVoiceForProfile(character, profileID)

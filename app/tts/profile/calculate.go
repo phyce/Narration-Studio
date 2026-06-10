@@ -3,6 +3,7 @@ package profile
 import (
 	"fmt"
 	"nstudio/app/common/response"
+	"nstudio/app/common/util"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/modelManager"
@@ -17,6 +18,28 @@ func setRandSeed(name string) {
 		seed = seed*31 + uint64(r)
 	}
 	rand.Seed(seed)
+}
+
+func storedVoiceUsable(profile *Profile, voice *util.CharacterVoice) bool {
+	if !engineRegistered(voice.Engine) {
+		return false
+	}
+
+	profileToggles := profile.GetModelToggles()
+	if len(profileToggles) > 0 {
+		return profileToggles[voice.Engine+":"+voice.Model]
+	}
+
+	return config.GetEngineToggles()[voice.Engine][voice.Model]
+}
+
+func engineRegistered(engineID string) bool {
+	for _, registeredEngine := range modelManager.GetAllEngines() {
+		if registeredEngine.ID == engineID {
+			return true
+		}
+	}
+	return false
 }
 
 func calculateEngine(name string) (engine.Engine, error) {

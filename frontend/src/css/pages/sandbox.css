@@ -10,6 +10,14 @@
 	@apply w-full;
 }
 
+.sandbox__panel__playback {
+	@apply flex w-full gap-2;
+}
+
+.sandbox__panel__playback-button {
+	@apply flex-1;
+}
+
 .sandbox__panel__model-tree {
 	@apply w-full mt-2 bg-blue-200;
 }

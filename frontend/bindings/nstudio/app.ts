@@ -135,6 +135,10 @@ export function OpenActivityLog(): $CancellablePromise<void> {
     return $Call.ByID(4430194);
 }
 
+export function OpenActivityLogChain(chainID: number): $CancellablePromise<void> {
+    return $Call.ByID(3594441807, chainID);
+}
+
 export function PiperDeleteModel(modelID: string): $CancellablePromise<string> {
     return $Call.ByID(72381515, modelID);
 }
@@ -190,12 +194,20 @@ export function SelectFile(defaultFile: string): $CancellablePromise<string> {
     return $Call.ByID(2427571203, defaultFile);
 }
 
+export function SetPlaybackPaused(paused: boolean): $CancellablePromise<void> {
+    return $Call.ByID(4280721140, paused);
+}
+
 export function StartDaemonServer(mode: string, port: number, host: string, configFile: string): $CancellablePromise<string> {
     return $Call.ByID(1769270060, mode, port, host, configFile);
 }
 
 export function StopDaemonServer(): $CancellablePromise<string> {
     return $Call.ByID(1532486666);
+}
+
+export function StopPlayback(): $CancellablePromise<void> {
+    return $Call.ByID(769253268);
 }
 
 // Private type creation functions

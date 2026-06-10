@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, reactive, ref} from "vue";
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref} from "vue";
 import {eventManager} from "../util/eventManager";
 import {GetActivityLog, GetActivityLogOlder} from "../../bindings/nstudio/app";
 
@@ -56,11 +56,29 @@ function onAppended(entry: Entry) {
 	mergeEntries([entry]);
 }
 
+function onFocusChain(chainId: number) {
+	if (typeof chainId !== "number") {
+		return;
+	}
+	for (const severity of severities) {
+		severityFilters[severity] = true;
+	}
+	statusFilter.value = "";
+	searchText.value = "";
+	expandedChains.add(chainId);
+	nextTick(() => {
+		document.querySelector(`[data-chain-id="${chainId}"]`)?.scrollIntoView({block: "center"});
+	});
+}
+
 let unsubscribe = () => {
+};
+let unsubscribeFocus = () => {
 };
 
 onMounted(async () => {
 	unsubscribe = eventManager.subscribe("activity.appended", onAppended);
+	unsubscribeFocus = eventManager.subscribe("activity.focusChain", onFocusChain);
 	const json = await GetActivityLog();
 	try {
 		const recent = JSON.parse(json) as Entry[];
@@ -72,6 +90,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
 	unsubscribe();
+	unsubscribeFocus();
 });
 
 async function loadOlder() {
@@ -200,10 +219,10 @@ function formatTime(timestamp: string): string {
 			<div
 				v-for="chain in chains"
 				:key="chain.chainId"
+				:data-chain-id="chain.chainId"
 				:class="['entry', chain.representative.severity, {expandable: isExpandable(chain)}]"
-				@click="isExpandable(chain) && toggleChain(chain.chainId)"
 			>
-				<div class="entry-row">
+				<div class="entry-row" @click="isExpandable(chain) && toggleChain(chain.chainId)">
 					<span class="chevron">{{ isExpandable(chain) ? (expandedChains.has(chain.chainId) ? "▾" : "▸") : "" }}</span>
 					<span :class="['dot', chain.representative.severity]"></span>
 					<span class="time">{{ formatTime(chain.representative.timestamp) }}</span>
@@ -299,8 +318,13 @@ function formatTime(timestamp: string): string {
 	border-left: 3px solid transparent;
 }
 
-.entry.expandable {
+.entry.expandable .entry-row {
 	cursor: pointer;
+}
+
+.frames {
+	user-select: text;
+	cursor: auto;
 }
 
 .entry.error {

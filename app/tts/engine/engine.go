@@ -27,6 +27,13 @@ func (t EngineType) MarshalJSON() ([]byte, error) {
 	}
 }
 
+type SpeechRequest struct {
+	Model  string
+	Voice  string
+	Text   string
+	Params map[string]interface{}
+}
+
 type Base interface {
 	Initialize() error
 	Start(modelName string) error

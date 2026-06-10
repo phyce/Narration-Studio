@@ -2,7 +2,7 @@ package piper
 
 import (
 	"bufio"
-	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,33 +22,56 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unicode/utf8"
-
-	"github.com/charmbracelet/log"
 )
 
-// <editor-fold desc="Audio Buffer">
-type AudioBuffer struct {
-	sync.Mutex
-	buffer bytes.Buffer
+const (
+	defaultSampleRate   = 22050
+	stdoutQuietWindow   = 50 * time.Millisecond
+	stdoutDrainDeadline = time.Second
+)
+
+// <editor-fold desc="Stream Router">
+// streamRouter owns the piper process stdout for the lifetime of the process
+// and mirrors it into the sink of the in-flight request; between requests
+// output is discarded. Write never fails — piper's stdout must always keep
+// draining or the subprocess stalls.
+type streamRouter struct {
+	mu        sync.Mutex
+	sink      io.Writer
+	lastWrite time.Time
 }
 
-func (ab *AudioBuffer) Write(p []byte) (n int, err error) {
-	ab.Lock()
-	defer ab.Unlock()
-	return ab.buffer.Write(p)
+func (router *streamRouter) Write(data []byte) (int, error) {
+	router.mu.Lock()
+	defer router.mu.Unlock()
+	router.lastWrite = time.Now()
+	if router.sink != nil {
+		if _, err := router.sink.Write(data); err != nil {
+			router.sink = nil
+		}
+	}
+	return len(data), nil
 }
 
-func (ab *AudioBuffer) Read(p []byte) (n int, err error) {
-	ab.Lock()
-	defer ab.Unlock()
-	return ab.buffer.Read(p)
+func (router *streamRouter) Attach(sink io.Writer) {
+	router.mu.Lock()
+	defer router.mu.Unlock()
+	router.sink = sink
+	router.lastWrite = time.Now()
 }
 
-func (ab *AudioBuffer) Reset() {
-	ab.Lock()
-	defer ab.Unlock()
-	ab.buffer.Reset()
+func (router *streamRouter) Detach() {
+	router.mu.Lock()
+	defer router.mu.Unlock()
+	router.sink = nil
+}
+
+func (router *streamRouter) QuietSince() time.Duration {
+	router.mu.Lock()
+	defer router.mu.Unlock()
+	return time.Since(router.lastWrite)
 }
 
 //</editor-fold>
@@ -83,7 +106,7 @@ func (piper *Piper) Initialize() error {
 	}
 
 	if piper.models == nil {
-		piper.models = make(map[string]PiperInstance)
+		piper.models = make(map[string]*PiperInstance)
 	}
 
 	return nil
@@ -157,10 +180,13 @@ func (piper *Piper) Start(modelName string) error {
 		),
 	})
 
-	instance := PiperInstance{
-		command:   command,
-		audioData: &AudioBuffer{},
-		Voices:    voices,
+	instance := &PiperInstance{
+		command:      command,
+		capture:      &streamRouter{},
+		sentinel:     make(chan struct{}, 1),
+		stderrClosed: make(chan struct{}),
+		sampleRate:   readModelSampleRate(onnxPath + ".json"),
+		Voices:       voices,
 	}
 
 	instance.stdin, err = instance.command.StdinPipe()
@@ -184,14 +210,35 @@ func (piper *Piper) Start(modelName string) error {
 	}
 
 	piper.StartAudioCapture(instance)
+	piper.watchCompletionSignals(instance)
 
 	if piper.models == nil {
-		piper.models = make(map[string]PiperInstance)
+		piper.models = make(map[string]*PiperInstance)
 	}
 
 	piper.models[modelName] = instance
 
 	return nil
+}
+
+// readModelSampleRate reads the output rate piper will synthesize at from the
+// model's onnx config; models that ship without one keep the piper default.
+func readModelSampleRate(configPath string) int {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return defaultSampleRate
+	}
+
+	var parsed struct {
+		Audio struct {
+			SampleRate int `json:"sample_rate"`
+		} `json:"audio"`
+	}
+	if err := json.Unmarshal(data, &parsed); err != nil || parsed.Audio.SampleRate <= 0 {
+		return defaultSampleRate
+	}
+
+	return parsed.Audio.SampleRate
 }
 
 func (piper *Piper) Stop(modelName string) error {
@@ -352,62 +399,35 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
+func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
+	if piper.isNativeMode() {
+		return piper.getNative().Synthesize(ctx, request)
+	}
+
+	speakerID, _ := strconv.Atoi(request.Voice)
+	payload, err := json.Marshal(PiperInputLite{
+		Text:      request.Text,
+		SpeakerID: speakerID,
+	})
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+	payload = append(payload, '\n')
+
+	return piper.streamUtterance(request.Model, payload)
+}
+
 func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 	if piper.isNativeMode() {
 		return piper.getNative().Generate(model, payload)
 	}
 
-	log.Info("generating in piper")
-	if piper.GetProcessID(model) == 0 {
-		if !config.GetEngineToggles()["piper"][model] {
-			return make([]byte, 0), response.Err("Model is not enabled: %s", model)
-		}
-
-		//no need to return, simply send error
-		response.NewWarn("Model is not running:" + model)
-
-		err := piper.Start(model)
-		if err != nil {
-			response.Err("Failed to start model %s: %v", model, err)
-		}
+	audioObject, err := piper.GenerateAudio(model, payload)
+	if err != nil {
+		return nil, err
 	}
 
-	if !utf8.Valid(payload) {
-		return nil, response.Err("Input JSON is not valid UTF-8")
-	}
-
-	response.Debug(util.MessageData{
-		Summary: fmt.Sprintf("Sending to piper model: %s payload: %s", model, string(payload)),
-	})
-	if _, err := piper.models[model].stdin.Write(payload); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	endSignal := make(chan bool)
-	go func() {
-		scanner := bufio.NewScanner(piper.models[model].stderr)
-		log.Info("scanning output")
-		for scanner.Scan() {
-			text := scanner.Text()
-			log.Info(text)
-
-			if strings.HasSuffix(text, " sec)") {
-				endSignal <- true
-				return
-			}
-		}
-	}()
-	<-endSignal
-
-	log.Info("past end signal")
-
-	audioBytes := piper.models[model].audioData.buffer.Bytes()
-	audioClip := make([]byte, len(audioBytes))
-	copy(audioClip, audioBytes)
-
-	piper.models[model].audioData.Reset()
-
-	return audioClip, nil
+	return audioObject.Data, nil
 }
 
 func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
@@ -415,12 +435,84 @@ func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, e
 		return piper.getNative().GenerateAudio(model, payload)
 	}
 
-	rawBytes, err := piper.Generate(model, payload)
+	stream, err := piper.streamUtterance(model, payload)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}
 
-	return audio.NewAudioFromPCM(rawBytes, 22050, 1, 16), nil
+	return stream.ReadAll()
+}
+
+// streamUtterance sends one json-input line to the piper process and returns a
+// live stream fed by its stdout. The instance mutex serializes requests on the
+// one process; completion is piper's stderr " sec)" sentinel followed by a
+// quiet-drain of stdout, because the sentinel can beat the last audio bytes
+// through the pipe buffers.
+func (piper *Piper) streamUtterance(model string, payload []byte) (*audio.Stream, error) {
+	instance, err := piper.ensureRunning(model)
+	if err != nil {
+		return nil, err
+	}
+
+	if !utf8.Valid(payload) {
+		return nil, response.Err("Input JSON is not valid UTF-8")
+	}
+
+	format := audio.StreamFormat{SampleRate: instance.sampleRate, Channels: 1, BitDepth: 16}
+	return audio.NewProducedStream(format, func(writer *audio.StreamWriter) error {
+		instance.mu.Lock()
+		defer instance.mu.Unlock()
+
+		select {
+		case <-instance.sentinel:
+		default:
+		}
+
+		response.Debug(util.MessageData{
+			Summary: fmt.Sprintf("Sending to piper model: %s payload: %s", model, string(payload)),
+		})
+
+		instance.capture.Attach(writer)
+		defer instance.capture.Detach()
+
+		if _, err := instance.stdin.Write(payload); err != nil {
+			return response.Err("%w", err)
+		}
+
+		select {
+		case <-instance.sentinel:
+		case <-instance.stderrClosed:
+			return response.Err("piper process for model %s exited mid-synthesis", model)
+		}
+
+		drainDeadline := time.Now().Add(stdoutDrainDeadline)
+		for instance.capture.QuietSince() < stdoutQuietWindow && time.Now().Before(drainDeadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		return nil
+	}), nil
+}
+
+func (piper *Piper) ensureRunning(model string) (*PiperInstance, error) {
+	if piper.GetProcessID(model) == 0 {
+		if !config.GetEngineToggles()["piper"][model] {
+			return nil, response.Err("Model is not enabled: %s", model)
+		}
+
+		response.NewWarn("Model is not running:" + model)
+
+		if err := piper.Start(model); err != nil {
+			return nil, response.Err("Failed to start model %s: %v", model, err)
+		}
+	}
+
+	instance, exists := piper.models[model]
+	if !exists {
+		return nil, response.Err("Model %s is not running", model)
+	}
+
+	return instance, nil
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
@@ -443,12 +535,27 @@ func (piper *Piper) FetchModels() map[string]engine.Model {
 // </editor-fold>
 
 // <editor-fold desc="Other">
-func (piper *Piper) StartAudioCapture(instance PiperInstance) {
+func (piper *Piper) StartAudioCapture(instance *PiperInstance) {
 	go func() {
-		_, err := io.Copy(instance.audioData, instance.stdout)
-		if err != nil {
+		_, err := io.Copy(instance.capture, instance.stdout)
+		if err != nil && !errors.Is(err, os.ErrClosed) {
 			response.Err("Failed to start capturing audio: %s\n%w", instance.command.String(), err)
 		}
+	}()
+}
+
+func (piper *Piper) watchCompletionSignals(instance *PiperInstance) {
+	go func() {
+		scanner := bufio.NewScanner(instance.stderr)
+		for scanner.Scan() {
+			if strings.HasSuffix(scanner.Text(), " sec)") {
+				select {
+				case instance.sentinel <- struct{}{}:
+				default:
+				}
+			}
+		}
+		close(instance.stderrClosed)
 	}()
 }
 

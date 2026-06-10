@@ -1,6 +1,7 @@
 package native
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"nstudio/app/common/audio"
@@ -247,56 +248,80 @@ func (piper *Piper) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
+func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
+	speakerID, _ := strconv.Atoi(request.Voice)
+
+	pcmBytes, sampleRate, err := piper.synthesizePCM(request.Model, request.Text, speakerID)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	return audio.NewBufferedStream(audio.StreamFormat{SampleRate: sampleRate, Channels: 1, BitDepth: 16}, pcmBytes), nil
+}
+
 func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
+	var input PiperInput
+	if err := json.Unmarshal(payload, &input); err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	pcmBytes, _, err := piper.synthesizePCM(model, input.Text, input.SpeakerID)
+	return pcmBytes, err
+}
+
+func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
+	var input PiperInput
+	if err := json.Unmarshal(payload, &input); err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	pcmBytes, sampleRate, err := piper.synthesizePCM(model, input.Text, input.SpeakerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return audio.NewAudioFromPCM(pcmBytes, sampleRate, 1, 16), nil
+}
+
+func (piper *Piper) synthesizePCM(model, text string, speakerID int) ([]byte, int, error) {
 	log.Info("generating in piper")
 
 	instance, exists := piper.models[model]
 	if !exists {
 		if !config.GetEngineToggles()["piper"][model] {
-			return nil, response.Err("model is not enabled: piper:%s", model)
+			return nil, 0, response.Err("model is not enabled: piper:%s", model)
 		}
 
 		response.NewWarn("piper model is not running: " + model)
 
 		err := piper.Start(model)
 		if err != nil {
-			return nil, response.Err("failed to start piper model %s: %v", model, err)
+			return nil, 0, response.Err("failed to start piper model %s: %v", model, err)
 		}
 
 		instance = piper.models[model]
 	}
 
-	var input PiperInput
-	if err := json.Unmarshal(payload, &input); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
 	response.Debug(util.MessageData{
-		Summary: fmt.Sprintf("piper synthesizing model=%s speaker=%d", model, input.SpeakerID),
-		Detail:  input.Text,
+		Summary: fmt.Sprintf("piper synthesizing model=%s speaker=%d", model, speakerID),
+		Detail:  text,
 	})
 
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
 	opts := instance.synth.DefaultOptions()
-	opts.SpeakerID = input.SpeakerID
+	opts.SpeakerID = speakerID
 
-	pcmBytes, _, err := instance.synth.Synthesize(input.Text, &opts)
+	pcmBytes, sampleRate, err := instance.synth.Synthesize(text, &opts)
 	if err != nil {
-		return nil, response.Err("%w", err)
+		return nil, 0, response.Err("%w", err)
+	}
+	if sampleRate <= 0 {
+		sampleRate = 22050
 	}
 
-	return pcmBytes, nil
-}
-
-func (piper *Piper) GenerateAudio(model string, payload []byte) (*audio.Audio, error) {
-	rawBytes, err := piper.Generate(model, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	return audio.NewAudioFromPCM(rawBytes, 22050, 1, 16), nil
+	return pcmBytes, sampleRate, nil
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {

@@ -9,12 +9,16 @@ import (
 )
 
 type PiperInstance struct {
-	command   *exec.Cmd
-	stdin     io.WriteCloser
-	stderr    io.ReadCloser
-	stdout    io.ReadCloser
-	audioData *AudioBuffer
-	Voices    []engine.Voice
+	command      *exec.Cmd
+	stdin        io.WriteCloser
+	stderr       io.ReadCloser
+	stdout       io.ReadCloser
+	capture      *streamRouter
+	sentinel     chan struct{}
+	stderrClosed chan struct{}
+	sampleRate   int
+	mu           sync.Mutex
+	Voices       []engine.Voice
 }
 
 type PiperInput struct {
@@ -29,7 +33,7 @@ type PiperInputLite struct {
 }
 
 type Piper struct {
-	models   map[string]PiperInstance
+	models   map[string]*PiperInstance
 	native   *native.Piper
 	initOnce sync.Once
 }

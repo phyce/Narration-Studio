@@ -43,7 +43,7 @@ type Base interface {
 	GetVoices(model string) ([]Voice, error)
 	FetchModels() map[string]Model
 
-	// Deprecated: removed in Phase 3 (docs/plan.md) — new callers use Synthesize.
+	// Deprecated
 	Play(message util.CharacterMessage) error
 	Save(messages []util.CharacterMessage, play bool) error
 	Generate(model string, payload []byte) ([]byte, error)

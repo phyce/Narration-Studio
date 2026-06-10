@@ -63,16 +63,26 @@ func Initialize() error {
 }
 
 func GetManager() *CacheManager {
-	if globalManager == nil {
+	mutex.RLock()
+	manager := globalManager
+	mutex.RUnlock()
+
+	if manager == nil {
 		Initialize()
+		mutex.RLock()
+		manager = globalManager
+		mutex.RUnlock()
 	}
-	return globalManager
+
+	return manager
 }
 
 func (cacheManager *CacheManager) IsEnabled() bool {
 	if cacheManager == nil {
 		return false
 	}
+	mutex.RLock()
+	defer mutex.RUnlock()
 	return cacheManager.enabled
 }
 

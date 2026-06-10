@@ -1,241 +1,126 @@
 package tts
 
 import (
-	"encoding/json"
-	"fmt"
-	"nstudio/app/cache"
+	"context"
+
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
 	"nstudio/app/common/util"
-	"nstudio/app/enums/Engines"
-	"nstudio/app/tts/engine/elevenlabs"
-	"nstudio/app/tts/engine/gemini"
-	"nstudio/app/tts/engine/google"
-	"nstudio/app/tts/engine/mssapi5"
-	"nstudio/app/tts/engine/openai"
-	"nstudio/app/tts/engine/piper"
+	"nstudio/app/config"
+	"nstudio/app/tts/engine"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
-	"strconv"
-	"strings"
 )
 
 func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID string) error {
-	profileManager := profile.GetManager()
-	cacheManager := cache.GetManager()
+	session, endSession := beginSession()
+	defer endSession()
 
 	status.Set(status.Generating, "Generating Audio")
+	defer status.Set(status.Ready, "")
 
+	profileManager := profile.GetManager()
+	resolved := make([]util.CharacterMessage, 0, len(messages))
 	for _, message := range messages {
-		var rawAudio []byte
-		var foundInCache bool
-
-		if !saveOutput && cacheManager.IsEnabled() {
-			rawAudio, foundInCache = cacheManager.GetCachedAudio(profileID, message.Character, message.Text)
-			if foundInCache {
-				status.Set(status.Playing, "Using cached audio")
-
-				if len(rawAudio) == 0 {
-					return response.NewWarn(fmt.Sprintf("Cached audio is empty for character: %s for message: %s",
-						message.Character,
-						message.Text,
-					))
-				}
-
-				playEngineOutput(rawAudio)
-				return nil
-			}
-		}
-
 		voice, err := profileManager.GetOrAllocateVoice(profileID, message.Character)
 		if err != nil {
 			return response.Err("%w", err)
 		}
-
 		message.Voice = *voice
+		resolved = append(resolved, message)
+	}
 
-		selectedEngineInstance, releaseFunc, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
-		if !ok {
-			return response.Err("Failed to retrieve engine instance: %s/%s", voice.Engine, voice.Model)
+	outputPath := ""
+	if saveOutput {
+		err, expandedPath := util.ExpandPath(config.GetSettings().OutputPath)
+		if err != nil {
+			return response.Err("%w", err)
+		}
+		outputPath = expandedPath
+	}
+
+	queue := dispatchFutures(session, resolved, saveOutput, profileID)
+
+	for future := range queue {
+		select {
+		case <-future.ready:
+		case <-session.ctx.Done():
+			go discardFuture(future)
+			drainFutures(queue)
+			return nil
+		}
+
+		if future.err != nil {
+			session.cancel()
+			drainFutures(queue)
+			return response.Err("%w", future.err)
 		}
 
 		if saveOutput {
-			err := selectedEngineInstance.Save([]util.CharacterMessage{message}, false)
-			releaseFunc()
-			if err != nil {
+			if err := saveFutureToFile(future, outputPath); err != nil {
+				session.cancel()
+				drainFutures(queue)
 				return response.Err("%w", err)
 			}
-
-			// Cache the generated audio if enabled
-			// Note: For Save mode, we'd need to read back the saved file to cache it
-			// For now, caching only works in play mode
-		} else {
-			status.Set(status.Playing, "")
-			message.Voice = *voice
-
-			payload, err := preparePayload(message)
-			if err != nil {
-				return response.Err("%w", err)
-			}
-
-			rawAudio, err = selectedEngineInstance.Generate(message.Voice.Model, payload)
-			releaseFunc()
-			if err != nil {
-				return response.Err("%w", err)
-			}
-
-			playEngineOutput(rawAudio)
-
-			if cacheManager != nil && cacheManager.IsEnabled() {
-				go func(data []byte) {
-					voiceKey := fmt.Sprintf("%s:%s:%s", voice.Engine, voice.Model, voice.Voice)
-					if err := cacheManager.CacheAudio(profileID, message.Character, message.Text, voiceKey, data); err != nil {
-						response.Warn("Background caching failed: %v\n", err)
-					}
-				}(rawAudio)
-			}
+			continue
 		}
+
+		status.Set(status.Playing, "")
+		if err := audio.PlayStream(session.ctx, future.stream); err != nil {
+			if session.ctx.Err() != nil {
+				drainFutures(queue)
+				return nil
+			}
+			session.cancel()
+			drainFutures(queue)
+			return response.Err("%w", err)
+		}
+
+		storeCacheCapture(future, profileID)
 	}
 
-	status.Set(status.Ready, "")
 	return nil
 }
 
-func GenerateAudio(voice *util.CharacterVoice, text string) (*audio.Audio, error) {
-	engineInstance, releaseFunc, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
+func SynthesizeStream(ctx context.Context, voice *util.CharacterVoice, text string) (*audio.Stream, error) {
+	engineInstance, releaseInstance, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
 	if !ok {
-		return nil, response.Err("failed to get engine instance: %s/%s", voice.Engine, voice.Model)
-	}
-	defer releaseFunc()
-
-	message := util.CharacterMessage{
-		Character: voice.Name,
-		Text:      text,
-		Voice:     *voice,
-		Save:      false,
+		return nil, response.Err("Failed to retrieve engine instance: %s/%s", voice.Engine, voice.Model)
 	}
 
-	payload, err := preparePayload(message)
+	stream, err := engineInstance.Synthesize(ctx, engine.SpeechRequest{
+		Model: voice.Model,
+		Voice: voice.Voice,
+		Text:  text,
+	})
+	if err != nil {
+		releaseInstance()
+		return nil, response.Err("%w", err)
+	}
+
+	go func() {
+		<-stream.Done()
+		releaseInstance()
+	}()
+
+	return stream, nil
+}
+
+func GenerateAudio(voice *util.CharacterVoice, text string) (*audio.Audio, error) {
+	stream, err := SynthesizeStream(context.Background(), voice, text)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}
 
-	audioObj, err := engineInstance.GenerateAudio(message.Voice.Model, payload)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return audioObj, nil
+	return stream.ReadAll()
 }
 
 func GenerateRawAudio(voice *util.CharacterVoice, text string) ([]byte, error) {
-	// Use new GenerateAudio function and convert to raw PCM for backward compatibility
-	audioObj, err := GenerateAudio(voice, text)
+	audioObject, err := GenerateAudio(voice, text)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}
 
-	return audioObj.ToPCM()
-}
-
-func preparePayload(message util.CharacterMessage) ([]byte, error) {
-	switch message.Voice.Engine {
-	case string(Engines.Piper):
-		speakerID, _ := strconv.Atoi(message.Voice.Voice)
-		payload := piper.PiperInputLite{
-			Text:      message.Text,
-			SpeakerID: speakerID,
-		}
-		result, err := json.Marshal(payload)
-		if err != nil {
-			return nil, response.Err("%w", err)
-		}
-
-		return append(result, '\n'), nil
-
-	case string(Engines.OpenAI):
-		payload := openai.OpenAIRequest{
-			Model: message.Voice.Model,
-			Input: message.Text,
-			Voice: message.Voice.Voice,
-		}
-		return json.Marshal(payload)
-
-	case string(Engines.MsSapi5):
-		payload := mssapi5.MsSapi5Request{
-			Text:  message.Text,
-			Voice: message.Voice.Voice,
-		}
-		return json.Marshal(payload)
-
-	case string(Engines.ElevenLabs):
-		payload := elevenlabs.ElevenLabsRequest{
-			Text:    message.Text,
-			ModelID: message.Voice.Model,
-			VoiceID: message.Voice.Voice,
-		}
-		return json.Marshal(payload)
-
-	case string(Engines.Google):
-		payload := google.GoogleRequest{
-			Input: google.Input{Text: message.Text},
-			Voice: google.VoiceSelectionParams{
-				Name:         message.Voice.Voice,
-				LanguageCode: "en-US",
-				ModelName:    message.Voice.Model,
-			},
-			AudioConfig: google.AudioConfig{
-				AudioEncoding: "WAV",
-				SpeakingRate:  1,
-				Pitch:         0,
-			},
-		}
-
-		parts := strings.Split(message.Voice.Voice, "-")
-		if len(parts) >= 2 {
-			payload.Voice.LanguageCode = parts[0] + "-" + parts[1]
-		}
-		return json.Marshal(payload)
-
-	case string(Engines.Gemini):
-		payload := gemini.GeminiRequest{
-			Model: message.Voice.Model,
-			Contents: []gemini.Content{
-				{Parts: []gemini.Part{{Text: message.Text}}},
-			},
-			GenerationConfig: gemini.GenerationConfig{
-				ResponseModalities: []string{"AUDIO"},
-				SpeechConfig: gemini.SpeechConfig{
-					VoiceConfig: gemini.VoiceConfig{
-						PrebuiltVoiceConfig: gemini.PrebuiltVoiceConfig{
-							VoiceName: message.Voice.Voice,
-						},
-					},
-				},
-			},
-		}
-		return json.Marshal(payload)
-
-	default:
-		return json.Marshal(map[string]interface{}{
-			"voice": message.Voice.Voice,
-			"text":  message.Text,
-		})
-	}
-}
-
-// Python-pack engines return self-describing WAV at varying sample rates;
-// playing those as fixed-rate raw PCM would slow them down, so honor the
-// embedded rate and fall back to raw PCM only when the bytes are not WAV.
-func playEngineOutput(audioData []byte) {
-	status.Set(status.Playing, "")
-	isWAV := len(audioData) >= 12 && string(audioData[0:4]) == "RIFF" && string(audioData[8:12]) == "WAVE"
-	if isWAV {
-		if err := audio.PlayWAVBytes(audioData); err == nil {
-			return
-		}
-	}
-	audio.PlayRawAudioBytes(audioData)
-	status.Set(status.Ready, "")
+	return audioObject.ToPCM()
 }

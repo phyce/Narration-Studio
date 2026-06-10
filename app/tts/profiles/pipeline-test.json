@@ -1,0 +1,23 @@
+{
+  "id": "pipeline-test",
+  "name": "pipeline-test",
+  "description": "",
+  "created_at": "2026-06-10T21:18:09Z",
+  "updated_at": "2026-06-10T21:18:09Z",
+  "voices": {
+    "Alice": {
+      "key": "mssapi5:mssapi5",
+      "name": "Alice",
+      "engine": "mssapi5",
+      "model": "mssapi5",
+      "voice": "TTS_MS_EN-GB_HAZEL_11.0"
+    },
+    "Bob": {
+      "key": "mssapi5:mssapi5",
+      "name": "Bob",
+      "engine": "mssapi5",
+      "model": "mssapi5",
+      "voice": "TTS_MS_EN-GB_HAZEL_11.0"
+    }
+  }
+}

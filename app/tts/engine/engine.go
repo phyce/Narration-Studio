@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"nstudio/app/common/audio"
@@ -38,14 +39,15 @@ type Base interface {
 	Initialize() error
 	Start(modelName string) error
 	Stop(modelName string) error
-	Play(message util.CharacterMessage) error
-	Save(messages []util.CharacterMessage, play bool) error
-
-	//TODO Maybe remove Generate() from Base? this is only used by Play and Save
-	Generate(model string, payload []byte) ([]byte, error)
-	GenerateAudio(model string, payload []byte) (*audio.Audio, error)
+	Synthesize(ctx context.Context, request SpeechRequest) (*audio.Stream, error)
 	GetVoices(model string) ([]Voice, error)
 	FetchModels() map[string]Model
+
+	// Deprecated: removed in Phase 3 (docs/plan.md) — new callers use Synthesize.
+	Play(message util.CharacterMessage) error
+	Save(messages []util.CharacterMessage, play bool) error
+	Generate(model string, payload []byte) ([]byte, error)
+	GenerateAudio(model string, payload []byte) (*audio.Audio, error)
 }
 
 type Engine struct {

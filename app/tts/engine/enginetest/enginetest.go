@@ -1,6 +1,7 @@
 package enginetest
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -136,6 +137,28 @@ func RunInterfaceTests(t *testing.T, c Case) {
 		}
 		if audioObject == nil || len(audioObject.Data) == 0 {
 			t.Error("GenerateAudio returned empty audio")
+		}
+	})
+
+	t.Run("Synthesize", func(t *testing.T) {
+		pace()
+		stream, err := c.Engine.Synthesize(context.Background(), engine.SpeechRequest{
+			Model: c.Model,
+			Voice: voiceID,
+			Text:  "Testing one two three.",
+		})
+		if err != nil {
+			t.Fatalf("Synthesize: %v", err)
+		}
+		audioObject, err := stream.ReadAll()
+		if err != nil {
+			t.Fatalf("ReadAll: %v", err)
+		}
+		if audioObject == nil || len(audioObject.Data) == 0 {
+			t.Error("Synthesize returned empty audio")
+		}
+		if audioObject != nil && audioObject.Metadata.SampleRate <= 0 {
+			t.Errorf("Synthesize returned invalid sample rate %d", audioObject.Metadata.SampleRate)
 		}
 	})
 

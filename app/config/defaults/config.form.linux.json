@@ -12,9 +12,6 @@
 								"description": "Path to piper executable"
 							}
 						}
-					},
-					"msSapi4": {
-						"hidden": true
 					}
 				}
 			},

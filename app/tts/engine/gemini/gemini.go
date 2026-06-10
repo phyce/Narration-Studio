@@ -1,6 +1,7 @@
 package gemini
 
 import (
+	"context"
 	"encoding/json"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
@@ -55,7 +56,7 @@ func (gemini *Gemini) Play(message util.CharacterMessage) error {
 		},
 	}
 
-	audioClip, err := gemini.sendRequest(input, message.Voice.Model)
+	audioClip, err := gemini.sendRequest(context.Background(), input, message.Voice.Model)
 	if err != nil {
 		return response.Err("%w", err)
 	}
@@ -100,7 +101,7 @@ func (gemini *Gemini) Save(messages []util.CharacterMessage, play bool) error {
 			},
 		}
 
-		audioClip, err := gemini.sendRequest(input, message.Voice.Model)
+		audioClip, err := gemini.sendRequest(context.Background(), input, message.Voice.Model)
 		if err != nil {
 			return response.Err("%w", err)
 		}
@@ -127,13 +128,39 @@ func (gemini *Gemini) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
+func (gemini *Gemini) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
+	input := GeminiRequest{
+		Model: request.Model,
+		Contents: []Content{
+			{Parts: []Part{{Text: request.Text}}},
+		},
+		GenerationConfig: GenerationConfig{
+			ResponseModalities: []string{"AUDIO"},
+			SpeechConfig: SpeechConfig{
+				VoiceConfig: VoiceConfig{
+					PrebuiltVoiceConfig: PrebuiltVoiceConfig{
+						VoiceName: request.Voice,
+					},
+				},
+			},
+		},
+	}
+
+	pcmData, err := gemini.sendRequest(ctx, input, request.Model)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	return audio.NewBufferedStream(audio.StreamFormat{SampleRate: 24000, Channels: 1, BitDepth: 16}, pcmData), nil
+}
+
 func (gemini *Gemini) Generate(model string, payload []byte) ([]byte, error) {
 	var request GeminiRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
 		return nil, response.Err("%w", err)
 	}
 
-	pcmData, err := gemini.sendRequest(request, model)
+	pcmData, err := gemini.sendRequest(context.Background(), request, model)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}

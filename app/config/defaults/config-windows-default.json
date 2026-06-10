@@ -17,11 +17,6 @@
 					"libritts": {
 						"instances": 2
 					}
-				},
-				"mssapi4": {
-					"mssapi4": {
-						"instances": 2
-					}
 				}
 			}
 		}
@@ -33,11 +28,6 @@
 				"location": "",
 				"modelsDirectory": "%USERPROFILE%\\Narration Studio\\piper\\models",
 				"useGPU": false
-			},
-			"msSapi4": {
-				"location": "",
-				"pitch": 150,
-				"speed": 100
 			},
 			"msSapi5": {
 				"rate": 0,

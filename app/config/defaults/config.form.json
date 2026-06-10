@@ -87,25 +87,6 @@
 										}
 									}
 								}
-							},
-							"mssapi4": {
-								"label": "",
-								"description": "",
-								"children": {
-									"mssapi4": {
-										"label": "Microsoft Speech Api 4",
-										"description": "Model Settings",
-										"children": {
-											"instances": {
-												"label": "Instances",
-												"type": "number",
-												"min": 1,
-												"max": 50,
-												"description": "Instance count"
-											}
-										}
-									}
-								}
 							}
 						}
 					}
@@ -152,32 +133,6 @@
 									{ "field": "engine.local.piper.useExecutable", "value": true },
 									{ "field": "engine.local.piper.nativeAvailable", "value": false }
 								]
-							}
-						}
-					},
-					"msSapi4": {
-						"label": "Microsoft SAPI4",
-						"description": "Microsoft SAPI4 TTS engine settings (Windows only)",
-						"children": {
-							"location": {
-								"label": "SAPI4 Executable",
-								"type": "path",
-								"pathType": "file",
-								"description": "Path to SAPI4 executable"
-							},
-							"pitch": {
-								"label": "Voice Pitch",
-								"type": "number",
-								"min": 0,
-								"max": 300,
-								"description": "Voice pitch (default: 150)"
-							},
-							"speed": {
-								"label": "Speech Speed",
-								"type": "number",
-								"min": 50,
-								"max": 200,
-								"description": "Speech speed (default: 100)"
 							}
 						}
 					},

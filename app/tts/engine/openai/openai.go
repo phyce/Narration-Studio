@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"context"
 	"encoding/json"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
@@ -55,7 +56,7 @@ func (openAI *OpenAI) Play(message util.CharacterMessage) error {
 		Speed:          1,
 	}
 
-	audioClip, err := openAI.sendRequest(input)
+	audioClip, err := openAI.sendRequest(context.Background(), input)
 	if err != nil {
 		return response.Err("%w", err)
 	}
@@ -89,7 +90,7 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 			Speed:          1,
 		}
 
-		audioClip, err := openAI.sendRequest(input)
+		audioClip, err := openAI.sendRequest(context.Background(), input)
 		if err != nil {
 			return response.Err("%w", err)
 		}
@@ -116,6 +117,23 @@ func (openAI *OpenAI) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
+func (openAI *OpenAI) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
+	input := OpenAIRequest{
+		Voice:          request.Voice,
+		Input:          request.Text,
+		Model:          request.Model,
+		ResponseFormat: openAI.outputType,
+		Speed:          1,
+	}
+
+	flacData, err := openAI.sendRequest(ctx, input)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	return audio.NewStreamFromAudio(audio.NewAudioFromFLAC(flacData))
+}
+
 func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
 	var request OpenAIRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
@@ -126,7 +144,7 @@ func (openAI *OpenAI) Generate(model string, payload []byte) ([]byte, error) {
 	request.ResponseFormat = openAI.outputType
 	request.Speed = 1
 
-	flacData, err := openAI.sendRequest(request)
+	flacData, err := openAI.sendRequest(context.Background(), request)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}

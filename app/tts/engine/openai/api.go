@@ -2,6 +2,7 @@ package openai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,7 @@ import (
 	"nstudio/app/config"
 )
 
-func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
+func (openAI *OpenAI) sendRequest(ctx context.Context, data OpenAIRequest) ([]byte, error) {
 	apiKey := config.GetEngine().Api.OpenAI.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("OpenAI API key is not set")
@@ -22,7 +23,7 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 		return nil, response.Err("Failed to marshal httpRequest body: %v", err)
 	}
 
-	httpRequest, err := http.NewRequest("POST", "https://api.openai.com/v1/audio/speech", bytes.NewBuffer(jsonData))
+	httpRequest, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/audio/speech", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, response.Err("Failed to create HTTP httpRequest: %v", err)
 	}
@@ -49,8 +50,8 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 		return nil, response.Err("Failed to read response body: %v", err)
 	}
 
-	response.Success(util.MessageData{
-		Summary: "Request succeeded?",
+	response.Debug(util.MessageData{
+		Summary: "OpenAI request succeeded",
 		Detail:  "Response Status: " + httpResponse.Status,
 	})
 

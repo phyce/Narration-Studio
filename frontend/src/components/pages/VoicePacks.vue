@@ -56,7 +56,6 @@ const engineMeta: Record<string, EngineMeta> = {
 
 const engineConfigPathMap: Record<string, string> = {
 	piper: 'engine.local.piper',
-	mssapi4: 'engine.local.msSapi4',
 	mssapi5: 'engine.local.msSapi5',
 	openai: 'engine.api.openAI',
 	elevenlabs: 'engine.api.elevenLabs',

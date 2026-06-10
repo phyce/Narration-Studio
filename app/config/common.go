@@ -28,12 +28,6 @@ func GetServerInstanceCount(engineID, modelID string) int {
 				return modelConfig.Instances
 			}
 		}
-	case string(Engines.MsSapi4):
-		if settings.Server.Engines.MsSapi4 != nil {
-			if modelConfig, exists := settings.Server.Engines.MsSapi4[modelID]; exists {
-				return modelConfig.Instances
-			}
-		}
 	}
 
 	return 0

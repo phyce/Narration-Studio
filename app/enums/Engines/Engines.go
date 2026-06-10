@@ -4,7 +4,6 @@ type Engine string
 
 const (
 	Piper   Engine = "piper"
-	MsSapi4 Engine = "mssapi4"
 	MsSapi5 Engine = "mssapi5"
 
 	OpenAI     Engine = "openai"

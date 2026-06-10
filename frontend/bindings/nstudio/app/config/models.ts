@@ -292,16 +292,12 @@ export class Info {
 
 export class Local {
     "piper": Piper;
-    "msSapi4": MsSapi4;
     "msSapi5": MsSapi5;
 
     /** Creates a new Local instance. */
     constructor($$source: Partial<Local> = {}) {
         if (!("piper" in $$source)) {
             this["piper"] = (new Piper());
-        }
-        if (!("msSapi4" in $$source)) {
-            this["msSapi4"] = (new MsSapi4());
         }
         if (!("msSapi5" in $$source)) {
             this["msSapi5"] = (new MsSapi5());
@@ -316,16 +312,12 @@ export class Local {
     static createFrom($$source: any = {}): Local {
         const $$createField0_0 = $$createType10;
         const $$createField1_0 = $$createType11;
-        const $$createField2_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("piper" in $$parsedSource) {
             $$parsedSource["piper"] = $$createField0_0($$parsedSource["piper"]);
         }
-        if ("msSapi4" in $$parsedSource) {
-            $$parsedSource["msSapi4"] = $$createField1_0($$parsedSource["msSapi4"]);
-        }
         if ("msSapi5" in $$parsedSource) {
-            $$parsedSource["msSapi5"] = $$createField2_0($$parsedSource["msSapi5"]);
+            $$parsedSource["msSapi5"] = $$createField1_0($$parsedSource["msSapi5"]);
         }
         return new Local($$parsedSource as Partial<Local>);
     }
@@ -349,35 +341,6 @@ export class ModelInstances {
     static createFrom($$source: any = {}): ModelInstances {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new ModelInstances($$parsedSource as Partial<ModelInstances>);
-    }
-}
-
-export class MsSapi4 {
-    "location": string;
-    "pitch": number;
-    "speed": number;
-
-    /** Creates a new MsSapi4 instance. */
-    constructor($$source: Partial<MsSapi4> = {}) {
-        if (!("location" in $$source)) {
-            this["location"] = "";
-        }
-        if (!("pitch" in $$source)) {
-            this["pitch"] = 0;
-        }
-        if (!("speed" in $$source)) {
-            this["speed"] = 0;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new MsSapi4 instance from a string or object.
-     */
-    static createFrom($$source: any = {}): MsSapi4 {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new MsSapi4($$parsedSource as Partial<MsSapi4>);
     }
 }
 
@@ -485,8 +448,8 @@ export class ServerSettings {
      * Creates a new ServerSettings instance from a string or object.
      */
     static createFrom($$source: any = {}): ServerSettings {
-        const $$createField0_0 = $$createType13;
-        const $$createField1_0 = $$createType14;
+        const $$createField0_0 = $$createType12;
+        const $$createField1_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("auth" in $$parsedSource) {
             $$parsedSource["auth"] = $$createField0_0($$parsedSource["auth"]);
@@ -502,7 +465,6 @@ export class ServerSettingsEngines {
     "piper"?: { [_ in string]?: ModelInstances };
     "openai"?: { [_ in string]?: ModelInstances };
     "elevenlabs"?: { [_ in string]?: ModelInstances };
-    "mssapi4"?: { [_ in string]?: ModelInstances };
     "mssapi5"?: { [_ in string]?: ModelInstances };
     "google"?: { [_ in string]?: ModelInstances };
     "gemini"?: { [_ in string]?: ModelInstances };
@@ -517,13 +479,12 @@ export class ServerSettingsEngines {
      * Creates a new ServerSettingsEngines instance from a string or object.
      */
     static createFrom($$source: any = {}): ServerSettingsEngines {
-        const $$createField0_0 = $$createType16;
-        const $$createField1_0 = $$createType16;
-        const $$createField2_0 = $$createType16;
-        const $$createField3_0 = $$createType16;
-        const $$createField4_0 = $$createType16;
-        const $$createField5_0 = $$createType16;
-        const $$createField6_0 = $$createType16;
+        const $$createField0_0 = $$createType15;
+        const $$createField1_0 = $$createType15;
+        const $$createField2_0 = $$createType15;
+        const $$createField3_0 = $$createType15;
+        const $$createField4_0 = $$createType15;
+        const $$createField5_0 = $$createType15;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("piper" in $$parsedSource) {
             $$parsedSource["piper"] = $$createField0_0($$parsedSource["piper"]);
@@ -534,17 +495,14 @@ export class ServerSettingsEngines {
         if ("elevenlabs" in $$parsedSource) {
             $$parsedSource["elevenlabs"] = $$createField2_0($$parsedSource["elevenlabs"]);
         }
-        if ("mssapi4" in $$parsedSource) {
-            $$parsedSource["mssapi4"] = $$createField3_0($$parsedSource["mssapi4"]);
-        }
         if ("mssapi5" in $$parsedSource) {
-            $$parsedSource["mssapi5"] = $$createField4_0($$parsedSource["mssapi5"]);
+            $$parsedSource["mssapi5"] = $$createField3_0($$parsedSource["mssapi5"]);
         }
         if ("google" in $$parsedSource) {
-            $$parsedSource["google"] = $$createField5_0($$parsedSource["google"]);
+            $$parsedSource["google"] = $$createField4_0($$parsedSource["google"]);
         }
         if ("gemini" in $$parsedSource) {
-            $$parsedSource["gemini"] = $$createField6_0($$parsedSource["gemini"]);
+            $$parsedSource["gemini"] = $$createField5_0($$parsedSource["gemini"]);
         }
         return new ServerSettingsEngines($$parsedSource as Partial<ServerSettingsEngines>);
     }
@@ -577,8 +535,8 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField3_0 = $$createType17;
-        const $$createField4_0 = $$createType18;
+        const $$createField3_0 = $$createType16;
+        const $$createField4_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("audioCache" in $$parsedSource) {
             $$parsedSource["audioCache"] = $$createField3_0($$parsedSource["audioCache"]);
@@ -602,11 +560,10 @@ const $$createType7 = Info.createFrom;
 const $$createType8 = Local.createFrom;
 const $$createType9 = Api.createFrom;
 const $$createType10 = Piper.createFrom;
-const $$createType11 = MsSapi4.createFrom;
-const $$createType12 = MsSapi5.createFrom;
-const $$createType13 = AuthSettings.createFrom;
-const $$createType14 = ServerSettingsEngines.createFrom;
-const $$createType15 = ModelInstances.createFrom;
-const $$createType16 = $Create.Map($Create.Any, $$createType15);
-const $$createType17 = AudioCacheSettings.createFrom;
-const $$createType18 = ServerSettings.createFrom;
+const $$createType11 = MsSapi5.createFrom;
+const $$createType12 = AuthSettings.createFrom;
+const $$createType13 = ServerSettingsEngines.createFrom;
+const $$createType14 = ModelInstances.createFrom;
+const $$createType15 = $Create.Map($Create.Any, $$createType14);
+const $$createType16 = AudioCacheSettings.createFrom;
+const $$createType17 = ServerSettings.createFrom;

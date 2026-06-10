@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]byte, error) {
+func (gemini *Gemini) sendRequest(ctx context.Context, request GeminiRequest, modelName string) ([]byte, error) {
 	apiKey := config.GetEngine().Api.Gemini.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("Gemini API key is not configured")
@@ -25,7 +26,7 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
 
-	httpRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	httpRequest, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}

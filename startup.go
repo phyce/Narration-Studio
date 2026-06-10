@@ -8,7 +8,6 @@ import (
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/elevenlabs"
-	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/mssapi5"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
@@ -133,20 +132,6 @@ func registerEngines() {
 	}
 
 	if runtime.GOOS == "windows" {
-		msSapi4Engine := engine.Engine{
-			ID:     "mssapi4",
-			Name:   "Microsoft SAPI4",
-			Type:   engine.Local,
-			Tags:   []string{"local"},
-			Engine: &mssapi4.MsSapi4{},
-			Models: mssapi4.FetchModels(),
-		}
-
-		err = modelManager.RegisterEngine(msSapi4Engine)
-		if err != nil {
-			response.Err("%w", err)
-		}
-
 		msSapi5Engine := engine.Engine{
 			ID:     "mssapi5",
 			Name:   "Microsoft SAPI5",

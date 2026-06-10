@@ -12,7 +12,6 @@ import (
 	"nstudio/app/tts/engine/elevenlabs"
 	"nstudio/app/tts/engine/gemini"
 	"nstudio/app/tts/engine/google"
-	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/mssapi5"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
@@ -136,8 +135,6 @@ func createModelPool(engineID, modelID string) (*ModelPool, error) {
 		switch engineID {
 		case string(Engines.Piper):
 			engine = &piper.Piper{}
-		case string(Engines.MsSapi4):
-			engine = &mssapi4.MsSapi4{}
 		case string(Engines.MsSapi5):
 			engine = &mssapi5.MsSapi5{}
 		case string(Engines.ElevenLabs):

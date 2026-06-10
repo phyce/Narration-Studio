@@ -2,6 +2,7 @@ package elevenlabs
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -59,7 +60,7 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 		},
 	}
 
-	audioClip, err := labs.sendRequest(message.Voice.Voice, input)
+	audioClip, err := labs.sendRequest(context.Background(), message.Voice.Voice, input)
 	if err != nil {
 		return response.Err("%w", err)
 	}
@@ -72,8 +73,6 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 	return response.Success(util.MessageData{
 		Summary: "ElevenLabs finished playing audio",
 	})
-
-	return nil
 }
 
 func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error {
@@ -96,7 +95,7 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 			},
 		}
 
-		audioClip, err := labs.sendRequest(message.Voice.Voice, input)
+		audioClip, err := labs.sendRequest(context.Background(), message.Voice.Voice, input)
 		if err != nil {
 			return response.Err("%w", err)
 		}
@@ -123,13 +122,32 @@ func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error 
 	return nil
 }
 
+func (labs *ElevenLabs) Synthesize(ctx context.Context, request engine.SpeechRequest) (*commonAudio.Stream, error) {
+	input := ElevenLabsRequest{
+		Text:    request.Text,
+		ModelID: request.Model,
+		VoiceID: request.Voice,
+		VoiceSettings: VoiceSettings{
+			Stability:       0.5,
+			SimilarityBoost: 0.5,
+		},
+	}
+
+	pcmData, err := labs.sendRequest(ctx, request.Voice, input)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	return commonAudio.NewBufferedStream(commonAudio.StreamFormat{SampleRate: 24000, Channels: 1, BitDepth: 16}, pcmData), nil
+}
+
 func (labs *ElevenLabs) Generate(model string, payload []byte) ([]byte, error) {
 	var request ElevenLabsRequest
 	if err := json.Unmarshal(payload, &request); err != nil {
 		return nil, response.Err("%w", err)
 	}
 
-	pcmData, err := labs.sendRequest(request.VoiceID, request)
+	pcmData, err := labs.sendRequest(context.Background(), request.VoiceID, request)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}
@@ -174,7 +192,7 @@ func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
 // </editor-fold>
 
 // <editor-fold desc="Other">
-func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]byte, error) {
+func (labs *ElevenLabs) sendRequest(ctx context.Context, voiceID string, data ElevenLabsRequest) ([]byte, error) {
 	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("Elevenlabs API Key is not set")
@@ -187,7 +205,7 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 
 	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=%s", voiceID, labs.outputType)
 
-	httpRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	httpRequest, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, response.Err("failed to create HTTP request: %v", err)
 	}
@@ -214,7 +232,7 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 		return nil, response.Err("failed to read response body: %v", err)
 	}
 
-	response.Success(util.MessageData{
+	response.Debug(util.MessageData{
 		Summary: "ElevenLabs request succeeded",
 		Detail:  "Response Status: " + httpResponse.Status,
 	})

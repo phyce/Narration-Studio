@@ -12,7 +12,6 @@ import (
 	"nstudio/app/tts/engine/elevenlabs"
 	"nstudio/app/tts/engine/gemini"
 	"nstudio/app/tts/engine/google"
-	"nstudio/app/tts/engine/mssapi4"
 	"nstudio/app/tts/engine/mssapi5"
 	"nstudio/app/tts/engine/openai"
 	"nstudio/app/tts/engine/piper"
@@ -159,13 +158,6 @@ func preparePayload(message util.CharacterMessage) ([]byte, error) {
 		payload := openai.OpenAIRequest{
 			Model: message.Voice.Model,
 			Input: message.Text,
-			Voice: message.Voice.Voice,
-		}
-		return json.Marshal(payload)
-
-	case string(Engines.MsSapi4):
-		payload := mssapi4.MsSapi4Request{
-			Text:  message.Text,
 			Voice: message.Voice.Voice,
 		}
 		return json.Marshal(payload)

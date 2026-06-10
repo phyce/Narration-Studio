@@ -14,8 +14,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-func (google *Google) sendRequest(data GoogleRequest) ([]byte, error) {
-	ctx := context.Background()
+func (google *Google) sendRequest(ctx context.Context, data GoogleRequest) ([]byte, error) {
 	apiKey := config.GetEngine().Api.Google.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("Google Cloud API key is not set")
@@ -72,8 +71,8 @@ func (google *Google) sendRequest(data GoogleRequest) ([]byte, error) {
 		return nil, response.Err("Google TTS request failed: %v", err)
 	}
 
-	response.Success(util.MessageData{
-		Summary: "Request succeeded",
+	response.Debug(util.MessageData{
+		Summary: "Google TTS request succeeded",
 		Detail:  "Google TTS generated audio",
 	})
 

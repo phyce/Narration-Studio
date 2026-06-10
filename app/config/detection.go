@@ -27,10 +27,6 @@ func findEngines(config *Base) {
 		}
 	}
 
-	msSapi4Path := filepath.Join(installDir, "engines", "mssapi4", "sapi4out", "sapi4out.exe")
-	if fileExists(msSapi4Path) {
-		config.Engine.Local.MsSapi4.Location = msSapi4Path
-	}
 }
 
 func fileExists(path string) bool {

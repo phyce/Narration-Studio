@@ -1,6 +1,7 @@
 package python
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"nstudio/app/common/audio"
@@ -83,6 +84,29 @@ func (pythonEngine *Python) Stop(modelName string) error {
 	pythonEngine.runner = nil
 	pythonEngine.currentModel = ""
 	return err
+}
+
+func (pythonEngine *Python) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
+	payload, err := json.Marshal(SynthPayload{
+		Voice:  request.Voice,
+		Text:   request.Text,
+		Params: request.Params,
+	})
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	wavBytes, err := pythonEngine.Generate(request.Model, payload)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	wavAudio, err := audio.NewAudioFromWAV(wavBytes)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	return audio.NewStreamFromAudio(wavAudio)
 }
 
 func (pythonEngine *Python) Generate(model string, payload []byte) ([]byte, error) {

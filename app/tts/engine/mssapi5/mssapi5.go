@@ -1,6 +1,7 @@
 package mssapi5
 
 import (
+	"context"
 	"encoding/json"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
@@ -99,6 +100,28 @@ func (sapi *MsSapi5) Save(messages []util.CharacterMessage, play bool) error {
 	}
 
 	return nil
+}
+
+func (sapi *MsSapi5) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
+	if request.Voice == "" {
+		return nil, response.Err("voice field is required")
+	}
+	if request.Text == "" {
+		return nil, response.Err("text field is required")
+	}
+
+	settings := config.GetEngine().Local.MsSapi5
+	wavBytes, err := synthesize(request.Voice, request.Text, settings.Rate, settings.Volume)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	wavAudio, err := audio.NewAudioFromWAV(wavBytes)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	return audio.NewStreamFromAudio(wavAudio)
 }
 
 func (sapi *MsSapi5) Generate(model string, payload []byte) ([]byte, error) {

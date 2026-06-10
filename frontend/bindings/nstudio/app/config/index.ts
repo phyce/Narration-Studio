@@ -13,7 +13,6 @@ export {
     Info,
     Local,
     ModelInstances,
-    MsSapi4,
     MsSapi5,
     OpenAI,
     Piper,

@@ -1,6 +1,7 @@
 package google
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"nstudio/app/common/audio"
@@ -61,7 +62,7 @@ func (google *Google) Play(message util.CharacterMessage) error {
 		input.Voice.LanguageCode = parts[0] + "-" + parts[1]
 	}
 
-	audioClip, err := google.sendRequest(input)
+	audioClip, err := google.sendRequest(context.Background(), input)
 	if err != nil {
 		return response.Err("%w", err)
 	}
@@ -106,7 +107,7 @@ func (google *Google) Save(messages []util.CharacterMessage, play bool) error {
 			input.Voice.LanguageCode = parts[0] + "-" + parts[1]
 		}
 
-		audioClip, err := google.sendRequest(input)
+		audioClip, err := google.sendRequest(context.Background(), input)
 		if err != nil {
 			return response.Err("%w", err)
 		}
@@ -133,6 +134,51 @@ func (google *Google) Save(messages []util.CharacterMessage, play bool) error {
 	return nil
 }
 
+func (google *Google) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
+	input := GoogleRequest{
+		Input: Input{Text: request.Text},
+		Voice: VoiceSelectionParams{
+			Name:         request.Voice,
+			LanguageCode: languageCodeFromVoice(request.Voice),
+			ModelName:    request.Model,
+		},
+		AudioConfig: AudioConfig{
+			AudioEncoding: "LINEAR16",
+			SpeakingRate:  1,
+			Pitch:         0,
+		},
+	}
+
+	audioContent, err := google.sendRequest(ctx, input)
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
+
+	// LINEAR16 responses carry a WAV header; honor its embedded format instead
+	// of playing the header bytes as PCM at an assumed rate.
+	if isWAV(audioContent) {
+		wavAudio, err := audio.NewAudioFromWAV(audioContent)
+		if err != nil {
+			return nil, response.Err("%w", err)
+		}
+		return audio.NewStreamFromAudio(wavAudio)
+	}
+
+	return audio.NewBufferedStream(audio.StreamFormat{SampleRate: 24000, Channels: 1, BitDepth: 16}, audioContent), nil
+}
+
+func isWAV(data []byte) bool {
+	return len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WAVE"
+}
+
+func languageCodeFromVoice(voice string) string {
+	parts := strings.Split(voice, "-")
+	if len(parts) >= 2 {
+		return parts[0] + "-" + parts[1]
+	}
+	return "en-US"
+}
+
 func (google *Google) Generate(model string, payload []byte) ([]byte, error) {
 	fmt.Println(string(payload))
 	var request GoogleRequest
@@ -142,7 +188,7 @@ func (google *Google) Generate(model string, payload []byte) ([]byte, error) {
 
 	request.AudioConfig.AudioEncoding = "LINEAR16"
 
-	pcmData, err := google.sendRequest(request)
+	pcmData, err := google.sendRequest(context.Background(), request)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}

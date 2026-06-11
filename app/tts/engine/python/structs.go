@@ -50,33 +50,12 @@ func (manifestModel *ManifestModel) ToVoices() []engine.Voice {
 	return voices
 }
 
-type rpcRequest struct {
+type runnerRequest struct {
 	ID     string                 `json:"id"`
 	Op     string                 `json:"op"`
 	Model  string                 `json:"model,omitempty"`
 	Voice  string                 `json:"voice,omitempty"`
 	Text   string                 `json:"text,omitempty"`
-	Out    string                 `json:"out,omitempty"`
 	Params map[string]interface{} `json:"params,omitempty"`
 	Voices []string               `json:"voices,omitempty"`
-}
-
-type rpcResponse struct {
-	ID         string `json:"id,omitempty"`
-	Event      string `json:"event,omitempty"`
-	Runner     string `json:"runner,omitempty"`
-	Version    string `json:"version,omitempty"`
-	Ok         bool   `json:"ok"`
-	Error      string `json:"error,omitempty"`
-	Code       string `json:"code,omitempty"`
-	SampleRate int    `json:"sampleRate,omitempty"`
-	Channels   int    `json:"channels,omitempty"`
-	Bits       int    `json:"bits,omitempty"`
-	Frames     int    `json:"frames,omitempty"`
-}
-
-type SynthPayload struct {
-	Voice  string                 `json:"voice"`
-	Text   string                 `json:"text"`
-	Params map[string]interface{} `json:"params,omitempty"`
 }

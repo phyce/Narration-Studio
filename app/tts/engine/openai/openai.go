@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"io"
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
@@ -24,8 +25,7 @@ var voices = []engine.Voice{
 
 // <editor-fold desc="Engine Interface">
 func (openAI *OpenAI) Initialize() error {
-	//openAI.outputType = defaults.GetEngine().Api.OpenAI.OutputType
-	openAI.outputType = "flac"
+	openAI.outputType = "pcm"
 
 	//TODO add api key check
 
@@ -48,12 +48,18 @@ func (openAI *OpenAI) Synthesize(ctx context.Context, request engine.SpeechReque
 		Speed:          1,
 	}
 
-	flacData, err := openAI.sendRequest(ctx, input)
+	body, err := openAI.sendRequest(ctx, input)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}
 
-	return audio.NewStreamFromAudio(audio.NewAudioFromFLAC(flacData))
+	// The pcm response format is s16le 24 kHz mono.
+	format := audio.StreamFormat{SampleRate: 24000, Channels: 1, BitDepth: 16}
+	return audio.NewProducedStream(format, func(writer *audio.StreamWriter) error {
+		defer body.Close()
+		_, copyErr := io.Copy(writer, body)
+		return copyErr
+	}), nil
 }
 
 func (openAI *OpenAI) GetVoices(model string) ([]engine.Voice, error) {

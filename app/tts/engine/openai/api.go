@@ -12,7 +12,9 @@ import (
 	"nstudio/app/config"
 )
 
-func (openAI *OpenAI) sendRequest(ctx context.Context, data OpenAIRequest) ([]byte, error) {
+var httpClient = &http.Client{}
+
+func (openAI *OpenAI) sendRequest(ctx context.Context, data OpenAIRequest) (io.ReadCloser, error) {
 	apiKey := config.GetEngine().Api.OpenAI.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("OpenAI API key is not set")
@@ -31,23 +33,15 @@ func (openAI *OpenAI) sendRequest(ctx context.Context, data OpenAIRequest) ([]by
 	httpRequest.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	httpRequest.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-
-	httpResponse, err := client.Do(httpRequest)
+	httpResponse, err := httpClient.Do(httpRequest)
 	if err != nil {
 		return nil, response.Err("Failed to send HTTP httpRequest: %v", err)
 	}
-	defer httpResponse.Body.Close()
 
 	if httpResponse.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(httpResponse.Body)
+		httpResponse.Body.Close()
 		return nil, response.Err("HttpRequest failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes))
-	}
-
-	responseData, err := io.ReadAll(httpResponse.Body)
-	if err != nil {
-		return nil, response.Err("Failed to read response body: %v", err)
 	}
 
 	response.Debug(util.MessageData{
@@ -55,5 +49,5 @@ func (openAI *OpenAI) sendRequest(ctx context.Context, data OpenAIRequest) ([]by
 		Detail:  "Response Status: " + httpResponse.Status,
 	})
 
-	return responseData, nil
+	return httpResponse.Body, nil
 }

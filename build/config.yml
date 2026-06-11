@@ -29,8 +29,13 @@ dev_mode:
   executes:
     - cmd: npm --prefix frontend run dev -- --port 9245 --strictPort
       type: background
-      delay_next: 2000
     - cmd: go build -o build/bin/nstudio-dev.exe .
+      type: blocking
+    # The exe polls the Vite URL for a hardcoded 5s (10 x 500ms) before
+    # fataling; a cold Vite start takes ~6-8s and loses that race when the go
+    # build is warm. Block here until Vite's port is actually open — costs
+    # ~50ms when Vite is already up.
+    - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/wait-devserver.ps1
       type: blocking
     - cmd: .\build\bin\nstudio-dev.exe
       type: primary

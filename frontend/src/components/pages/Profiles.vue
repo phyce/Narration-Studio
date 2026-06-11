@@ -5,7 +5,7 @@ import InputText from 'primevue/inputtext';
 import Button from "primevue/button";
 import Dropdown, {DropdownChangeEvent} from "primevue/dropdown";
 import Dialog from 'primevue/dialog';
-import {nextTick, onMounted, onUnmounted, reactive, ref} from "vue";
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref} from "vue";
 import {
 	CreateProfile,
 	DeleteProfile,
@@ -59,6 +59,36 @@ const selectedModelKeys = ref<{key: string, label: string, engine: string, model
 const selectedModels: Record<string, any> = reactive({});
 const selectedVoices: Record<string, any> = reactive({});
 
+// Rows whose stored model or voice is not currently available (engine
+// disabled, model not enabled, voice gone) keep their data but get flagged.
+const voiceIssues = computed<Record<string, string>>(() => {
+	const issues: Record<string, string> = {};
+	for (const [rowKey, character] of Object.entries(characterVoices.value)) {
+		const selectionKeys = selectedModels[rowKey] ? Object.keys(selectedModels[rowKey]) : [];
+		const modelKey = selectionKeys[0] || character.key;
+		if (!modelKey) continue;
+
+		const options = voiceOptions.value[modelKey];
+		if (!options) {
+			const [engineId, ...modelParts] = modelKey.split(':');
+			const modelId = modelParts.join(':');
+			const engineEntry = engines.value[engineId];
+			const engineName = engineEntry?.name || engineId;
+			const engineModels = engineEntry?.models ?? {};
+			issues[rowKey] = Object.keys(engineModels).length > 0
+				? `Model "${engineName}: ${modelId}" is not enabled`
+				: `Engine "${engineName}" is not enabled`;
+			continue;
+		}
+
+		const voiceID = selectedVoices[rowKey]?.voiceID || character.voice;
+		if (voiceID && !options[voiceID]) {
+			issues[rowKey] = `Voice "${voiceID}" is not available`;
+		}
+	}
+	return issues;
+});
+
 async function getEngines() {
 	const result = await GetEngines();
 	const engineList: Engine[] = JSON.parse(result);
@@ -104,21 +134,19 @@ async function getCharacterVoices() {
 		const data = characterVoiceData[name];
 		const {key, voice} = data;
 
-		selectedModels[name] = {[key]: true};
+		selectedModels[name] = key ? {[key]: true} : {};
 
 		const voiceOption = voiceOptions.value[key];
 		if (voiceOption && voiceOption[voice]) {
 			selectedVoices[name] = voiceOption[voice];
 		} else {
-			data.engine = "";
-			data.model = "";
-			data.voice = "";
-			selectedModels[name] = {};
+			// Stored model/voice is not currently available (engine disabled,
+			// pack uninstalled, ...). Keep the stored assignment — only the
+			// dropdown shows unselected.
 			selectedVoices[name] = null;
 		}
 
-		const engineModelKey = data.engine + ":" + data.model;
-		const voiceOptionsRecord = voiceOptions.value[engineModelKey] || {};
+		const voiceOptionsRecord = voiceOptions.value[key] || {};
 		voiceOptionsMap.value[name] = Object.values(voiceOptionsRecord);
 	}
 
@@ -285,16 +313,18 @@ async function rebuildEngineModelNodes() {
 		enginesList = Object.values(engines.value);
 	}
 
-	engineModelNodes.value = enginesList.map(engine => ({
-		key: engine.id,
-		label: engine.name,
-		selectable: false,
-		children: Object.entries(engine.models ?? {}).map(([modelId, modelData]) => ({
-			selectable: true,
-			key: `${engine.id}:${modelId}`,
-			label: modelData.name,
-		}))
-	}));
+	engineModelNodes.value = enginesList
+		.filter(engine => Object.keys(engine.models ?? {}).length > 0)
+		.map(engine => ({
+			key: engine.id,
+			label: engine.name,
+			selectable: false,
+			children: Object.entries(engine.models ?? {}).map(([modelId, modelData]) => ({
+				selectable: true,
+				key: `${engine.id}:${modelId}`,
+				label: modelData.name,
+			}))
+		}));
 }
 
 async function onProfileDropdownChange() {
@@ -318,10 +348,22 @@ async function onProfileChange() {
 function onModelSelect(nodeKey: TreeNode, characterKey: string) {
 	const [engineId, modelId] = nodeKey.key?.split(':') ?? '';
 	const character = characterVoices.value[characterKey];
+	character.key = nodeKey.key ?? '';
 	character.engine = engineId;
 	character.model = modelId;
 
-	voiceOptionsMap.value[characterKey] = Object.values(voiceOptions.value[`${engineId}:${modelId}`]) || [];
+	const rowVoiceOptions = Object.values(voiceOptions.value[`${engineId}:${modelId}`] ?? {});
+	voiceOptionsMap.value[characterKey] = rowVoiceOptions;
+
+	// A voice from the previous model must not survive a model switch.
+	const voiceStillAvailable = (voiceID: string) => rowVoiceOptions.some(option => option.voiceID === voiceID);
+	const currentVoice = selectedVoices[characterKey];
+	if (currentVoice && !voiceStillAvailable(currentVoice.voiceID)) {
+		selectedVoices[characterKey] = null;
+	}
+	if (character.voice && !voiceStillAvailable(character.voice)) {
+		character.voice = '';
+	}
 }
 
 async function onVoiceSelect(key: string, event: DropdownChangeEvent) {
@@ -330,18 +372,18 @@ async function onVoiceSelect(key: string, event: DropdownChangeEvent) {
 
 const saveProfileVoices = () => {
 	const dataToSave = Object.entries(characterVoices.value)
-		.filter(([key, voice]) => {
-			const hasName = voice.name && voice.name.trim() !== '';
-			const hasSelection = selectedModels[key] && Object.keys(selectedModels[key]).length > 0;
-
-			return hasName && hasSelection;
-		})
+		.filter(([key, voice]) => voice.name && voice.name.trim() !== '')
 		.reduce((accumulator, [key, voice]) => {
-			const modelKeys = Object.keys(selectedModels[key]);
-			const modelKey = modelKeys[0];
+			const selectionKeys = selectedModels[key] ? Object.keys(selectedModels[key]) : [];
+			const modelKey = selectionKeys[0] || voice.key;
+			if (!modelKey) {
+				return accumulator;
+			}
+
 			const [engine, model] = modelKey.split(':');
 			const voiceOption = selectedVoices[key];
-			const voiceID = voiceOption ? voiceOption.voiceID : '';
+			// Stored voice id only carries over while the model is unchanged.
+			const voiceID = voiceOption ? voiceOption.voiceID : (modelKey === voice.key ? voice.voice : '');
 
 			const newKey = key.startsWith('_') ? voice.name : key;
 
@@ -350,7 +392,7 @@ const saveProfileVoices = () => {
 				name: voice.name,
 				engine: engine,
 				model: model,
-				voice: voiceID,
+				voice: voiceID || '',
 			};
 
 			return accumulator;
@@ -476,6 +518,8 @@ onUnmounted(() => {
 			</div>
 			<div class="voices__entry__model">
 				<TreeSelect class="voices__entry__model__tree"
+							:class="{'voices__entry__model__tree--invalid': voiceIssues[key]}"
+							v-tooltip.top="voiceIssues[key]"
 							v-if="engineModelNodes && engineModelNodes.length > 0"
 							:options="engineModelNodes"
 							v-model="selectedModels[key]"

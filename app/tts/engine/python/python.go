@@ -14,8 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -83,62 +81,37 @@ func (pythonEngine *Python) Stop(modelName string) error {
 }
 
 func (pythonEngine *Python) Synthesize(ctx context.Context, request engine.SpeechRequest) (*audio.Stream, error) {
-	wavBytes, err := pythonEngine.synthesizeToWAV(request.Model, SynthPayload{
-		Voice:  request.Voice,
+	pythonEngine.mutex.Lock()
+	if err := pythonEngine.ensureModelLoaded(request.Model); err != nil {
+		pythonEngine.mutex.Unlock()
+		return nil, response.Err("%w", err)
+	}
+
+	loadedRunner := pythonEngine.runner
+	format := loadedRunner.format
+
+	voice := request.Voice
+	if resolvedVoicePath, found := voicepack.ResolvePath(pythonEngine.Manifest.ID, voice); found {
+		voice = resolvedVoicePath
+	}
+	pythonEngine.mutex.Unlock()
+
+	synthRequest := runnerRequest{
+		Op:     "synth",
+		Model:  request.Model,
+		Voice:  voice,
 		Text:   request.Text,
 		Params: request.Params,
-	})
-	if err != nil {
-		return nil, response.Err("%w", err)
 	}
 
-	wavAudio, err := audio.NewAudioFromWAV(wavBytes)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	return audio.NewStreamFromAudio(wavAudio)
-}
-
-func (pythonEngine *Python) synthesizeToWAV(model string, synthPayload SynthPayload) ([]byte, error) {
-	pythonEngine.mutex.Lock()
-	defer pythonEngine.mutex.Unlock()
-
-	if err := pythonEngine.ensureModelLoaded(model); err != nil {
-		return nil, response.Err("%w", err)
-	}
-
-	if resolvedVoicePath, found := voicepack.ResolvePath(pythonEngine.Manifest.ID, synthPayload.Voice); found {
-		synthPayload.Voice = resolvedVoicePath
-	}
-
-	outputPath, err := temporaryWAVPath(pythonEngine.Manifest.ID)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-	defer os.Remove(outputPath)
-
-	synthRequest := rpcRequest{
-		Op:     "synth",
-		Model:  model,
-		Voice:  synthPayload.Voice,
-		Text:   synthPayload.Text,
-		Out:    outputPath,
-		Params: synthPayload.Params,
-	}
-	synthResponse, err := pythonEngine.runner.send(synthRequest, time.Duration(defaultGenerateTimeoutSec)*time.Second)
-	if err != nil {
-		return nil, response.Err("python synth: %w", err)
-	}
-	if !synthResponse.Ok {
-		return nil, response.Err("python synth: %s", synthResponse.Error)
-	}
-
-	wavBytes, err := os.ReadFile(outputPath)
-	if err != nil {
-		return nil, response.Err("python synth: read output: %w", err)
-	}
-	return wavBytes, nil
+	return audio.NewProducedStream(format, func(writer *audio.StreamWriter) error {
+		pythonEngine.mutex.Lock()
+		defer pythonEngine.mutex.Unlock()
+		if pythonEngine.runner != loadedRunner {
+			return response.Err("python: runner restarted before synthesis started")
+		}
+		return loadedRunner.streamSynth(ctx, synthRequest, writer)
+	}), nil
 }
 
 func (pythonEngine *Python) GetVoices(model string) ([]engine.Voice, error) {
@@ -205,16 +178,10 @@ func (pythonEngine *Python) ensureModelLoaded(model string) error {
 		"Loading %s model %q + encoding %d voice reference(s) — first run also downloads weights from HuggingFace",
 		pythonEngine.Manifest.Name, model, len(installedVoicePaths),
 	))
-	loadResponse, err := newlyStartedRunner.send(rpcRequest{Op: "load", Model: model, Voices: installedVoicePaths}, time.Duration(defaultGenerateTimeoutSec)*time.Second)
-	if err != nil {
+	if err := newlyStartedRunner.load(model, installedVoicePaths); err != nil {
 		_ = newlyStartedRunner.close(time.Second)
 		status.Set(status.Ready, "")
 		return response.Err("python: load model %q: %w", model, err)
-	}
-	if !loadResponse.Ok {
-		_ = newlyStartedRunner.close(time.Second)
-		status.Set(status.Ready, "")
-		return response.Err("python: load model %q: %s", model, loadResponse.Error)
 	}
 
 	pythonEngine.runner = newlyStartedRunner
@@ -259,18 +226,6 @@ func (pythonEngine *Python) allowRestart() bool {
 	}
 	pythonEngine.recentRestarts = append(pythonEngine.recentRestarts, now)
 	return true
-}
-
-func temporaryWAVPath(engineID string) (string, error) {
-	cacheRootPath, err := os.UserCacheDir()
-	if err != nil {
-		cacheRootPath = os.TempDir()
-	}
-	engineOutputPath := filepath.Join(cacheRootPath, "Narration Studio", "python-tts", engineID)
-	if err := os.MkdirAll(engineOutputPath, 0o755); err != nil {
-		return "", response.Err("%w", err)
-	}
-	return filepath.Join(engineOutputPath, uuid.NewString()+".wav"), nil
 }
 
 func childProcessEnvironment(bundlePath string, extraEnvironmentVariables map[string]string) []string {

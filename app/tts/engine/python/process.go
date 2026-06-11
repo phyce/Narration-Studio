@@ -2,10 +2,13 @@ package python
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"nstudio/app/common/audio"
 	"nstudio/app/common/process"
 	"nstudio/app/common/response"
 	"os/exec"
@@ -21,39 +24,62 @@ const (
 	defaultBootTimeoutSec = 60
 )
 
-type runner struct {
-	engineID   string
-	bundlePath string
-	manifest   *Manifest
-
-	mutex        sync.Mutex
-	command      *exec.Cmd
-	stdin        io.WriteCloser
-	stdoutReader *bufio.Reader
-	stderrReader io.ReadCloser
-
-	pendingMutex sync.Mutex
-	pending      map[string]chan rpcResponse
-
-	nextRequestID atomic.Uint64
-	exited        atomic.Bool
-	exitError     atomic.Value
-
-	readerDone chan struct{}
-}
-
 var (
 	ErrRunnerExited  = errors.New("python runner exited")
 	ErrRunnerTimeout = errors.New("python runner timed out")
 )
 
+// runner drives the bundle's runner.py over the streaming stdio protocol
+// (docs/python-engine-protocol.md): stdin carries JSON-line requests, stdout
+// is a raw s16le PCM firehose routed straight into the active stream writer,
+// stderr carries JSON event lines (ready/done/error) interleaved with
+// free-form log lines.
+type runner struct {
+	engineID   string
+	bundlePath string
+
+	command *exec.Cmd
+	stdin   io.WriteCloser
+	stdout  io.ReadCloser
+	stderr  io.ReadCloser
+
+	writeMutex sync.Mutex
+
+	format audio.StreamFormat
+
+	sinkMutex   sync.Mutex
+	sink        *audio.StreamWriter
+	routedBytes int64
+
+	pendingMutex sync.Mutex
+	pending      map[string]chan runnerEvent
+
+	nextRequestID atomic.Uint64
+	exited        atomic.Bool
+	exitError     atomic.Value
+
+	processDone chan struct{}
+}
+
+type runnerEvent struct {
+	ID           string `json:"id,omitempty"`
+	Event        string `json:"event"`
+	Runner       string `json:"runner,omitempty"`
+	Version      string `json:"version,omitempty"`
+	Error        string `json:"error,omitempty"`
+	Code         string `json:"code,omitempty"`
+	SampleRate   int    `json:"sampleRate,omitempty"`
+	Channels     int    `json:"channels,omitempty"`
+	Bits         int    `json:"bits,omitempty"`
+	TotalSamples int    `json:"totalSamples,omitempty"`
+}
+
 func newRunner(engineID, bundlePath string, manifest *Manifest) (*runner, error) {
 	pythonRunner := &runner{
-		engineID:   engineID,
-		bundlePath: bundlePath,
-		manifest:   manifest,
-		pending:    make(map[string]chan rpcResponse),
-		readerDone: make(chan struct{}),
+		engineID:    engineID,
+		bundlePath:  bundlePath,
+		pending:     make(map[string]chan runnerEvent),
+		processDone: make(chan struct{}),
 	}
 
 	interpreterPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Python))
@@ -84,11 +110,11 @@ func newRunner(engineID, bundlePath string, manifest *Manifest) (*runner, error)
 
 	pythonRunner.command = command
 	pythonRunner.stdin = stdin
-	pythonRunner.stdoutReader = bufio.NewReaderSize(stdout, 1<<16)
-	pythonRunner.stderrReader = stderr
+	pythonRunner.stdout = stdout
+	pythonRunner.stderr = stderr
 
-	go pythonRunner.readStderr()
-	go pythonRunner.readStdout()
+	go pythonRunner.routeStdout()
+	go pythonRunner.readEvents()
 	go pythonRunner.watchExit()
 
 	bootTimeout := time.Duration(manifest.Runtime.BootTimeoutSec) * time.Second
@@ -104,59 +130,109 @@ func newRunner(engineID, bundlePath string, manifest *Manifest) (*runner, error)
 }
 
 func (pythonRunner *runner) waitForReady(bootTimeout time.Duration) error {
+	readyChannel := pythonRunner.registerPending("__ready__")
+	defer pythonRunner.cancelPending("__ready__")
+
 	select {
-	case readyEvent := <-pythonRunner.readyChannel():
-		if !readyEvent.Ok && readyEvent.Error != "" {
+	case readyEvent, ok := <-readyChannel:
+		if !ok {
+			return pythonRunner.exitFailure()
+		}
+		if readyEvent.Event == "error" {
 			return response.Err("runner failed to start: %s", readyEvent.Error)
 		}
 		return nil
-	case <-pythonRunner.readerDone:
-		if err, _ := pythonRunner.exitError.Load().(error); err != nil {
-			return response.Err("%w", err)
-		}
-		return response.Err("%w", ErrRunnerExited)
+	case <-pythonRunner.processDone:
+		return pythonRunner.exitFailure()
 	case <-time.After(bootTimeout):
 		return response.Err("runner boot timed out after %s", bootTimeout)
 	}
 }
 
-func (pythonRunner *runner) readyChannel() chan rpcResponse {
-	pythonRunner.pendingMutex.Lock()
-	defer pythonRunner.pendingMutex.Unlock()
-	readyResponseChannel, alreadyRegistered := pythonRunner.pending["__ready__"]
-	if !alreadyRegistered {
-		readyResponseChannel = make(chan rpcResponse, 1)
-		pythonRunner.pending["__ready__"] = readyResponseChannel
+func (pythonRunner *runner) exitFailure() error {
+	if err, _ := pythonRunner.exitError.Load().(error); err != nil {
+		return response.Err("%w: %s", ErrRunnerExited, err.Error())
 	}
-	return readyResponseChannel
+	return response.Err("%w", ErrRunnerExited)
 }
 
-func (pythonRunner *runner) readStdout() {
-	defer close(pythonRunner.readerDone)
+// routeStdout owns stdout for the life of the process. PCM bytes are mirrored
+// into the active sink (or discarded between requests); routedBytes always
+// counts the current request's bytes so completion can be detected even after
+// the consumer abandoned the stream.
+func (pythonRunner *runner) routeStdout() {
+	chunk := make([]byte, 32*1024)
 	for {
-		line, err := pythonRunner.stdoutReader.ReadBytes('\n')
-		if len(line) > 0 {
-			var responseMessage rpcResponse
-			if unmarshalErr := json.Unmarshal(line, &responseMessage); unmarshalErr != nil {
-				log.Warnf("[python:%s] non-JSON stdout line: %s", pythonRunner.engineID, string(line))
-				continue
+		count, err := pythonRunner.stdout.Read(chunk)
+		if count > 0 {
+			pythonRunner.sinkMutex.Lock()
+			pythonRunner.routedBytes += int64(count)
+			if pythonRunner.sink != nil {
+				if _, writeErr := pythonRunner.sink.Write(chunk[:count]); writeErr != nil {
+					pythonRunner.sink = nil
+				}
 			}
-			pythonRunner.dispatch(responseMessage)
+			pythonRunner.sinkMutex.Unlock()
 		}
 		if err != nil {
-			if err != io.EOF {
-				pythonRunner.exitError.Store(fmt.Errorf("stdout read error: %w", err))
-			}
 			return
 		}
 	}
 }
 
-func (pythonRunner *runner) readStderr() {
-	scanner := bufio.NewScanner(pythonRunner.stderrReader)
+// readEvents parses stderr: JSON objects carrying an "event" field are
+// protocol events; anything else is treated as a runner log line.
+func (pythonRunner *runner) readEvents() {
+	scanner := bufio.NewScanner(pythonRunner.stderr)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
-		log.Infof("[python:%s] %s", pythonRunner.engineID, scanner.Text())
+		line := scanner.Bytes()
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) == 0 {
+			continue
+		}
+		if trimmed[0] == '{' {
+			var event runnerEvent
+			if err := json.Unmarshal(trimmed, &event); err == nil && event.Event != "" {
+				pythonRunner.dispatch(event)
+				continue
+			}
+		}
+		log.Infof("[python:%s] %s", pythonRunner.engineID, string(trimmed))
+	}
+}
+
+func (pythonRunner *runner) dispatch(event runnerEvent) {
+	eventID := event.ID
+	switch event.Event {
+	case "ready":
+		eventID = "__ready__"
+	case "chunk":
+		return
+	case "done", "error":
+	default:
+		log.Warnf("[python:%s] unknown event %q: %+v", pythonRunner.engineID, event.Event, event)
+		return
+	}
+	if eventID == "" {
+		log.Warnf("[python:%s] event with no id: %+v", pythonRunner.engineID, event)
+		return
+	}
+
+	pythonRunner.pendingMutex.Lock()
+	pendingChannel, exists := pythonRunner.pending[eventID]
+	if exists {
+		delete(pythonRunner.pending, eventID)
+	}
+	pythonRunner.pendingMutex.Unlock()
+
+	if !exists {
+		log.Warnf("[python:%s] event for unknown id %q: %+v", pythonRunner.engineID, eventID, event)
+		return
+	}
+	select {
+	case pendingChannel <- event:
+	default:
 	}
 }
 
@@ -167,100 +243,224 @@ func (pythonRunner *runner) watchExit() {
 		pythonRunner.exitError.Store(err)
 	}
 	pythonRunner.pendingMutex.Lock()
-	for requestID, pendingChannel := range pythonRunner.pending {
-		failure := ErrRunnerExited
-		if err != nil {
-			failure = fmt.Errorf("%w: %s", ErrRunnerExited, err.Error())
-		}
-		select {
-		case pendingChannel <- rpcResponse{ID: requestID, Ok: false, Error: failure.Error()}:
-		default:
-		}
+	for eventID, pendingChannel := range pythonRunner.pending {
 		close(pendingChannel)
-		delete(pythonRunner.pending, requestID)
+		delete(pythonRunner.pending, eventID)
 	}
 	pythonRunner.pendingMutex.Unlock()
+	close(pythonRunner.processDone)
 }
 
-func (pythonRunner *runner) dispatch(responseMessage rpcResponse) {
-	responseID := responseMessage.ID
-	if responseMessage.Event == "ready" {
-		responseID = "__ready__"
-		responseMessage.Ok = true
-	}
-	if responseID == "" {
-		log.Warnf("[python:%s] response with no id: %+v", pythonRunner.engineID, responseMessage)
-		return
-	}
+func (pythonRunner *runner) registerPending(eventID string) chan runnerEvent {
 	pythonRunner.pendingMutex.Lock()
-	pendingChannel, exists := pythonRunner.pending[responseID]
-	if exists {
-		delete(pythonRunner.pending, responseID)
-	}
-	pythonRunner.pendingMutex.Unlock()
-
+	defer pythonRunner.pendingMutex.Unlock()
+	pendingChannel, exists := pythonRunner.pending[eventID]
 	if !exists {
-		log.Warnf("[python:%s] response for unknown id %q: %+v", pythonRunner.engineID, responseID, responseMessage)
-		return
+		pendingChannel = make(chan runnerEvent, 1)
+		pythonRunner.pending[eventID] = pendingChannel
 	}
-	select {
-	case pendingChannel <- responseMessage:
-	default:
-		log.Warnf("[python:%s] response channel for id %q was full; dropping", pythonRunner.engineID, responseID)
-	}
+	return pendingChannel
 }
 
-func (pythonRunner *runner) send(request rpcRequest, timeout time.Duration) (rpcResponse, error) {
+func (pythonRunner *runner) cancelPending(eventID string) {
+	pythonRunner.pendingMutex.Lock()
+	if pendingChannel, exists := pythonRunner.pending[eventID]; exists {
+		delete(pythonRunner.pending, eventID)
+		close(pendingChannel)
+	}
+	pythonRunner.pendingMutex.Unlock()
+}
+
+func (pythonRunner *runner) writeRequest(request runnerRequest) error {
+	requestPayload, err := json.Marshal(request)
+	if err != nil {
+		return response.Err("marshal request: %w", err)
+	}
+	requestPayload = append(requestPayload, '\n')
+
+	pythonRunner.writeMutex.Lock()
+	_, writeErr := pythonRunner.stdin.Write(requestPayload)
+	pythonRunner.writeMutex.Unlock()
+	if writeErr != nil {
+		return response.Err("stdin write: %w", writeErr)
+	}
+	return nil
+}
+
+// request performs a non-streaming op (load/unload) and returns its terminal
+// event.
+func (pythonRunner *runner) request(request runnerRequest, timeout time.Duration) (runnerEvent, error) {
 	if pythonRunner.exited.Load() {
-		if err, _ := pythonRunner.exitError.Load().(error); err != nil {
-			return rpcResponse{}, response.Err("%w: %s", ErrRunnerExited, err.Error())
-		}
-		return rpcResponse{}, ErrRunnerExited
+		return runnerEvent{}, pythonRunner.exitFailure()
 	}
 
 	if request.ID == "" {
 		request.ID = fmt.Sprintf("r%d", pythonRunner.nextRequestID.Add(1))
 	}
+	eventChannel := pythonRunner.registerPending(request.ID)
+	defer pythonRunner.cancelPending(request.ID)
 
-	responseChannel := make(chan rpcResponse, 1)
-	pythonRunner.pendingMutex.Lock()
-	pythonRunner.pending[request.ID] = responseChannel
-	pythonRunner.pendingMutex.Unlock()
-
-	requestPayload, err := json.Marshal(request)
-	if err != nil {
-		pythonRunner.cancelPending(request.ID)
-		return rpcResponse{}, response.Err("marshal request: %w", err)
-	}
-	requestPayload = append(requestPayload, '\n')
-
-	pythonRunner.mutex.Lock()
-	_, writeErr := pythonRunner.stdin.Write(requestPayload)
-	pythonRunner.mutex.Unlock()
-	if writeErr != nil {
-		pythonRunner.cancelPending(request.ID)
-		return rpcResponse{}, response.Err("stdin write: %w", writeErr)
+	if err := pythonRunner.writeRequest(request); err != nil {
+		return runnerEvent{}, err
 	}
 
 	select {
-	case runnerResponse, ok := <-responseChannel:
+	case event, ok := <-eventChannel:
 		if !ok {
-			return rpcResponse{}, ErrRunnerExited
+			return runnerEvent{}, pythonRunner.exitFailure()
 		}
-		return runnerResponse, nil
+		return event, nil
+	case <-pythonRunner.processDone:
+		return runnerEvent{}, pythonRunner.exitFailure()
 	case <-time.After(timeout):
-		pythonRunner.cancelPending(request.ID)
-		return rpcResponse{}, ErrRunnerTimeout
+		return runnerEvent{}, ErrRunnerTimeout
 	}
 }
 
-func (pythonRunner *runner) cancelPending(requestID string) {
-	pythonRunner.pendingMutex.Lock()
-	if pendingChannel, exists := pythonRunner.pending[requestID]; exists {
-		delete(pythonRunner.pending, requestID)
-		close(pendingChannel)
+func (pythonRunner *runner) load(model string, voicePaths []string) error {
+	event, err := pythonRunner.request(runnerRequest{Op: "load", Model: model, Voices: voicePaths}, time.Duration(defaultGenerateTimeoutSec)*time.Second)
+	if err != nil {
+		return response.Err("%w", err)
 	}
-	pythonRunner.pendingMutex.Unlock()
+	if event.Event == "error" {
+		return response.Err("%s", event.Error)
+	}
+	if event.SampleRate <= 0 {
+		return response.Err("load response is missing sampleRate")
+	}
+	channels := event.Channels
+	if channels <= 0 {
+		channels = 1
+	}
+	bits := event.Bits
+	if bits <= 0 {
+		bits = 16
+	}
+	pythonRunner.format = audio.StreamFormat{SampleRate: event.SampleRate, Channels: channels, BitDepth: bits}
+	return nil
+}
+
+func (pythonRunner *runner) streamSynth(ctx context.Context, request runnerRequest, writer *audio.StreamWriter) error {
+	if pythonRunner.exited.Load() {
+		return pythonRunner.exitFailure()
+	}
+
+	request.ID = fmt.Sprintf("r%d", pythonRunner.nextRequestID.Add(1))
+	eventChannel := pythonRunner.registerPending(request.ID)
+	defer pythonRunner.cancelPending(request.ID)
+
+	pythonRunner.attachSink(writer)
+	defer pythonRunner.detachSink()
+
+	if err := pythonRunner.writeRequest(request); err != nil {
+		return err
+	}
+
+	generateTimeout := time.NewTimer(time.Duration(defaultGenerateTimeoutSec) * time.Second)
+	defer generateTimeout.Stop()
+
+	var terminalEvent runnerEvent
+	terminalReceived := false
+	cancelled := false
+
+	select {
+	case event, ok := <-eventChannel:
+		if !ok {
+			return pythonRunner.exitFailure()
+		}
+		terminalEvent = event
+		terminalReceived = true
+	case <-ctx.Done():
+		cancelled = true
+		pythonRunner.detachSink()
+		select {
+		case event, ok := <-eventChannel:
+			if ok {
+				terminalEvent = event
+				terminalReceived = true
+			}
+		case <-pythonRunner.processDone:
+		case <-generateTimeout.C:
+		}
+	case <-pythonRunner.processDone:
+		return pythonRunner.exitFailure()
+	case <-generateTimeout.C:
+		return response.Err("python synth: %w", ErrRunnerTimeout)
+	}
+
+	if terminalReceived && terminalEvent.Event == "error" {
+		pythonRunner.drainQuiet()
+		return response.Err("python synth: %s", terminalEvent.Error)
+	}
+	if terminalReceived {
+		expectedBytes := int64(terminalEvent.TotalSamples) * 2
+		pythonRunner.awaitRoutedBytes(expectedBytes)
+		if terminalEvent.SampleRate > 0 && terminalEvent.SampleRate != pythonRunner.format.SampleRate {
+			log.Warnf("[python:%s] synth sample rate %d differs from loaded format %d",
+				pythonRunner.engineID, terminalEvent.SampleRate, pythonRunner.format.SampleRate)
+		}
+	}
+
+	if cancelled {
+		return ctx.Err()
+	}
+	return nil
+}
+
+func (pythonRunner *runner) attachSink(writer *audio.StreamWriter) {
+	pythonRunner.sinkMutex.Lock()
+	pythonRunner.sink = writer
+	pythonRunner.routedBytes = 0
+	pythonRunner.sinkMutex.Unlock()
+}
+
+func (pythonRunner *runner) detachSink() {
+	pythonRunner.sinkMutex.Lock()
+	pythonRunner.sink = nil
+	pythonRunner.sinkMutex.Unlock()
+}
+
+func (pythonRunner *runner) currentRoutedBytes() int64 {
+	pythonRunner.sinkMutex.Lock()
+	defer pythonRunner.sinkMutex.Unlock()
+	return pythonRunner.routedBytes
+}
+
+// awaitRoutedBytes waits until the request's full PCM payload has cleared the
+// stdout pipe. The runner emits done only after writing everything, so this is
+// a pipe-flush wait, not a generation wait.
+func (pythonRunner *runner) awaitRoutedBytes(expectedBytes int64) {
+	if expectedBytes <= 0 {
+		pythonRunner.drainQuiet()
+		return
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if pythonRunner.currentRoutedBytes() >= expectedBytes || pythonRunner.exited.Load() {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	log.Warnf("[python:%s] stdout drain timed out: %d of %d bytes",
+		pythonRunner.engineID, pythonRunner.currentRoutedBytes(), expectedBytes)
+}
+
+func (pythonRunner *runner) drainQuiet() {
+	quietDeadline := time.Now().Add(time.Second)
+	lastCount := pythonRunner.currentRoutedBytes()
+	lastGrowth := time.Now()
+	for time.Now().Before(quietDeadline) {
+		time.Sleep(5 * time.Millisecond)
+		count := pythonRunner.currentRoutedBytes()
+		if count != lastCount {
+			lastCount = count
+			lastGrowth = time.Now()
+			continue
+		}
+		if time.Since(lastGrowth) >= 50*time.Millisecond {
+			return
+		}
+	}
 }
 
 func (pythonRunner *runner) close(shutdownGrace time.Duration) error {
@@ -268,17 +468,11 @@ func (pythonRunner *runner) close(shutdownGrace time.Duration) error {
 		return nil
 	}
 
-	_, _ = pythonRunner.send(rpcRequest{Op: "shutdown"}, shutdownGrace)
+	_ = pythonRunner.writeRequest(runnerRequest{ID: fmt.Sprintf("r%d", pythonRunner.nextRequestID.Add(1)), Op: "shutdown"})
 	_ = pythonRunner.stdin.Close()
 
-	readerFinished := make(chan struct{})
-	go func() {
-		<-pythonRunner.readerDone
-		close(readerFinished)
-	}()
-
 	select {
-	case <-readerFinished:
+	case <-pythonRunner.processDone:
 		return nil
 	case <-time.After(shutdownGrace):
 		return pythonRunner.kill()

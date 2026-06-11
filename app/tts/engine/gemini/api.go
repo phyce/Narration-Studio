@@ -14,10 +14,23 @@ import (
 	"time"
 )
 
+var httpClient = &http.Client{}
+
+// requestTimeout is a fallback deadline for callers that pass an undeadlined
+// context. Generous because Gemini synthesizes the whole clip inline; user
+// stop still cancels immediately through ctx.
+const requestTimeout = 2 * time.Minute
+
 func (gemini *Gemini) sendRequest(ctx context.Context, request GeminiRequest, modelName string) ([]byte, error) {
 	apiKey := config.GetEngine().Api.Gemini.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("Gemini API key is not configured")
+	}
+
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, requestTimeout)
+		defer cancel()
 	}
 
 	for contentIndex := range request.Contents {
@@ -43,8 +56,7 @@ func (gemini *Gemini) sendRequest(ctx context.Context, request GeminiRequest, mo
 
 	httpRequest.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	httpResponse, err := client.Do(httpRequest)
+	httpResponse, err := httpClient.Do(httpRequest)
 	if err != nil {
 		return nil, response.Err("%w", err)
 	}

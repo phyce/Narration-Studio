@@ -14,17 +14,35 @@ import (
 	"google.golang.org/api/option"
 )
 
-func (google *Google) sendRequest(ctx context.Context, data GoogleRequest) ([]byte, error) {
+// ensureClient lazily creates the shared texttospeech client. It is created
+// against context.Background() because it outlives any single request; Stop
+// closes it.
+func (google *Google) ensureClient() (*texttospeech.Client, error) {
+	google.clientMutex.Lock()
+	defer google.clientMutex.Unlock()
+
+	if google.client != nil {
+		return google.client, nil
+	}
+
 	apiKey := config.GetEngine().Api.Google.ApiKey
 	if apiKey == "" {
 		return nil, response.Err("Google Cloud API key is not set")
 	}
 
-	client, err := texttospeech.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := texttospeech.NewClient(context.Background(), option.WithAPIKey(apiKey))
 	if err != nil {
 		return nil, response.Err("Failed to create Google TTS client: %v", err)
 	}
-	defer client.Close()
+	google.client = client
+	return client, nil
+}
+
+func (google *Google) sendRequest(ctx context.Context, data GoogleRequest) ([]byte, error) {
+	client, err := google.ensureClient()
+	if err != nil {
+		return nil, response.Err("%w", err)
+	}
 
 	audioEncoding := texttospeechpb.AudioEncoding_MP3
 	if data.AudioConfig.AudioEncoding == "LINEAR16" {
@@ -102,16 +120,10 @@ func (google *Google) fetchVoices(model string) ([]engine.Voice, error) {
 	}
 
 	ctx := context.Background()
-	apiKey := config.GetEngine().Api.Google.ApiKey
-	if apiKey == "" {
-		return nil, response.Err("Google Cloud API key is not set")
-	}
-
-	client, err := texttospeech.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := google.ensureClient()
 	if err != nil {
-		return nil, response.Err("Failed to create Google TTS client: %v", err)
+		return nil, response.Err("%w", err)
 	}
-	defer client.Close()
 
 	request := &texttospeechpb.ListVoicesRequest{}
 	dataResponse, err := client.ListVoices(ctx, request)

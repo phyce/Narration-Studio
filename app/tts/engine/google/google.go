@@ -8,12 +8,17 @@ import (
 	"nstudio/app/tts/engine"
 	"strings"
 	"sync"
+
+	texttospeech "cloud.google.com/go/texttospeech/apiv1"
 )
 
 type Google struct {
 	Models     map[string]Model
 	voiceCache map[string][]engine.Voice
 	mu         sync.RWMutex
+
+	clientMutex sync.Mutex
+	client      *texttospeech.Client
 }
 
 func (google *Google) Initialize() error {
@@ -29,6 +34,16 @@ func (google *Google) Start(modelName string) error {
 }
 
 func (google *Google) Stop(modelName string) error {
+	google.clientMutex.Lock()
+	defer google.clientMutex.Unlock()
+	if google.client == nil {
+		return nil
+	}
+	err := google.client.Close()
+	google.client = nil
+	if err != nil {
+		return response.Err("closing Google TTS client: %w", err)
+	}
 	return nil
 }
 

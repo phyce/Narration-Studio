@@ -17,16 +17,13 @@ func FetchModels() (map[string]engine.Model, error) {
 
 	modelsMap := make(map[string]engine.Model)
 
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-
 	request, err := http.NewRequest("GET", "https://api.elevenlabs.io/v1/models", nil)
 	if err != nil {
 		return modelsMap, response.Err("%w", err)
 	}
 	request.Header.Set("xi-api-key", apiKey)
 
-	httpResponse, err := client.Do(request)
+	httpResponse, err := httpClient.Do(request)
 	if err != nil {
 		return modelsMap, response.Err("Failed to fetch elevenlabs models: %w", err)
 	}
@@ -66,9 +63,6 @@ func FetchVoices() ([]engine.Voice, error) {
 		return make([]engine.Voice, 0), response.Err("api key is empty")
 	}
 
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-
 	request, err := http.NewRequest("GET", "https://api.elevenlabs.io/v1/voices", nil)
 	if err != nil {
 		return make([]engine.Voice, 0), response.Err("creating request failed: %w", err)
@@ -76,7 +70,7 @@ func FetchVoices() ([]engine.Voice, error) {
 
 	request.Header.Set("xi-api-key", apiKey)
 
-	httpResponse, err := client.Do(request)
+	httpResponse, err := httpClient.Do(request)
 	if err != nil {
 		return make([]engine.Voice, 0), response.Err("performing request failed: %w", err)
 	}

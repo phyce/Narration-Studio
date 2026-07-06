@@ -1,17 +1,15 @@
 package elevenlabs
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	commonAudio "nstudio/app/common/audio"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
+	"nstudio/app/tts/engine/internal/httpapi"
 )
 
 type ElevenLabs struct {
@@ -72,8 +70,6 @@ func (labs *ElevenLabs) Play(message util.CharacterMessage) error {
 	return response.Success(util.MessageData{
 		Summary: "ElevenLabs finished playing audio",
 	})
-
-	return nil
 }
 
 func (labs *ElevenLabs) Save(messages []util.CharacterMessage, play bool) error {
@@ -186,46 +182,17 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 		return nil, response.Err(fmt.Errorf("Elevenlabs API Key is not set"))
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to marshal request body: %v", err))
-	}
-
 	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=%s", voiceID, labs.outputType)
 
-	httpRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to create HTTP request: %v", err))
-	}
-
-	httpRequest.Header.Set("xi-api-key", apiKey)
-	httpRequest.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-
-	httpResponse, err := client.Do(httpRequest)
-	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to send HTTP request: %v", err))
-	}
-	defer httpResponse.Body.Close()
-
-	if httpResponse.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(httpResponse.Body)
-		return nil, response.Err(fmt.Errorf("request failed with status %d: %s", httpResponse.StatusCode, string(bodyBytes)))
-	}
-
-	responseData, err := io.ReadAll(httpResponse.Body)
-	if err != nil {
-		return nil, response.Err(fmt.Errorf("failed to read response body: %v", err))
-	}
-
-	response.Success(util.MessageData{
-		Summary: "ElevenLabs request succeeded",
-		Detail:  "Response Status: " + httpResponse.Status,
+	return httpapi.Do(httpapi.Request{
+		Method: "POST",
+		URL:    url,
+		Headers: map[string]string{
+			"xi-api-key":   apiKey,
+			"Content-Type": "application/json",
+		},
+		Body: data,
 	})
-
-	return responseData, nil
 }
 
 // </editor-fold>

@@ -5,27 +5,19 @@ import (
 	"fmt"
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
-	"nstudio/app/config"
 	"nstudio/app/tts/engine"
 	"strings"
 
-	texttospeech "cloud.google.com/go/texttospeech/apiv1"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
-	"google.golang.org/api/option"
 )
 
 func (google *Google) sendRequest(data GoogleRequest) ([]byte, error) {
 	ctx := context.Background()
-	apiKey := config.GetEngine().Api.Google.ApiKey
-	if apiKey == "" {
-		return nil, response.Err(fmt.Errorf("Google Cloud API key is not set"))
-	}
 
-	client, err := texttospeech.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := google.getClient(ctx)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to create Google TTS client: %v", err))
+		return nil, err
 	}
-	defer client.Close()
 
 	audioEncoding := texttospeechpb.AudioEncoding_MP3
 	if data.AudioConfig.AudioEncoding == "LINEAR16" {
@@ -103,16 +95,11 @@ func (google *Google) fetchVoices(model string) ([]engine.Voice, error) {
 	}
 
 	ctx := context.Background()
-	apiKey := config.GetEngine().Api.Google.ApiKey
-	if apiKey == "" {
-		return nil, response.Err(fmt.Errorf("Google Cloud API key is not set"))
-	}
 
-	client, err := texttospeech.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := google.getClient(ctx)
 	if err != nil {
-		return nil, response.Err(fmt.Errorf("Failed to create Google TTS client: %v", err))
+		return nil, err
 	}
-	defer client.Close()
 
 	request := &texttospeechpb.ListVoicesRequest{}
 	dataResponse, err := client.ListVoices(ctx, request)

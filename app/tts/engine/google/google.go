@@ -1,6 +1,7 @@
 package google
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"nstudio/app/common/audio"
@@ -11,12 +12,42 @@ import (
 	"nstudio/app/tts/engine"
 	"strings"
 	"sync"
+
+	texttospeech "cloud.google.com/go/texttospeech/apiv1"
+	"google.golang.org/api/option"
 )
 
 type Google struct {
 	Models     map[string]Model
 	voiceCache map[string][]engine.Voice
 	mu         sync.RWMutex
+
+	clientMu sync.Mutex
+	client   *texttospeech.Client
+}
+
+// getClient lazily creates and caches a single TextToSpeech client, reusing
+// it across requests so each call does not repeat auth and connection setup.
+func (google *Google) getClient(ctx context.Context) (*texttospeech.Client, error) {
+	google.clientMu.Lock()
+	defer google.clientMu.Unlock()
+
+	if google.client != nil {
+		return google.client, nil
+	}
+
+	apiKey := config.GetEngine().Api.Google.ApiKey
+	if apiKey == "" {
+		return nil, response.Err(fmt.Errorf("Google Cloud API key is not set"))
+	}
+
+	client, err := texttospeech.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		return nil, response.Err(fmt.Errorf("Failed to create Google TTS client: %v", err))
+	}
+
+	google.client = client
+	return client, nil
 }
 
 func (google *Google) Initialize() error {
@@ -32,6 +63,14 @@ func (google *Google) Start(modelName string) error {
 }
 
 func (google *Google) Stop(modelName string) error {
+	google.clientMu.Lock()
+	defer google.clientMu.Unlock()
+	if google.client != nil {
+		if err := google.client.Close(); err != nil {
+			return response.Err(err)
+		}
+		google.client = nil
+	}
 	return nil
 }
 

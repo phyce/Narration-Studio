@@ -23,6 +23,10 @@ interface Chain {
 
 const severities = ["error", "warning", "success", "info", "status"];
 const olderPageSize = 200;
+// Cap the number of live entries kept in memory. Older entries remain in the
+// backing .jsonl and are re-fetched on demand via loadOlder, so trimming the
+// in-memory array keeps a long-running session from growing unboundedly.
+const MAX_ENTRIES = 5000;
 
 const entries = ref<Entry[]>([]);
 const severityFilters = reactive<Record<string, boolean>>({
@@ -38,6 +42,8 @@ const expandedChains = reactive<Set<number>>(new Set());
 const hasMore = ref<boolean>(true);
 const loadingOlder = ref<boolean>(false);
 
+// Bulk merge for initial-load and load-older paths: rebuilds the id-keyed set
+// and re-sorts. Used only when entries arrive out of order or in a batch.
 function mergeEntries(incoming: Entry[]) {
 	const byID = new Map<number, Entry>();
 	for (const entry of entries.value) {
@@ -49,11 +55,37 @@ function mergeEntries(incoming: Entry[]) {
 	entries.value = Array.from(byID.values()).sort((a, b) => a.id - b.id);
 }
 
+// Single live event: backend ids are monotonically increasing and arrive in
+// order, so we append in place (with an id de-dupe) instead of a full
+// merge+sort. This is O(1) amortised versus O(n log n) per event, which
+// matters under a burst of log events.
+function appendEntry(entry: Entry) {
+	const current = entries.value;
+	const last = current[current.length - 1];
+	if (last) {
+		if (entry.id === last.id) {
+			return; // duplicate of the newest entry
+		}
+		if (entry.id < last.id) {
+			// Out-of-order arrival; fall back to the sorted merge (also de-dupes).
+			mergeEntries([entry]);
+			return;
+		}
+	}
+	current.push(entry);
+	// Trim the oldest live entries once over the cap. loadOlder cursors off
+	// entries.value[0].id, so dropping from the front keeps that consistent —
+	// the trimmed entries are still reachable via "load older".
+	if (current.length > MAX_ENTRIES) {
+		current.splice(0, current.length - MAX_ENTRIES);
+	}
+}
+
 function onAppended(entry: Entry) {
 	if (!entry || typeof entry.id !== "number") {
 		return;
 	}
-	mergeEntries([entry]);
+	appendEntry(entry);
 }
 
 function onFocusChain(chainId: number) {

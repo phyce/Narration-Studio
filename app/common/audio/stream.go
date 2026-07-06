@@ -7,13 +7,14 @@ import (
 	"sync"
 )
 
-// Producers never block: the queue is elastic so generation can run ahead of
-// playback. The limit only guards against a consumer that never reads.
+// The queue is elastic so generation can run ahead of playback, but it is
+// bounded by streamQueueLimit as a backpressure high-water mark: once the
+// queued bytes reach the limit, Write blocks until the consumer drains space
+// instead of buffering unboundedly. Closing the stream unblocks the writer.
 var streamQueueLimit = 64 * 1024 * 1024
 
 var (
-	ErrStreamClosed       = errors.New("audio stream is closed")
-	ErrStreamLimitReached = errors.New("audio stream queue limit exceeded")
+	ErrStreamClosed = errors.New("audio stream is closed")
 )
 
 type StreamFormat struct {
@@ -129,6 +130,12 @@ func (stream *Stream) Read(destination []byte) (int, error) {
 	copied := copy(destination, stream.queue)
 	stream.queue = stream.queue[copied:]
 
+	// Draining the queue may free space below the high-water mark; wake any
+	// writer blocked in Write applying backpressure.
+	if copied > 0 {
+		stream.condition.Broadcast()
+	}
+
 	if stream.teeSink != nil && copied > 0 {
 		if _, err := stream.teeSink.Write(destination[:copied]); err != nil {
 			stream.teeError = err
@@ -189,11 +196,18 @@ func (writer *StreamWriter) Write(data []byte) (int, error) {
 	stream.mutex.Lock()
 	defer stream.mutex.Unlock()
 
-	if stream.consumerClosed || stream.producerClosed {
-		return 0, ErrStreamClosed
-	}
-	if len(stream.queue)+len(data) > streamQueueLimit {
-		return 0, ErrStreamLimitReached
+	// Apply backpressure: once the queue reaches the high-water mark, block
+	// until the consumer drains enough space instead of buffering unboundedly.
+	// A blocked writer wakes if the stream is closed or errored so a
+	// genuinely-gone consumer can never deadlock the producer forever.
+	for {
+		if stream.consumerClosed || stream.producerClosed {
+			return 0, ErrStreamClosed
+		}
+		if len(stream.queue) < streamQueueLimit {
+			break
+		}
+		stream.condition.Wait()
 	}
 
 	stream.queue = append(stream.queue, data...)

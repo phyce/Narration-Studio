@@ -161,18 +161,85 @@ func TestPipeStream(t *testing.T) {
 		}
 	})
 
-	t.Run("QueueLimitFailsWrite", func(t *testing.T) {
+	t.Run("QueueLimitBlocksWriteUntilRead", func(t *testing.T) {
 		originalLimit := streamQueueLimit
 		streamQueueLimit = 8
 		t.Cleanup(func() { streamQueueLimit = originalLimit })
 
-		_, writer := NewPipeStream(defaultStreamFormat())
+		stream, writer := NewPipeStream(defaultStreamFormat())
+
+		// Fill the queue up to the high-water mark.
+		if _, err := writer.Write(patternBytes(8)); err != nil {
+			t.Fatalf("Write within limit: %v", err)
+		}
+
+		// The next write must block: the queue is at the limit.
+		writeDone := make(chan error, 1)
+		go func() {
+			_, err := writer.Write([]byte("more"))
+			writeDone <- err
+		}()
+
+		select {
+		case err := <-writeDone:
+			t.Fatalf("Write returned %v while queue was full; expected it to block", err)
+		case <-time.After(50 * time.Millisecond):
+			// Still blocked, as intended.
+		}
+
+		// Reading frees space below the limit, which must unblock the writer.
+		readExactly(t, stream, 8)
+
+		select {
+		case err := <-writeDone:
+			if err != nil {
+				t.Fatalf("blocked Write returned %v after read freed space", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Write never returned after a read freed queue space")
+		}
+
+		data := readExactly(t, stream, 4)
+		if string(data) != "more" {
+			t.Fatalf("got %q, want %q", data, "more")
+		}
+	})
+
+	t.Run("ConsumerCloseUnblocksWrite", func(t *testing.T) {
+		originalLimit := streamQueueLimit
+		streamQueueLimit = 8
+		t.Cleanup(func() { streamQueueLimit = originalLimit })
+
+		stream, writer := NewPipeStream(defaultStreamFormat())
 
 		if _, err := writer.Write(patternBytes(8)); err != nil {
 			t.Fatalf("Write within limit: %v", err)
 		}
-		if _, err := writer.Write([]byte{0}); err != ErrStreamLimitReached {
-			t.Fatalf("got %v, want ErrStreamLimitReached", err)
+
+		writeDone := make(chan error, 1)
+		go func() {
+			_, err := writer.Write([]byte("more"))
+			writeDone <- err
+		}()
+
+		// Ensure the writer is parked on the condition before closing.
+		select {
+		case err := <-writeDone:
+			t.Fatalf("Write returned %v while queue was full; expected it to block", err)
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		// Closing the stream must wake the blocked writer with an error rather
+		// than deadlocking a producer whose consumer has gone away.
+		stream.Close()
+
+		select {
+		case err := <-writeDone:
+			if err != ErrStreamClosed {
+				t.Fatalf("got %v, want ErrStreamClosed after consumer close", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Write never returned after consumer Close unblocked it")
 		}
 	})
 

@@ -9,7 +9,14 @@ import (
 	"nstudio/app/common/response"
 	"nstudio/app/common/util"
 	"nstudio/app/config"
+	"time"
 )
+
+// requestTimeout bounds each HTTP call so a hung endpoint cannot block a
+// pooled engine instance forever.
+const requestTimeout = 30 * time.Second
+
+var httpClient = &http.Client{Timeout: requestTimeout}
 
 func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 	apiKey := config.GetEngine().Api.OpenAI.ApiKey
@@ -30,10 +37,7 @@ func (openAI *OpenAI) sendRequest(data OpenAIRequest) ([]byte, error) {
 	httpRequest.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	httpRequest.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-
-	httpResponse, err := client.Do(httpRequest)
+	httpResponse, err := httpClient.Do(httpRequest)
 	if err != nil {
 		return nil, response.Err(fmt.Errorf("Failed to send HTTP httpRequest: %v", err))
 	}

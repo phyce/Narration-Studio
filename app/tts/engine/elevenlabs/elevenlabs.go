@@ -12,7 +12,12 @@ import (
 	"nstudio/app/common/util/fileIndex"
 	"nstudio/app/config"
 	"nstudio/app/tts/engine"
+	"time"
 )
+
+// requestTimeout bounds each HTTP call so a hung endpoint cannot block a
+// pooled engine instance forever.
+const requestTimeout = 30 * time.Second
 
 type ElevenLabs struct {
 	Models     map[string]Model
@@ -20,6 +25,8 @@ type ElevenLabs struct {
 }
 
 var voices = make([]engine.Voice, 0)
+
+var httpClient = &http.Client{Timeout: requestTimeout}
 
 // <editor-fold desc="Engine Interface">
 func (labs *ElevenLabs) Initialize() error {
@@ -201,10 +208,7 @@ func (labs *ElevenLabs) sendRequest(voiceID string, data ElevenLabsRequest) ([]b
 	httpRequest.Header.Set("xi-api-key", apiKey)
 	httpRequest.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-
-	httpResponse, err := client.Do(httpRequest)
+	httpResponse, err := httpClient.Do(httpRequest)
 	if err != nil {
 		return nil, response.Err(fmt.Errorf("failed to send HTTP request: %v", err))
 	}

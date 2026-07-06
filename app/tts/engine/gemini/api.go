@@ -23,13 +23,16 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 		return nil, response.Err(err)
 	}
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", modelName)
 
 	httpRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, response.Err(err)
 	}
 
+	// Send the API key via the documented header instead of a URL query
+	// param so the secret does not leak into logs, proxies, or error bodies.
+	httpRequest.Header.Set("x-goog-api-key", apiKey)
 	httpRequest.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 30 * time.Second}

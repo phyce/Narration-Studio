@@ -3,6 +3,7 @@ import '../../css/pages/settings.css';
 
 import Button from "primevue/button";
 import {onBeforeMount, ref, watch} from "vue";
+import {useEventListener} from "@vueuse/core";
 import {GetConfigSchema, GetSettings, SaveSettings} from "../../../wailsjs/go/main/App";
 import {config as configuration} from "../../../wailsjs/go/models";
 import type {ConfigField, ConfigSchema} from "../../interfaces/config";
@@ -28,15 +29,11 @@ async function loadData() {
 	// Load config
 	config.value = await GetSettings();
 	originalConfig.value = JSON.stringify(config.value);
-	console.log('we got settings');
-	console.log(config.value);
 
 	// Load schema
 	try {
 		const schemaResult = await GetConfigSchema();
 		schema.value = JSON.parse(schemaResult);
-		console.log('Schema loaded:', schema.value);
-		console.log('Server fields:', schema.value?.fields.filter(f => f.path.startsWith('settings.server')));
 	} catch (err) {
 		console.error('Failed to load config schema:', err);
 	}
@@ -81,15 +78,15 @@ function setValueByPath(path: string, value: any) {
 }
 
 // Confirm before leaving if there are unsaved changes
+useEventListener(window, 'beforeunload', (e) => {
+	if (hasUnsavedChanges.value) {
+		e.preventDefault();
+		e.returnValue = '';
+	}
+});
+
 onBeforeMount(async () => {
 	await loadData();
-
-	window.addEventListener('beforeunload', (e) => {
-		if (hasUnsavedChanges.value) {
-			e.preventDefault();
-			e.returnValue = '';
-		}
-	});
 });
 
 

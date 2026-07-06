@@ -22,9 +22,8 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unicode/utf8"
-
-	"github.com/charmbracelet/log"
 )
 
 // <editor-fold desc="Audio Buffer">
@@ -185,11 +184,12 @@ func (piper *Piper) Start(modelName string) error {
 
 	piper.StartAudioCapture(instance)
 
+	piper.modelsLock.Lock()
 	if piper.models == nil {
 		piper.models = make(map[string]PiperInstance)
 	}
-
 	piper.models[modelName] = instance
+	piper.modelsLock.Unlock()
 
 	return nil
 }
@@ -199,9 +199,11 @@ func (piper *Piper) Stop(modelName string) error {
 		return piper.native.Stop(modelName)
 	}
 
-	defer delete(piper.models, modelName)
-
+	piper.modelsLock.Lock()
 	instance, exists := piper.models[modelName]
+	delete(piper.models, modelName)
+	piper.modelsLock.Unlock()
+
 	if !exists {
 		response.Debug(util.MessageData{
 			Summary: fmt.Sprintf("Instance for %s is not running", modelName),
@@ -357,18 +359,15 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 		return piper.getNative().Generate(model, payload)
 	}
 
-	log.Info("generating in piper")
 	if piper.GetProcessID(model) == 0 {
 		if !config.GetEngineToggles()["piper"][model] {
-			return make([]byte, 0), response.Err(fmt.Errorf("Model is not enabled:" + model))
+			return make([]byte, 0), response.Err(fmt.Errorf("Model is not enabled: %s", model))
 		}
 
-		//no need to return, simply send error
 		response.NewWarn("Model is not running:" + model)
 
-		err := piper.Start(model)
-		if err != nil {
-			response.Err(fmt.Errorf("Failed to start model %s: %v", model, err))
+		if err := piper.Start(model); err != nil {
+			return nil, response.Err(fmt.Errorf("Failed to start model %s: %v", model, err))
 		}
 	}
 
@@ -376,36 +375,50 @@ func (piper *Piper) Generate(model string, payload []byte) ([]byte, error) {
 		return nil, response.Err(fmt.Errorf("Input JSON is not valid UTF-8"))
 	}
 
+	piper.modelsLock.Lock()
+	instance, exists := piper.models[model]
+	piper.modelsLock.Unlock()
+
+	if !exists {
+		return nil, response.Err(fmt.Errorf("Model %s is not running", model))
+	}
+
 	response.Debug(util.MessageData{
 		Summary: fmt.Sprintf("Sending to piper model: %s payload: %s", model, string(payload)),
 	})
-	if _, err := piper.models[model].stdin.Write(payload); err != nil {
+	if _, err := instance.stdin.Write(payload); err != nil {
 		return nil, response.Err(err)
 	}
 
-	endSignal := make(chan bool)
+	// endSignal is buffered so the scanning goroutine never blocks and can
+	// always exit, even if nobody is listening (e.g. after a timeout).
+	endSignal := make(chan bool, 1)
 	go func() {
-		scanner := bufio.NewScanner(piper.models[model].stderr)
-		log.Info("scanning output")
+		scanner := bufio.NewScanner(instance.stderr)
 		for scanner.Scan() {
 			text := scanner.Text()
-			log.Info(text)
 
 			if strings.HasSuffix(text, " sec)") {
 				endSignal <- true
 				return
 			}
 		}
+		// stderr closed / scan ended (e.g. the subprocess died) without the
+		// expected suffix: signal so the caller doesn't block forever.
+		endSignal <- false
 	}()
-	<-endSignal
 
-	log.Info("past end signal")
+	select {
+	case <-endSignal:
+	case <-time.After(60 * time.Second):
+		return nil, response.Err(fmt.Errorf("Timed out waiting for model %s to finish generating", model))
+	}
 
-	audioBytes := piper.models[model].audioData.buffer.Bytes()
+	audioBytes := instance.audioData.buffer.Bytes()
 	audioClip := make([]byte, len(audioBytes))
 	copy(audioClip, audioBytes)
 
-	piper.models[model].audioData.Reset()
+	instance.audioData.Reset()
 
 	return audioClip, nil
 }
@@ -428,7 +441,10 @@ func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 		return piper.native.GetVoices(model)
 	}
 
+	piper.modelsLock.Lock()
 	modelData, exists := piper.models[model]
+	piper.modelsLock.Unlock()
+
 	if !exists {
 		return nil, response.Err(fmt.Errorf("Model %s is not initialized", model))
 	}
@@ -456,7 +472,10 @@ func (piper *Piper) StartAudioCapture(instance PiperInstance) {
 }
 
 func (piper *Piper) GetProcessID(modelName string) int {
+	piper.modelsLock.Lock()
 	instance, exists := piper.models[modelName]
+	piper.modelsLock.Unlock()
+
 	if !exists {
 		return 0
 	}

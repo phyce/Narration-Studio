@@ -29,7 +29,8 @@ type PiperInputLite struct {
 }
 
 type Piper struct {
-	models   map[string]PiperInstance
-	native   *native.Piper
-	initOnce sync.Once
+	models     map[string]PiperInstance
+	modelsLock sync.Mutex
+	native     *native.Piper
+	initOnce   sync.Once
 }

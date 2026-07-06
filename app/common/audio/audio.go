@@ -39,74 +39,80 @@ func CombineWAVFiles(dirPath, outputFilename string, pauseDuration time.Duration
 	}
 
 	for index, wavPath := range wavFiles {
-		file, err := os.Open(wavPath)
-		defer file.Close()
-		if err != nil {
+		if err := func() error {
+			file, err := os.Open(wavPath)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			decoder := wav.NewDecoder(file)
+			if !decoder.IsValidFile() {
+				return response.Err(fmt.Errorf("Invalid WAV file: " + wavPath))
+			}
+
+			pcmBuffer, err := decoder.FullPCMBuffer()
+			if err != nil {
+				return response.Err(err)
+			}
+
+			if pcmBuffer.Format.SampleRate != sampleRate {
+				pcmBuffer, err = ResampleBuffer(pcmBuffer, sampleRate)
+				if err != nil {
+					return response.Err(err)
+				}
+			}
+
+			if pcmBuffer.Format.NumChannels != channelCount {
+				pcmBuffer, err = ChangeChannelCount(pcmBuffer, channelCount)
+				if err != nil {
+					return response.Err(err)
+				}
+			}
+
+			if pcmBuffer.SourceBitDepth != bitDepth {
+				pcmBuffer, err = ChangeBitDepth(pcmBuffer, bitDepth)
+				if err != nil {
+					return response.Err(err)
+				}
+			}
+
+			if index == 0 {
+				combinedBuffer = &audio.IntBuffer{
+					Data:           []int{},
+					Format:         pcmBuffer.Format,
+					SourceBitDepth: pcmBuffer.SourceBitDepth,
+				}
+			}
+
+			combinedBuffer.Data = append(combinedBuffer.Data, pcmBuffer.Data...)
+
+			if index < len(wavFiles)-1 {
+				combinedBuffer.Data = append(combinedBuffer.Data, silenceBuffer.Data...)
+			}
+
+			return nil
+		}(); err != nil {
 			return err
-		}
-
-		decoder := wav.NewDecoder(file)
-		if !decoder.IsValidFile() {
-			return response.Err(fmt.Errorf("Invalid WAV file: " + wavPath))
-		}
-
-		pcmBuffer, err := decoder.FullPCMBuffer()
-		if err != nil {
-			return response.Err(err)
-		}
-
-		if pcmBuffer.Format.SampleRate != sampleRate {
-			pcmBuffer, err = ResampleBuffer(pcmBuffer, sampleRate)
-			if err != nil {
-				response.Err(err)
-			}
-		}
-
-		if pcmBuffer.Format.NumChannels != channelCount {
-			pcmBuffer, err = ChangeChannelCount(pcmBuffer, channelCount)
-			if err != nil {
-				response.Err(err)
-			}
-		}
-
-		if pcmBuffer.SourceBitDepth != bitDepth {
-			pcmBuffer, err = ChangeBitDepth(pcmBuffer, bitDepth)
-			if err != nil {
-				response.Err(err)
-			}
-		}
-
-		if index == 0 {
-			combinedBuffer = &audio.IntBuffer{
-				Data:           []int{},
-				Format:         pcmBuffer.Format,
-				SourceBitDepth: pcmBuffer.SourceBitDepth,
-			}
-		}
-
-		combinedBuffer.Data = append(combinedBuffer.Data, pcmBuffer.Data...)
-
-		if index < len(wavFiles)-1 {
-			combinedBuffer.Data = append(combinedBuffer.Data, silenceBuffer.Data...)
 		}
 	}
 
 	outputPath := filepath.Join(dirPath, outputFilename)
 	combinedFile, err := os.Create(outputPath)
 	if err != nil {
-		response.Err(err)
+		return response.Err(err)
 	}
 	defer combinedFile.Close()
 
 	encoder := wav.NewEncoder(combinedFile, sampleRate, bitDepth, channelCount, 1)
 	err = encoder.Write(combinedBuffer)
 	if err != nil {
-		response.Err(err)
+		return response.Err(err)
 	}
 
 	err = encoder.Close()
 	if err != nil {
-		response.Err(err)
+		return response.Err(err)
 	}
 
 	return nil

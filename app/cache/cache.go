@@ -7,6 +7,8 @@ import (
 	"nstudio/app/tts/profile"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 
 	"nstudio/app/common/response"
@@ -17,6 +19,43 @@ var (
 	globalManager *CacheManager
 	mutex         sync.RWMutex
 )
+
+// cacheComponentPattern is an allowlist for a single, safe path element used
+// when building cache filesystem paths from caller-supplied values.
+var cacheComponentPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// sanitizeCacheComponent validates that name is a single safe path element
+// suitable for use in a filesystem path. It rejects empty strings, "." and
+// "..", any value containing a path separator, and anything outside the
+// allowlist. It returns the validated name unchanged on success.
+func sanitizeCacheComponent(name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("invalid cache path component: empty value")
+	}
+	if name == "." || name == ".." {
+		return "", fmt.Errorf("invalid cache path component: %q", name)
+	}
+	if strings.ContainsRune(name, '/') || strings.ContainsRune(name, os.PathSeparator) {
+		return "", fmt.Errorf("invalid cache path component: %q contains a path separator", name)
+	}
+	if !cacheComponentPattern.MatchString(name) {
+		return "", fmt.Errorf("invalid cache path component: %q", name)
+	}
+	return name, nil
+}
+
+// ensureWithinCacheRoot verifies that path resolves to a location inside the
+// cache root, guarding against traversal even if a component slipped through.
+func (cacheManager *CacheManager) ensureWithinCacheRoot(path string) error {
+	rel, err := filepath.Rel(cacheManager.cacheDir, path)
+	if err != nil {
+		return fmt.Errorf("path escapes cache directory: %v", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
+		return fmt.Errorf("path escapes cache directory: %q", path)
+	}
+	return nil
+}
 
 func Initialize() error {
 	mutex.Lock()
@@ -134,11 +173,18 @@ func (cacheManager *CacheManager) ClearProfileCache(profileID string) error {
 		return nil
 	}
 
+	if _, err := sanitizeCacheComponent(profileID); err != nil {
+		return response.Err(err)
+	}
+
 	cacheManager.mutex.Lock()
 	delete(cacheManager.profiles, profileID)
 	cacheManager.mutex.Unlock()
 
 	cacheDirectory := cacheManager.getProfileCacheDirectory(profileID)
+	if err := cacheManager.ensureWithinCacheRoot(cacheDirectory); err != nil {
+		return response.Err(err)
+	}
 	if err := os.RemoveAll(cacheDirectory); err != nil && !os.IsNotExist(err) {
 		return response.Err(err)
 	}
@@ -158,6 +204,15 @@ func (cacheManager *CacheManager) getProfileAudioDir(profileID string) string {
 
 // <editor-fold desc="Character Cache">
 func (cacheManager *CacheManager) GetCachedAudio(profileID, character, text string) ([]byte, bool) {
+	if _, err := sanitizeCacheComponent(profileID); err != nil {
+		response.Warn("Invalid profile ID for cache lookup: %v\n", err)
+		return nil, false
+	}
+	if _, err := sanitizeCacheComponent(character); err != nil {
+		response.Warn("Invalid character name for cache lookup: %v\n", err)
+		return nil, false
+	}
+
 	profileCache, err := cacheManager.loadProfileCache(profileID)
 	if err != nil {
 		response.Warn("Failed to load profile cache: %v\n", err)
@@ -191,6 +246,10 @@ func (cacheManager *CacheManager) GetCachedAudio(profileID, character, text stri
 	}
 
 	audioPath := filepath.Join(cacheManager.getCharacterAudioDir(profileID, character), filename)
+	if err := cacheManager.ensureWithinCacheRoot(audioPath); err != nil {
+		response.Warn("Cache audio path escapes cache root: %v\n", err)
+		return nil, false
+	}
 	audioData, err := os.ReadFile(audioPath)
 	if err != nil {
 		response.Warn("Failed to read audio file: %v\n", err)
@@ -202,6 +261,13 @@ func (cacheManager *CacheManager) GetCachedAudio(profileID, character, text stri
 }
 
 func (cacheManager *CacheManager) CacheAudio(profileID, characterName, text, voiceKey string, rawAudio []byte) error {
+	if _, err := sanitizeCacheComponent(profileID); err != nil {
+		return response.Err(err)
+	}
+	if _, err := sanitizeCacheComponent(characterName); err != nil {
+		return response.Err(err)
+	}
+
 	profileCache, err := cacheManager.loadProfileCache(profileID)
 	if err != nil {
 		return response.Err(err)
@@ -235,6 +301,9 @@ func (cacheManager *CacheManager) CacheAudio(profileID, characterName, text, voi
 	}
 
 	audioPath := filepath.Join(audioDir, filename)
+	if err := cacheManager.ensureWithinCacheRoot(audioPath); err != nil {
+		return response.Err(err)
+	}
 	outputFile, err := os.Create(audioPath)
 	if err != nil {
 		fmt.Printf("[Cache] CacheAudio: Error creating file: %v\n", err)
@@ -263,6 +332,13 @@ func (cacheManager *CacheManager) ClearCharacterCache(profileID, character strin
 		return nil
 	}
 
+	if _, err := sanitizeCacheComponent(profileID); err != nil {
+		return response.Err(err)
+	}
+	if _, err := sanitizeCacheComponent(character); err != nil {
+		return response.Err(err)
+	}
+
 	profileCache, err := cacheManager.loadProfileCache(profileID)
 	if err != nil {
 		return response.Err(err)
@@ -277,6 +353,9 @@ func (cacheManager *CacheManager) ClearCharacterCache(profileID, character strin
 	profileCache.mutex.Unlock()
 
 	characterDir := cacheManager.getCharacterAudioDir(profileID, character)
+	if err := cacheManager.ensureWithinCacheRoot(characterDir); err != nil {
+		return response.Err(err)
+	}
 	if err := os.RemoveAll(characterDir); err != nil && !os.IsNotExist(err) {
 		response.Warn("failed to remove character directory: %v", err)
 	}

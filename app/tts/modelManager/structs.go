@@ -29,7 +29,9 @@ type EngineEntry struct {
 }
 
 func (entry *EngineEntry) GetModelInstance(modelID string) (tts.Base, *ModelPool, bool) {
+	manager.RLock()
 	pool, exists := entry.Models[modelID]
+	manager.RUnlock()
 	if !exists {
 		return nil, nil, false
 	}

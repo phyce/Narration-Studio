@@ -7,9 +7,9 @@ import (
 
 type ConfigManager struct {
 	//defaults map[string]Value `json:"defaults"`
-	config   Base       `json:"defaults"`
-	filePath string     `json:"filePath"`
-	lock     sync.Mutex `json:"lock"`
+	config   Base         `json:"defaults"`
+	filePath string       `json:"filePath"`
+	lock     sync.RWMutex `json:"lock"`
 }
 
 type Base struct {

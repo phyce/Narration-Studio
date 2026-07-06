@@ -11,16 +11,20 @@ import (
 	"golang.org/x/exp/rand"
 )
 
-func setRandSeed(name string) {
+// newRandForName returns a local RNG seeded deterministically from the
+// character name. Using a local *rand.Rand keeps per-character voice
+// assignment deterministic while avoiding races and global state mutation
+// during concurrent voice allocation.
+func newRandForName(name string) *rand.Rand {
 	seed := uint64(0)
 	for _, r := range name {
 		seed = seed*31 + uint64(r)
 	}
-	rand.Seed(seed)
+	return rand.New(rand.NewSource(seed))
 }
 
 func calculateEngine(name string) (engine.Engine, error) {
-	setRandSeed(name)
+	r := newRandForName(name)
 
 	managerEngines := modelManager.GetAllEngines()
 	var enabledEngines []engine.Engine
@@ -39,7 +43,7 @@ func calculateEngine(name string) (engine.Engine, error) {
 	} else if len(enabledEngines) == 1 {
 		return enabledEngines[0], nil
 	} else {
-		selectedEngine := enabledEngines[rand.Intn(len(enabledEngines)-1)]
+		selectedEngine := enabledEngines[r.Intn(len(enabledEngines))]
 		return selectedEngine, nil
 	}
 }
@@ -56,6 +60,8 @@ func calculateVoice(engine engine.Engine, name string) (string, string, error) {
 		return segments[0], segments[1], nil
 	}
 
+	r := newRandForName(name)
+
 	modelToggles := config.GetEngineToggles()
 
 	models := make([]string, 0, len(engine.Models))
@@ -71,7 +77,7 @@ func calculateVoice(engine engine.Engine, name string) (string, string, error) {
 	} else if len(models) == 1 {
 		selectedModel = models[0]
 	} else {
-		selectedModel = models[rand.Intn(len(models)-1)]
+		selectedModel = models[r.Intn(len(models))]
 	}
 
 	voices, err := modelManager.GetModelVoices(engine.ID, selectedModel)
@@ -81,7 +87,7 @@ func calculateVoice(engine engine.Engine, name string) (string, string, error) {
 			fmt.Errorf("No voices found for engine: %s", engine.Name),
 		)
 	}
-	selectedVoice := voices[rand.Intn(len(voices)-1)]
+	selectedVoice := voices[r.Intn(len(voices))]
 
 	return selectedModel, selectedVoice.ID, nil
 }
@@ -108,7 +114,7 @@ func getEngineTogglesFromFlat(toggles map[string]bool) map[string]map[string]boo
 }
 
 func calculateProfileEngine(name string, profileID string) (engine.Engine, error) {
-	setRandSeed(name)
+	r := newRandForName(name)
 
 	manager := GetManager()
 	profile, err := manager.GetProfile(profileID)
@@ -142,7 +148,7 @@ func calculateProfileEngine(name string, profileID string) (engine.Engine, error
 	} else if len(enabledEngines) == 1 {
 		return enabledEngines[0], nil
 	} else {
-		selectedEngine := enabledEngines[rand.Intn(len(enabledEngines)-1)]
+		selectedEngine := enabledEngines[r.Intn(len(enabledEngines))]
 		return selectedEngine, nil
 	}
 }
@@ -169,6 +175,8 @@ func calculateProfileVoice(eng engine.Engine, name string, profileID string) (st
 		return calculateVoice(eng, name)
 	}
 
+	r := newRandForName(name)
+
 	engineToggles := getEngineTogglesFromFlat(profileToggles)
 
 	models := make([]string, 0, len(eng.Models))
@@ -187,7 +195,7 @@ func calculateProfileVoice(eng engine.Engine, name string, profileID string) (st
 	} else if len(models) == 1 {
 		selectedModel = models[0]
 	} else {
-		selectedModel = models[rand.Intn(len(models)-1)]
+		selectedModel = models[r.Intn(len(models))]
 	}
 
 	voices, err := modelManager.GetModelVoices(eng.ID, selectedModel)
@@ -197,7 +205,7 @@ func calculateProfileVoice(eng engine.Engine, name string, profileID string) (st
 			fmt.Errorf("No voices found for engine: %s", eng.Name),
 		)
 	}
-	selectedVoice := voices[rand.Intn(len(voices)-1)]
+	selectedVoice := voices[r.Intn(len(voices))]
 
 	return selectedModel, selectedVoice.ID, nil
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gopxl/beep"
@@ -14,6 +15,10 @@ import (
 	"github.com/gopxl/beep/vorbis"
 	"github.com/gopxl/beep/wav"
 )
+
+const targetRate = beep.SampleRate(48000)
+
+var speakerInitOnce sync.Once
 
 func PlayAudioFile(filePath string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -48,8 +53,9 @@ func PlayAudioFile(filePath string) error {
 	}
 	defer streamer.Close()
 
-	targetRate := beep.SampleRate(48000)
-	speaker.Init(targetRate, targetRate.N(time.Second/10))
+	speakerInitOnce.Do(func() {
+		speaker.Init(targetRate, targetRate.N(time.Second/10))
+	})
 
 	var finalStreamer beep.Streamer = streamer
 	if format.SampleRate != targetRate {

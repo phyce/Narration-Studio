@@ -2,7 +2,10 @@ package pack
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"hash"
 	"io"
 	"net/http"
 	"nstudio/app/common/eventManager"
@@ -14,6 +17,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/log"
 )
 
 const (
@@ -93,7 +98,7 @@ func Install(availablePack AvailablePack) error {
 	progress := &progressReader{engineID: availablePack.Manifest.ID, totalBytes: availablePack.BundleSize}
 	progress.emitProgressIfDue(true)
 
-	if err := downloadBundle(availablePack.BundleURL, archivePath, progress); err != nil {
+	if err := downloadBundle(availablePack.BundleURL, archivePath, availablePack.ExpectedSHA256, progress); err != nil {
 		return response.Err("install: download: %w", err)
 	}
 
@@ -189,13 +194,22 @@ func isLocalBundlePath(bundleSource string) bool {
 	return true
 }
 
-func downloadBundle(bundleURL, destinationPath string, progress *progressReader) error {
+func downloadBundle(bundleURL, destinationPath, expectedSHA256 string, progress *progressReader) error {
 	if err := os.MkdirAll(filepath.Dir(destinationPath), 0o755); err != nil {
 		return response.Err("%w", err)
 	}
 
 	if isLocalBundlePath(bundleURL) {
-		return copyLocalBundle(bundleURL, destinationPath, progress)
+		// Local file paths are trusted operator input, not a network fetch, so
+		// there is nothing to MITM. Still verify a digest if one was supplied.
+		return copyLocalBundle(bundleURL, destinationPath, expectedSHA256, progress)
+	}
+
+	// Only https is acceptable for remote bundles. A plain http:// (or any other
+	// scheme) download can be transparently rewritten by a network attacker, and
+	// the bundle's interpreter is executed as native code after install.
+	if !strings.HasPrefix(strings.ToLower(bundleURL), "https://") {
+		return response.Err("refusing to download bundle over insecure URL (https required): %s", bundleURL)
 	}
 
 	httpClient := &http.Client{Timeout: 60 * time.Minute}
@@ -214,10 +228,10 @@ func downloadBundle(bundleURL, destinationPath string, progress *progressReader)
 	}
 
 	progress.underlyingReader = downloadResponse.Body
-	return writeThroughTemporaryFile(progress, destinationPath)
+	return writeThroughTemporaryFile(progress, destinationPath, expectedSHA256)
 }
 
-func copyLocalBundle(sourcePath, destinationPath string, progress *progressReader) error {
+func copyLocalBundle(sourcePath, destinationPath, expectedSHA256 string, progress *progressReader) error {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
 		return response.Err("open local bundle %s: %w", sourcePath, err)
@@ -229,17 +243,32 @@ func copyLocalBundle(sourcePath, destinationPath string, progress *progressReade
 	}
 
 	progress.underlyingReader = sourceFile
-	return writeThroughTemporaryFile(progress, destinationPath)
+	return writeThroughTemporaryFile(progress, destinationPath, expectedSHA256)
 }
 
-func writeThroughTemporaryFile(sourceReader io.Reader, destinationPath string) error {
+// writeThroughTemporaryFile streams sourceReader to a ".part" temp file, then
+// atomically renames it into place. When expectedSHA256 is non-empty the file's
+// SHA-256 is computed while writing and verified before the rename; on mismatch
+// the temp file is deleted and nothing is installed. When it is empty (no
+// trusted digest available, e.g. an older GitHub API response or a local pack) a
+// prominent warning is logged and the download proceeds unverified.
+func writeThroughTemporaryFile(sourceReader io.Reader, destinationPath, expectedSHA256 string) error {
 	temporaryFilePath := destinationPath + ".part"
 	temporaryFile, err := os.Create(temporaryFilePath)
 	if err != nil {
 		return response.Err("%w", err)
 	}
 
-	if _, err := io.Copy(temporaryFile, sourceReader); err != nil {
+	var digestWriter hash.Hash
+	writeTarget := io.Writer(temporaryFile)
+	if expectedSHA256 != "" {
+		digestWriter = sha256.New()
+		writeTarget = io.MultiWriter(temporaryFile, digestWriter)
+	} else {
+		log.Warnf("pack install: no trusted SHA-256 digest available for %s; installing UNVERIFIED bundle", filepath.Base(destinationPath))
+	}
+
+	if _, err := io.Copy(writeTarget, sourceReader); err != nil {
 		temporaryFile.Close()
 		_ = os.Remove(temporaryFilePath)
 		return response.Err("%w", err)
@@ -247,6 +276,14 @@ func writeThroughTemporaryFile(sourceReader io.Reader, destinationPath string) e
 	if err := temporaryFile.Close(); err != nil {
 		_ = os.Remove(temporaryFilePath)
 		return response.Err("%w", err)
+	}
+
+	if digestWriter != nil {
+		actualSHA256 := hex.EncodeToString(digestWriter.Sum(nil))
+		if !strings.EqualFold(actualSHA256, expectedSHA256) {
+			_ = os.Remove(temporaryFilePath)
+			return response.Err("bundle digest mismatch: expected sha256 %s, got %s", strings.ToLower(expectedSHA256), actualSHA256)
+		}
 	}
 
 	if err := os.Rename(temporaryFilePath, destinationPath); err != nil {
@@ -380,6 +417,15 @@ func validateManifest(manifest *python.Manifest, bundlePath string) error {
 	if manifest.Runtime.Python == "" || manifest.Runtime.Entrypoint == "" {
 		return response.Err("manifest runtime is missing python or entrypoint")
 	}
+	// The interpreter/entrypoint are joined onto bundlePath and then executed,
+	// so a manifest that escapes the bundle (absolute path or "..") could run an
+	// arbitrary binary outside the extracted, verified bundle.
+	if err := validateBundleRelativePath(manifest.Runtime.Python); err != nil {
+		return response.Err("manifest runtime.python is unsafe: %w", err)
+	}
+	if err := validateBundleRelativePath(manifest.Runtime.Entrypoint); err != nil {
+		return response.Err("manifest runtime.entrypoint is unsafe: %w", err)
+	}
 	interpreterPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Python))
 	if _, err := os.Stat(interpreterPath); err != nil {
 		return response.Err("bundle missing python at %s: %w", interpreterPath, err)
@@ -387,6 +433,22 @@ func validateManifest(manifest *python.Manifest, bundlePath string) error {
 	entrypointPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Entrypoint))
 	if _, err := os.Stat(entrypointPath); err != nil {
 		return response.Err("bundle missing entrypoint at %s: %w", entrypointPath, err)
+	}
+	return nil
+}
+
+// validateBundleRelativePath rejects manifest-supplied paths that are absolute
+// or contain a ".." segment, so they cannot resolve outside the bundle when
+// joined onto the bundle root.
+func validateBundleRelativePath(rawPath string) error {
+	cleanedPath := filepath.FromSlash(rawPath)
+	if filepath.IsAbs(cleanedPath) || filepath.IsAbs(rawPath) {
+		return response.Err("absolute path not allowed: %q", rawPath)
+	}
+	for _, segment := range strings.Split(filepath.ToSlash(rawPath), "/") {
+		if segment == ".." {
+			return response.Err("path traversal not allowed: %q", rawPath)
+		}
 	}
 	return nil
 }

@@ -21,6 +21,12 @@ type AvailablePack struct {
 	BundleSize int64           `json:"bundleSize"`
 	Installed  bool            `json:"installed"`
 	TagName    string          `json:"tagName"`
+	// ExpectedSHA256 is the lowercase hex SHA-256 digest the downloaded bundle
+	// must match before it is extracted/executed. It is populated from the
+	// GitHub asset "digest" field ("sha256:<hex>") when the API exposes it, and
+	// is empty for older API responses or local packs that carry no trusted
+	// digest.
+	ExpectedSHA256 string `json:"expectedSha256"`
 }
 
 type githubRelease struct {
@@ -33,6 +39,9 @@ type githubRelease struct {
 		Name               string `json:"name"`
 		BrowserDownloadURL string `json:"browser_download_url"`
 		Size               int64  `json:"size"`
+		// Digest is provided by newer GitHub Releases API responses in the
+		// form "sha256:<hex>". Used to verify bundle integrity before install.
+		Digest string `json:"digest"`
 	} `json:"assets"`
 }
 
@@ -68,7 +77,7 @@ func FetchAvailable() ([]AvailablePack, error) {
 			continue
 		}
 
-		var bundleURL, metadataURL string
+		var bundleURL, metadataURL, bundleDigest string
 		var bundleSize int64
 
 		for _, asset := range release.Assets {
@@ -80,6 +89,7 @@ func FetchAvailable() ([]AvailablePack, error) {
 			case strings.HasSuffix(lowerCaseAssetName, ".nstudio"):
 				bundleURL = asset.BrowserDownloadURL
 				bundleSize = asset.Size
+				bundleDigest = asset.Digest
 			case strings.HasSuffix(lowerCaseAssetName, ".metadata.json"):
 				metadataURL = asset.BrowserDownloadURL
 			}
@@ -95,15 +105,28 @@ func FetchAvailable() ([]AvailablePack, error) {
 		}
 
 		availablePacks = append(availablePacks, AvailablePack{
-			Manifest:   *manifest,
-			BundleURL:  bundleURL,
-			BundleSize: bundleSize,
-			Installed:  IsInstalled(manifest.ID),
-			TagName:    release.TagName,
+			Manifest:       *manifest,
+			BundleURL:      bundleURL,
+			BundleSize:     bundleSize,
+			Installed:      IsInstalled(manifest.ID),
+			TagName:        release.TagName,
+			ExpectedSHA256: parseSHA256Digest(bundleDigest),
 		})
 	}
 
 	return availablePacks, nil
+}
+
+// parseSHA256Digest extracts the lowercase hex payload from a GitHub asset
+// digest of the form "sha256:<hex>". Any other/empty value yields "", which the
+// installer treats as "no trusted digest available".
+func parseSHA256Digest(digest string) string {
+	digest = strings.TrimSpace(digest)
+	const prefix = "sha256:"
+	if !strings.HasPrefix(strings.ToLower(digest), prefix) {
+		return ""
+	}
+	return strings.ToLower(digest[len(prefix):])
 }
 
 func fetchMetadata(metadataURL string) (*python.Manifest, error) {

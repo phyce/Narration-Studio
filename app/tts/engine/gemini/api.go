@@ -1,15 +1,12 @@
 package gemini
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"nstudio/app/common/response"
 	"nstudio/app/config"
-	"time"
+	"nstudio/app/tts/engine/internal/httpapi"
 )
 
 func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]byte, error) {
@@ -18,37 +15,25 @@ func (gemini *Gemini) sendRequest(request GeminiRequest, modelName string) ([]by
 		return nil, fmt.Errorf("Gemini API key is not configured")
 	}
 
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return nil, response.Err(err)
-	}
-
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", modelName)
 
-	httpRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	// Send the API key via the documented header instead of a URL query param
+	// so the secret does not leak into logs, proxies, or error bodies.
+	body, err := httpapi.Do(httpapi.Request{
+		Method: "POST",
+		URL:    url,
+		Headers: map[string]string{
+			"x-goog-api-key": apiKey,
+			"Content-Type":   "application/json",
+		},
+		Body: request,
+	})
 	if err != nil {
-		return nil, response.Err(err)
-	}
-
-	// Send the API key via the documented header instead of a URL query
-	// param so the secret does not leak into logs, proxies, or error bodies.
-	httpRequest.Header.Set("x-goog-api-key", apiKey)
-	httpRequest.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	httpResponse, err := client.Do(httpRequest)
-	if err != nil {
-		return nil, response.Err(err)
-	}
-	defer httpResponse.Body.Close()
-
-	if httpResponse.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(httpResponse.Body)
-		return nil, fmt.Errorf("Gemini API error: %s - %s", httpResponse.Status, string(bodyBytes))
+		return nil, err
 	}
 
 	var geminiResponse GeminiResponse
-	if err := json.NewDecoder(httpResponse.Body).Decode(&geminiResponse); err != nil {
+	if err := json.Unmarshal(body, &geminiResponse); err != nil {
 		return nil, response.Err(err)
 	}
 

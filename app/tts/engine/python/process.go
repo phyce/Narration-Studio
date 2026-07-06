@@ -45,6 +45,12 @@ type runner struct {
 
 	writeMutex sync.Mutex
 
+	// synthMutex serializes streamSynth requests on this runner. routeStdout
+	// routes all stdout to whichever sink is currently attached, so only one
+	// request may own the sink at a time; otherwise a second attachSink would
+	// reset routedBytes and steal the first request's PCM.
+	synthMutex sync.Mutex
+
 	format audio.StreamFormat
 
 	sinkMutex   sync.Mutex
@@ -341,6 +347,13 @@ func (pythonRunner *runner) load(model string, voicePaths []string) error {
 }
 
 func (pythonRunner *runner) streamSynth(ctx context.Context, request runnerRequest, writer *audio.StreamWriter) error {
+	// Serialize per runner: routeStdout mirrors stdout into the single
+	// attached sink, so concurrent requests would clobber each other's sink
+	// and routedBytes. The mutex is held for the whole request and released
+	// via defer on every return path (including ctx cancellation).
+	pythonRunner.synthMutex.Lock()
+	defer pythonRunner.synthMutex.Unlock()
+
 	if pythonRunner.exited.Load() {
 		return pythonRunner.exitFailure()
 	}

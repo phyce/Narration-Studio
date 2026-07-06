@@ -34,7 +34,7 @@ type AudioCacheSettings struct {
 
 type ServerSettings struct {
 	Auth    AuthSettings          `json:"auth,omitempty"`
-	Engines ServerSettingsEngines `json:"engines, omitempty"`
+	Engines ServerSettingsEngines `json:"engines,omitempty"`
 }
 type ServerSettingsEngines struct {
 	Piper      map[string]ModelInstances `json:"piper,omitempty"`

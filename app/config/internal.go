@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"strings"
 )
 
 func findFieldByJSONTag(dest reflect.Value, jsonTag string) (reflect.Value, bool) {
@@ -10,7 +11,11 @@ func findFieldByJSONTag(dest reflect.Value, jsonTag string) (reflect.Value, bool
 		field := dest.Field(i)
 		fieldType := destType.Field(i)
 		tag := fieldType.Tag.Get("json")
-		if tag == jsonTag {
+		name := strings.SplitN(tag, ",", 2)[0]
+		if name == "" || name == "-" {
+			continue
+		}
+		if name == jsonTag {
 			return field, true
 		}
 	}

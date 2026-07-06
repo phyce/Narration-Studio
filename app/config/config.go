@@ -123,6 +123,9 @@ func Import(jsonString string) error {
 		return err
 	}
 
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+
 	manager.config = newConfig
 
 	updatedConfigs, err := json.MarshalIndent(manager.config, "", "\t")
@@ -139,22 +142,50 @@ func Import(jsonString string) error {
 }
 
 func Get() Base {
-	return manager.config
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	base := manager.config
+	base.ModelToggles = copyModelToggles(manager.config.ModelToggles)
+	return base
 }
 
 func GetSettings() Settings {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
 	return manager.config.Settings
 }
 
 func GetEngine() Engine {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
 	return manager.config.Engine
 }
 
 func GetModelToggles() map[string]bool {
-	return manager.config.ModelToggles
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	return copyModelToggles(manager.config.ModelToggles)
+}
+
+func copyModelToggles(source map[string]bool) map[string]bool {
+	if source == nil {
+		return nil
+	}
+	dst := make(map[string]bool, len(source))
+	for key, value := range source {
+		dst[key] = value
+	}
+	return dst
 }
 
 func GetEngineToggles() map[string]map[string]bool {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
 	engineToggles := make(map[string]map[string]bool)
 
 	for key, value := range manager.config.ModelToggles {
@@ -176,6 +207,9 @@ func GetEngineToggles() map[string]map[string]bool {
 }
 
 func GetInfo() Info {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
 	return manager.config.Info
 }
 
@@ -184,6 +218,9 @@ func GetValueFromPath(path string) (interface{}, error) {
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("Invalid path")
 	}
+
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
 
 	current := reflect.ValueOf(manager.config)
 

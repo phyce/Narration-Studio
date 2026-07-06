@@ -114,15 +114,17 @@ func restartEngine(engineName string) {
 }
 
 func restartLocalEngines() {
-	manager.Lock()
-	defer manager.Unlock()
-
+	manager.RLock()
+	var localEngineIDs []string
 	for engineID, entry := range manager.Engines {
 		if entry.Engine.Type == tts.Local {
-			manager.Unlock()
-			restartEngine(engineID)
-			manager.Lock()
+			localEngineIDs = append(localEngineIDs, engineID)
 		}
+	}
+	manager.RUnlock()
+
+	for _, engineID := range localEngineIDs {
+		restartEngine(engineID)
 	}
 }
 
@@ -368,7 +370,10 @@ func GetEngineInstance(engineID, modelID string) (tts.Base, func(), bool) {
 	}
 
 	// Model exists but has no pool (not enabled in toggles). Create one on demand.
-	if _, modelExists := entry.Engine.Models[modelID]; modelExists {
+	manager.RLock()
+	_, modelExists := entry.Engine.Models[modelID]
+	manager.RUnlock()
+	if modelExists {
 		manager.Lock()
 		// Double-check after acquiring write lock
 		if existingPool, exists := entry.Models[modelID]; exists {
@@ -399,6 +404,9 @@ func GetEngineInstance(engineID, modelID string) (tts.Base, func(), bool) {
 func GetAllEngines() []tts.Engine {
 	toggles := config.GetEngineToggles()
 	var availableEngines []tts.Engine
+
+	manager.RLock()
+	defer manager.RUnlock()
 
 	for engineID, entry := range manager.Engines {
 		filteredEngine := tts.Engine{
@@ -477,6 +485,9 @@ func GetActiveEngines() []tts.Engine {
 func GetAllModels() map[string]tts.Model {
 	result := make(map[string]tts.Model)
 
+	manager.RLock()
+	defer manager.RUnlock()
+
 	for _, entry := range manager.Engines {
 		for _, model := range entry.Engine.Models {
 			result[model.Engine+":"+model.ID] = model
@@ -487,25 +498,42 @@ func GetAllModels() map[string]tts.Model {
 }
 
 func GetModelVoices(engineName string, modelID string) ([]tts.Voice, error) {
+	manager.RLock()
 	selectedEngine, exists := manager.Engines[engineName]
-
 	if !exists {
+		manager.RUnlock()
 		return nil, response.Err(fmt.Errorf("Engine %s not found", engineName))
 	}
 
+	var instance tts.Base
 	if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists && len(modelPool.Instances) > 0 {
-		return modelPool.Instances[0].GetVoices(modelID)
+		instance = modelPool.Instances[0]
+	}
+
+	var fallbackEngine tts.Base
+	if instance == nil {
+		if _, modelExists := selectedEngine.Engine.Models[modelID]; modelExists {
+			fallbackEngine = selectedEngine.Engine.Engine
+		}
+	}
+	manager.RUnlock()
+
+	if instance != nil {
+		return instance.GetVoices(modelID)
 	}
 
 	// Fall back to the engine directly (handles models not yet pooled/enabled)
-	if _, modelExists := selectedEngine.Engine.Models[modelID]; modelExists {
-		return selectedEngine.Engine.Engine.GetVoices(modelID)
+	if fallbackEngine != nil {
+		return fallbackEngine.GetVoices(modelID)
 	}
 
 	return nil, response.Err(fmt.Errorf("Model %s not found for engine %s", modelID, engineName))
 }
 
 func GetInstanceCount(engineID string, modelID string) int {
+	manager.RLock()
+	defer manager.RUnlock()
+
 	if selectedEngine, exists := manager.Engines[engineID]; exists {
 		if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists {
 			return len(modelPool.Instances)

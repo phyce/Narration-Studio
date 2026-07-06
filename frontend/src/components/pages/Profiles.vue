@@ -367,8 +367,11 @@ async function previewVoice(key: string) {
 	const modelVoiceID = "::" + Object.keys(selectedModels[key])[0] + ":" + selectedVoices[key].voiceID;
 
 	await EventTrigger('notification.enabled', false);
-	await Play(voice.name + ": " + voice.name, false, modelVoiceID, selectedProfile.value);
-	await EventTrigger('notification.enabled', true);
+	try {
+		await Play(voice.name + ": " + voice.name, false, modelVoiceID, selectedProfile.value);
+	} finally {
+		await EventTrigger('notification.enabled', true);
+	}
 }
 
 async function removeVoice(key: string) {

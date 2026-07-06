@@ -18,6 +18,7 @@ type PiperInstance struct {
 	stderrClosed chan struct{}
 	sampleRate   int
 	mu           sync.Mutex
+	reapOnce     sync.Once
 	Voices       []engine.Voice
 }
 

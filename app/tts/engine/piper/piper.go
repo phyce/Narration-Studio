@@ -329,7 +329,7 @@ func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest
 	}
 	payload = append(payload, '\n')
 
-	return piper.streamUtterance(request.Model, payload)
+	return piper.streamUtterance(ctx, request.Model, payload)
 }
 
 // streamUtterance sends one json-input line to the piper process and returns a
@@ -337,7 +337,7 @@ func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest
 // one process; completion is piper's stderr " sec)" sentinel followed by a
 // quiet-drain of stdout, because the sentinel can beat the last audio bytes
 // through the pipe buffers.
-func (piper *Piper) streamUtterance(model string, payload []byte) (*audio.Stream, error) {
+func (piper *Piper) streamUtterance(ctx context.Context, model string, payload []byte) (*audio.Stream, error) {
 	instance, err := piper.ensureRunning(model)
 	if err != nil {
 		return nil, err
@@ -349,8 +349,18 @@ func (piper *Piper) streamUtterance(model string, payload []byte) (*audio.Stream
 
 	format := audio.StreamFormat{SampleRate: instance.sampleRate, Channels: 1, BitDepth: 16}
 	return audio.NewProducedStream(format, func(writer *audio.StreamWriter) error {
+		// Cancel before we take the process lock: a superseded session must not
+		// wait behind an in-flight request to abandon its own.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		instance.mu.Lock()
 		defer instance.mu.Unlock()
+
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
 		select {
 		case <-instance.sentinel:
@@ -368,19 +378,58 @@ func (piper *Piper) streamUtterance(model string, payload []byte) (*audio.Stream
 			return response.Err("%w", err)
 		}
 
+		// Block until piper reports completion, its stderr closes, or the caller
+		// cancels. On cancellation we abandon this utterance: the process is
+		// interrupted so it stops mid-synthesis, its output is detached (via the
+		// deferred Detach) and the next request re-drains any stale sentinel.
 		select {
 		case <-instance.sentinel:
 		case <-instance.stderrClosed:
 			return response.Err("piper process for model %s exited mid-synthesis", model)
+		case <-ctx.Done():
+			piper.abandonUtterance(model, instance)
+			return ctx.Err()
 		}
 
 		drainDeadline := time.Now().Add(stdoutDrainDeadline)
 		for instance.capture.QuietSince() < stdoutQuietWindow && time.Now().Before(drainDeadline) {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
 			time.Sleep(10 * time.Millisecond)
 		}
 
 		return nil
 	}), nil
+}
+
+// abandonUtterance stops a piper process that is stuck mid-synthesis so a
+// cancelled request does not leave the subprocess feeding the next one. Killing
+// the process unblocks the stderr scanner (closing stderrClosed) and the stdout
+// copier, so the reader goroutines started in Start do not leak. GetProcessID
+// then reports the model as not running, so ensureRunning re-starts it (and
+// overwrites the stale map entry) on the next request. The map itself is left
+// untouched here because it is mutated by the caller's goroutine, not this
+// producer goroutine.
+func (piper *Piper) abandonUtterance(model string, instance *PiperInstance) {
+	if instance.command == nil || instance.command.Process == nil {
+		return
+	}
+
+	if err := instance.command.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		response.Debug(util.MessageData{
+			Summary: fmt.Sprintf("Failed to kill cancelled piper process for model %s: %v", model, err),
+		})
+		return
+	}
+
+	// Reap the killed process so it does not linger as a zombie. Wait() must not
+	// race the eventual Stop()/restart, so guard it to run at most once.
+	instance.reapOnce.Do(func() {
+		go func() { _ = instance.command.Wait() }()
+	})
 }
 
 func (piper *Piper) ensureRunning(model string) (*PiperInstance, error) {

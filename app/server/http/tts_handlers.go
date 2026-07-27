@@ -1,7 +1,9 @@
 package http
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"nstudio/app/common/response"
 	"nstudio/app/server/http/responses"
@@ -14,9 +16,76 @@ import (
 	"nstudio/app/tts"
 	"nstudio/app/tts/profile"
 
-	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 )
+
+func canStream(outputFormat string, audioOpts *AudioOptions) bool {
+	if outputFormat != "wav" && outputFormat != "pcm" && outputFormat != "pcm_s16le" {
+		return false
+	}
+	if audioOpts == nil {
+		return true
+	}
+	return audioOpts.SampleRate <= 0 && audioOpts.Channels <= 0
+}
+
+func streamTTSResponse(echoContext echo.Context, stream *audio.Stream, outputFormat, filename string) bool {
+	httpResponse := echoContext.Response()
+	httpResponse.Header().Set("Content-Type", audio.GetContentType(outputFormat))
+	httpResponse.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	httpResponse.WriteHeader(http.StatusOK)
+
+	flusher, canFlush := httpResponse.Writer.(http.Flusher)
+	flush := func() {
+		if canFlush {
+			flusher.Flush()
+		}
+	}
+
+	if outputFormat == "wav" {
+		if _, err := httpResponse.Write(audio.StreamingWAVHeader(stream.Format)); err != nil {
+			stream.Close()
+			return false
+		}
+		flush()
+	}
+
+	chunk := make([]byte, 32*1024)
+	for {
+		count, err := stream.Read(chunk)
+		if count > 0 {
+			if _, writeErr := httpResponse.Write(chunk[:count]); writeErr != nil {
+				stream.Close()
+				return false
+			}
+			flush()
+		}
+		if err == io.EOF {
+			return true
+		}
+		if err != nil {
+			response.Err("streaming TTS response aborted: %w", err)
+			return false
+		}
+	}
+}
+
+func audioFileExtension(outputFormat string) string {
+	if outputFormat == "pcm" || outputFormat == "pcm_s16le" {
+		return "pcm"
+	}
+	return outputFormat
+}
+
+func audioFromCache(cached []byte) (*audio.Audio, error) {
+	if len(cached) == 0 {
+		return nil, response.Err("cached audio is empty")
+	}
+	if len(cached) >= 12 && string(cached[0:4]) == "RIFF" && string(cached[8:12]) == "WAVE" {
+		return audio.NewAudioFromWAV(cached)
+	}
+	return audio.NewAudioFromPCM(cached, 22050, 1, 16), nil
+}
 
 func handleProfileTTSRequest(context echo.Context) error {
 	var request ProfileTTSRequest
@@ -91,8 +160,6 @@ func handleProfileTTSRequest(context echo.Context) error {
 		})
 	}
 
-	log.Info("about to get manager")
-
 	manager := profile.GetManager()
 	voice, err := manager.GetOrAllocateVoice(request.Profile, request.Character)
 	if err != nil {
@@ -117,12 +184,51 @@ func handleProfileTTSRequest(context echo.Context) error {
 		}
 	}
 
+	filename := fmt.Sprintf("tts_%s_%s.%s", request.Profile, request.Character, audioFileExtension(outputFormat))
+
 	var audioObject *audio.Audio
 	if cacheEnabled {
-		cachedAudio, found := cacheManager.GetCachedAudio(request.Profile, request.Character, request.Text)
-		if found {
-			audioObject = audio.NewAudioFromPCM(cachedAudio, 22050, 1, 16)
+		if cachedAudio, found := cacheManager.GetCachedAudio(request.Profile, request.Character, request.Text); found {
+			cachedObject, err := audioFromCache(cachedAudio)
+			if err == nil {
+				audioObject = cachedObject
+			} else {
+				response.Err("ignoring unusable cache entry for %s: %w", request.Character, err)
+			}
 		}
+	}
+
+	// Cache misses on streamable formats return chunks as the engine produces
+	// them; cache hits and whole-file formats stay on the buffered path below.
+	if audioObject == nil && canStream(outputFormat, audioOpts) {
+		stream, err := tts.SynthesizeStream(context.Request().Context(), voice, request.Text)
+		if err != nil {
+			return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Success: false,
+				Error:   "Failed to generate speech: " + err.Error(),
+				Code:    500,
+			})
+		}
+
+		var capture *bytes.Buffer
+		if cacheEnabled {
+			capture = &bytes.Buffer{}
+			stream = audio.NewTeeStream(stream, capture)
+		}
+
+		stats.IncrementMessages()
+		completed := streamTTSResponse(context, stream, outputFormat, filename)
+
+		if completed && capture != nil && stream.Err() == nil && stream.TeeErr() == nil && capture.Len() > 0 {
+			format := stream.Format
+			wavBytes, err := audio.NewAudioFromPCM(capture.Bytes(), format.SampleRate, format.Channels, format.BitDepth).ToWAV()
+			if err == nil {
+				if err := cacheManager.CacheAudio(request.Profile, request.Character, request.Text, voiceKey, wavBytes); err != nil {
+					response.Warn("failed to cache audio: %v", err)
+				}
+			}
+		}
+		return nil
 	}
 
 	if audioObject == nil {
@@ -136,9 +242,11 @@ func handleProfileTTSRequest(context echo.Context) error {
 		}
 
 		if cacheEnabled {
-			pcmData, _ := audioObject.ToPCM()
-			if err := cacheManager.CacheAudio(request.Profile, request.Character, request.Text, voiceKey, pcmData); err != nil {
-				response.Warn("failed to cache audio: %v", err)
+			wavBytes, err := audioObject.ToWAV()
+			if err == nil {
+				if err := cacheManager.CacheAudio(request.Profile, request.Character, request.Text, voiceKey, wavBytes); err != nil {
+					response.Warn("failed to cache audio: %v", err)
+				}
 			}
 		}
 	}
@@ -177,13 +285,6 @@ func handleProfileTTSRequest(context echo.Context) error {
 	}
 
 	contentType := audio.GetContentType(outputFormat)
-
-	fileExtension := outputFormat
-	if outputFormat == "pcm" || outputFormat == "pcm_s16le" {
-		fileExtension = "pcm"
-	}
-
-	filename := fmt.Sprintf("tts_%s_%s.%s", request.Profile, request.Character, fileExtension)
 
 	context.Response().Header().Set("Content-Type", contentType)
 	context.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
@@ -255,7 +356,7 @@ func handleSimpleTTS(context echo.Context) error {
 		}
 	}
 
-	validFormats := []string{"wav", "flac", "ogg"}
+	validFormats := []string{"wav", "flac", "ogg", "pcm", "pcm_s16le"}
 	formatValid := false
 	for _, validFormat := range validFormats {
 		if format == validFormat {
@@ -266,7 +367,7 @@ func handleSimpleTTS(context echo.Context) error {
 	if !formatValid {
 		return context.JSON(http.StatusBadRequest, responses.ErrorResponse{
 			Success: false,
-			Error:   "Invalid format. Supported formats: wav, flac, ogg",
+			Error:   "Invalid format. Supported formats: wav, flac, ogg, pcm, pcm_s16le",
 			Code:    400,
 		})
 	}
@@ -275,6 +376,23 @@ func handleSimpleTTS(context echo.Context) error {
 		Engine: engineId,
 		Model:  modelId,
 		Voice:  voiceId,
+	}
+
+	filename := fmt.Sprintf("tts_%s_%s_%s.%s", engineId, modelId, voiceId, audioFileExtension(format))
+
+	if canStream(format, nil) {
+		stream, err := tts.SynthesizeStream(context.Request().Context(), voice, request.Text)
+		if err != nil {
+			return context.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Success: false,
+				Error:   "Failed to generate speech: " + err.Error(),
+				Code:    500,
+			})
+		}
+
+		stats.IncrementMessages()
+		streamTTSResponse(context, stream, format, filename)
+		return nil
 	}
 
 	audioObj, err := tts.GenerateAudio(voice, request.Text)
@@ -298,7 +416,6 @@ func handleSimpleTTS(context echo.Context) error {
 	}
 
 	contentType := audio.GetContentType(format)
-	filename := fmt.Sprintf("tts_%s_%s_%s.%s", engineId, modelId, voiceId, format)
 
 	context.Response().Header().Set("Content-Type", contentType)
 	context.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))

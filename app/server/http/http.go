@@ -10,6 +10,7 @@ import (
 	"nstudio/app/server/http/routes/profiles"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,7 +23,7 @@ type ServerConfig struct {
 	Port int
 }
 
-func StartHTTPServer(config ServerConfig) error {
+func NewEchoServer() *echo.Echo {
 	echoServer := echo.New()
 
 	echoServer.HideBanner = true
@@ -37,9 +38,18 @@ func StartHTTPServer(config ServerConfig) error {
 
 	echoServer.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 60 * time.Second,
+		Skipper: func(context echo.Context) bool {
+			return strings.HasPrefix(context.Path(), "/tts")
+		},
 	}))
 
 	setupRoutes(echoServer)
+
+	return echoServer
+}
+
+func StartHTTPServer(config ServerConfig) error {
+	echoServer := NewEchoServer()
 
 	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	fmt.Printf("HTTP server listening on %s\n", address)

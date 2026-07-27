@@ -87,11 +87,6 @@ func (piper *Piper) autoDetect(settings *config.Piper) {
 func (piper *Piper) Start(modelName string) error {
 	err := piper.Initialize()
 	if err != nil {
-		configuration := config.Get()
-		configuration.ModelToggles[fmt.Sprintf("piper:%s", modelName)] = false
-		if setErr := config.Set(configuration); setErr != nil {
-			return setErr
-		}
 		return response.Err("%w", err)
 	}
 

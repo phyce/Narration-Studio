@@ -38,7 +38,7 @@ try {
         $arguments += @('-run', $Run)
     }
     elseif (-not $All) {
-        $arguments += @('-skip', 'TestOpenAIEngine|TestElevenLabsEngine|TestGoogleEngine|TestGeminiEngine')
+        $arguments += @('-skip', 'TestOpenAIEngine|TestElevenLabsEngine|TestGoogleEngine|TestGeminiEngine|TestServerAPIEngines')
     }
 
     $results = New-Object System.Collections.Generic.List[object]

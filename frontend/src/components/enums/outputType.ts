@@ -6,8 +6,8 @@ export enum OutputType {
 
 export const OutputTypeNames = {
 	[OutputType.CombinedFile]: 'Combined File',
-	[OutputType.SplitFiles]: 'Split Files',
-	[OutputType.Both]: 'Split & Combined Files',
+	[OutputType.SplitFiles]: 'Individual Files',
+	[OutputType.Both]: 'Both Individual and Combined',
 };
 
 export const OutputTypeOptions = Object.keys(OutputType)

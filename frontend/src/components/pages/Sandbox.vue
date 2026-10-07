@@ -21,7 +21,6 @@ const selectedVoice = ref<Voice>();
 const selectedProfile = useLocalStorage<string>('sandboxProfile', 'default');
 const text = useLocalStorage<string>('sandboxText', 'user: hello world');
 const overrideVoices = ref<boolean>(false);
-const saveNewCharacters = ref<boolean>(false);
 const isPlaying = ref<boolean>(false);
 const isPaused = ref<boolean>(false);
 
@@ -45,7 +44,7 @@ async function generateSpeech() {
 	isPlaying.value = true;
 	isPaused.value = false;
 	try {
-		await Play(text.value, (!!saveNewCharacters.value), voiceID, selectedProfile.value);
+		await Play(text.value, false, voiceID, selectedProfile.value);
 	} finally {
 		isPlaying.value = false;
 		isPaused.value = false;
@@ -87,73 +86,54 @@ onMounted(async () => {
 </script>
 
 <template>
-	<div class="sandbox">
-		<div class="sandbox__panel">
-			<ProfileSelector v-model="selectedProfile"/>
+	<div class="page">
+		<aside class="page-sidebar">
+			<div class="field">
+				<label class="field__label">Profile</label>
+				<ProfileSelector v-model="selectedProfile"/>
+			</div>
+
 			<Button v-if="!isPlaying"
-					class="sandbox__panel__generate mt-2"
-					title="Play All"
-					aria-label="Play"
+					icon="pi pi-play"
+					:label="isDisabled ? 'Select a voice first' : 'Play'"
 					:disabled="isDisabled"
 					@click="generateSpeech"
-			>
-				<template v-if="isDisabled">select voice</template>
-				<i v-else class="pi pi-play"/>
-			</Button>
-			<div v-else class="sandbox__panel__playback mt-2">
-				<Button class="sandbox__panel__playback-button"
-						:title="isPaused ? 'Resume' : 'Pause'"
-						:aria-label="isPaused ? 'Resume' : 'Pause'"
+			/>
+			<div v-else class="sandbox__playback">
+				<Button :icon="isPaused ? 'pi pi-play' : 'pi pi-pause'"
+						:label="isPaused ? 'Resume' : 'Pause'"
+						severity="secondary"
 						@click="togglePause"
-				>
-					<i :class="isPaused ? 'pi pi-play' : 'pi pi-pause'"/>
-				</Button>
-				<Button class="sandbox__panel__playback-button"
-						title="Stop"
-						aria-label="Stop"
+				/>
+				<Button icon="pi pi-stop"
+						label="Stop"
 						severity="danger"
 						@click="stopPlayback"
-				>
-					<i class="pi pi-stop"/>
-				</Button>
+				/>
 			</div>
-			<TreeSelect class="sandbox__panel__model-tree"
-						:options="modelVoiceTree"
-						v-model="selectedModel"
-						@node-select="onModelSelect"
-						placeholder="Select a model"
-			/>
-			<Dropdown class="sandbox__panel__voice-dropdown"
-					  v-model="selectedVoice"
-					  :options="voices"
-					  filter
-					  optionLabel="name"
-					  placeholder="Select a voice"
-			/>
 
-			<div class="sandbox__panel__checkbox">
-				<Checkbox class="checkbox"
-						  v-model="overrideVoices"
-						  inputId="overrideVoices"
-						  name="overrideVoices"
-						  :binary="true"
-				/>
-				<label class="checkbox-label" for="overrideVoices">
-					Override Voices
-				</label>
+			<div class="sandbox__override">
+				<div class="check-row">
+					<Checkbox v-model="overrideVoices" inputId="overrideVoices" :binary="true"/>
+					<label for="overrideVoices">Override voices</label>
+				</div>
+				<template v-if="overrideVoices">
+					<TreeSelect :options="modelVoiceTree"
+								v-model="selectedModel"
+								@node-select="onModelSelect"
+								placeholder="Select a model"
+								class="w-full"
+					/>
+					<Dropdown v-model="selectedVoice"
+							  :options="voices"
+							  filter
+							  optionLabel="name"
+							  placeholder="Select a voice"
+							  class="w-full"
+					/>
+				</template>
 			</div>
-			<div class="sandbox__panel__checkbox">
-				<Checkbox class="checkbox"
-						  v-model="saveNewCharacters"
-						  inputId="saveNewCharacters"
-						  name="saveNewCharacters"
-						  value="1"
-				/>
-				<label class="checkbox-label" for="saveNewCharacters">
-					Save new characters
-				</label>
-			</div>
-		</div>
+		</aside>
 		<div class="sandbox__editor">
 			<Editor v-model:text="text" :regexes="regexes"/>
 		</div>

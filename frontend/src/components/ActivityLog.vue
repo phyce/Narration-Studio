@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, nextTick, onMounted, onUnmounted, reactive, ref} from "vue";
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from "vue";
 import {eventManager} from "../util/eventManager";
 import {GetActivityLog, GetActivityLogOlder} from "../../bindings/nstudio/app";
 
@@ -23,6 +23,8 @@ interface Chain {
 
 const severities = ["error", "warning", "success", "info", "status"];
 const olderPageSize = 200;
+const initialRows = 40;
+const revealFrames = 45;
 
 const entries = ref<Entry[]>([]);
 const severityFilters = reactive<Record<string, boolean>>({
@@ -66,6 +68,8 @@ function onFocusChain(chainId: number) {
 	statusFilter.value = "";
 	searchText.value = "";
 	expandedChains.add(chainId);
+	const index = chains.value.findIndex(chain => chain.chainId === chainId);
+	visibleCount.value = Math.max(visibleCount.value, index + 1);
 	nextTick(() => {
 		document.querySelector(`[data-chain-id="${chainId}"]`)?.scrollIntoView({block: "center"});
 	});
@@ -91,6 +95,7 @@ onMounted(async () => {
 onUnmounted(() => {
 	unsubscribe();
 	unsubscribeFocus();
+	cancelAnimationFrame(revealFrame);
 });
 
 async function loadOlder() {
@@ -116,6 +121,9 @@ async function loadOlder() {
 
 function onScroll(event: Event) {
 	const target = event.target as HTMLElement;
+	if (visibleCount.value < chains.value.length) {
+		return;
+	}
 	if (target.scrollHeight - target.scrollTop - target.clientHeight < 120) {
 		loadOlder();
 	}
@@ -173,6 +181,37 @@ const chains = computed<Chain[]>(() => {
 	return result;
 });
 
+// Rows are added a few per frame instead of all at once, so the list (and its scrollbar) grows
+// smoothly when the log opens or a page of older entries arrives. Each step is a fraction of what's
+// left, so a big page starts fast and slows down towards the end.
+const visibleCount = ref(initialRows);
+let revealFrame = 0;
+
+const visibleChains = computed(() => chains.value.slice(0, visibleCount.value));
+
+function revealStep() {
+	revealFrame = 0;
+	const remaining = chains.value.length - visibleCount.value;
+	if (remaining <= 0) {
+		return;
+	}
+	visibleCount.value += Math.ceil(remaining / revealFrames);
+	scheduleReveal();
+}
+
+function scheduleReveal() {
+	if (!revealFrame) {
+		revealFrame = requestAnimationFrame(revealStep);
+	}
+}
+
+watch(() => chains.value.length, scheduleReveal);
+
+watch([severityFilters, statusFilter, searchText], () => {
+	visibleCount.value = initialRows;
+	scheduleReveal();
+});
+
 function toggleChain(chainId: number) {
 	if (expandedChains.has(chainId)) {
 		expandedChains.delete(chainId);
@@ -217,7 +256,7 @@ function formatTime(timestamp: string): string {
 
 		<div class="entries" @scroll="onScroll">
 			<div
-				v-for="chain in chains"
+				v-for="chain in visibleChains"
 				:key="chain.chainId"
 				:data-chain-id="chain.chainId"
 				:class="['entry', chain.representative.severity, {expandable: isExpandable(chain)}]"
@@ -263,6 +302,8 @@ function formatTime(timestamp: string): string {
 	flex-direction: column;
 	height: 100vh;
 	font-size: 13px;
+	background-color: var(--app-bg);
+	accent-color: #ea580c;
 }
 
 .toolbar {
@@ -270,8 +311,8 @@ function formatTime(timestamp: string): string {
 	align-items: center;
 	gap: 12px;
 	padding: 8px 12px;
-	background-color: #1e2a38;
-	border-bottom: 1px solid #2f3e50;
+	background-color: #2f2f2f;
+	border-bottom: 1px solid #444444;
 	flex-wrap: wrap;
 }
 
@@ -294,9 +335,9 @@ function formatTime(timestamp: string): string {
 
 .status-select,
 .search {
-	background-color: #16212d;
+	background-color: #1c1c1c;
 	color: white;
-	border: 1px solid #2f3e50;
+	border: 1px solid #444444;
 	border-radius: 4px;
 	padding: 4px 8px;
 }
@@ -313,9 +354,16 @@ function formatTime(timestamp: string): string {
 }
 
 .entry {
+	animation: entry-in 0.25s ease-out;
 	padding: 6px 12px;
-	border-bottom: 1px solid #232f3d;
+	border-bottom: 1px solid #333333;
 	border-left: 3px solid transparent;
+}
+
+@keyframes entry-in {
+	from {
+		opacity: 0;
+	}
 }
 
 .entry.expandable .entry-row {
@@ -344,7 +392,7 @@ function formatTime(timestamp: string): string {
 }
 
 .entry.status {
-	border-left-color: #64748b;
+	border-left-color: #737373;
 }
 
 .entry-row {
@@ -355,7 +403,7 @@ function formatTime(timestamp: string): string {
 
 .chevron {
 	width: 12px;
-	color: #93a4b8;
+	color: #a3a3a3;
 	flex-shrink: 0;
 }
 
@@ -383,11 +431,11 @@ function formatTime(timestamp: string): string {
 }
 
 .dot.status {
-	background-color: #64748b;
+	background-color: #737373;
 }
 
 .time {
-	color: #93a4b8;
+	color: #a3a3a3;
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
 }
@@ -401,20 +449,20 @@ function formatTime(timestamp: string): string {
 }
 
 .status-tag {
-	color: #93a4b8;
-	background-color: #16212d;
+	color: #a3a3a3;
+	background-color: #1c1c1c;
 	border-radius: 4px;
 	padding: 1px 6px;
 	white-space: nowrap;
 }
 
 .chain-count {
-	color: #cbd5e1;
+	color: #d4d4d4;
 	white-space: nowrap;
 }
 
 .source {
-	color: #6b7f96;
+	color: #8a8a8a;
 	white-space: nowrap;
 }
 
@@ -428,7 +476,7 @@ function formatTime(timestamp: string): string {
 
 .frame {
 	text-align: left;
-	border-left: 2px solid #2f3e50;
+	border-left: 2px solid #444444;
 	padding-left: 8px;
 }
 
@@ -440,32 +488,32 @@ function formatTime(timestamp: string): string {
 }
 
 .cause-arrow {
-	color: #6b7f96;
+	color: #8a8a8a;
 	white-space: nowrap;
 }
 
 .frame-summary {
-	color: #d7e0ea;
+	color: #e5e5e5;
 }
 
 .frame-source {
-	color: #6b7f96;
+	color: #8a8a8a;
 }
 
 .frame-detail {
-	color: #93a4b8;
+	color: #a3a3a3;
 	white-space: pre-wrap;
 	margin-top: 2px;
 }
 
 .empty {
-	color: #6b7f96;
+	color: #8a8a8a;
 	padding: 24px;
 	text-align: center;
 }
 
 .load-older {
-	color: #93a4b8;
+	color: #a3a3a3;
 	padding: 12px;
 	text-align: center;
 	cursor: pointer;

@@ -23,6 +23,7 @@ type Settings struct {
 	OutputType           OutputType.Option  `json:"outputType"`
 	OutputPath           string             `json:"outputPath"`
 	Debug                bool               `json:"debug"`
+	ActivityLogDays      int                `json:"activityLogDays"`
 	AudioCache           AudioCacheSettings `json:"audioCache,omitempty"`
 	Server               ServerSettings     `json:"server,omitempty"`
 	LocalEnginePacksPath string             `json:"localEnginePacksPath,omitempty"`

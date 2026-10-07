@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"nstudio/app/common/daemon"
 	"nstudio/app/common/issue"
-	"nstudio/app/config"
 	"nstudio/app/server"
 	"nstudio/app/tts/modelManager"
 	"os"
-	"time"
 )
 
 func main() {
@@ -62,17 +60,6 @@ func startCmdServer(options commandLineArguments) {
 	pidFile := daemon.GetPidFilePath()
 	if err := os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644); err != nil {
 		fmt.Printf("Warning: Failed to write PID file: %v\n", err)
-	}
-
-	status := daemon.DaemonStatusInfo{
-		PID:               os.Getpid(),
-		Version:           config.GetInfo().Version,
-		StartTime:         time.Now(),
-		ProcessedMessages: 0,
-	}
-
-	if err := daemon.WriteDaemonStatus(status); err != nil {
-		fmt.Printf("Warning: Failed to write status file: %v\n", err)
 	}
 
 	defer func() {

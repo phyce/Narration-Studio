@@ -2,6 +2,7 @@ package stats
 
 import (
 	"nstudio/app/common/daemon"
+	"nstudio/app/common/response"
 	"nstudio/app/config"
 	"os"
 	"sync/atomic"
@@ -11,11 +12,19 @@ import (
 var (
 	processedMessages int64
 	startTime         time.Time
+	serverMode        string
+	serverHost        string
+	serverPort        int
 )
 
-func Initialize() {
+// The first write is synchronous so the status file, the desktop's only way to
+// find the server, exists before the server starts answering.
+func Initialize(mode, host string, port int) {
 	startTime = time.Now()
 	atomic.StoreInt64(&processedMessages, 0)
+	serverMode = mode
+	serverHost = host
+	serverPort = port
 
 	updateDaemonStatusFile()
 
@@ -37,9 +46,14 @@ func updateDaemonStatusFile() {
 		Version:           config.GetInfo().Version,
 		StartTime:         startTime,
 		ProcessedMessages: atomic.LoadInt64(&processedMessages),
+		Mode:              serverMode,
+		Host:              serverHost,
+		Port:              serverPort,
 	}
 
-	go daemon.WriteDaemonStatus(status)
+	if err := daemon.WriteDaemonStatus(status); err != nil {
+		response.Err("Failed to write daemon status file: %w", err)
+	}
 }
 
 func GetProcessedMessages() int64 {

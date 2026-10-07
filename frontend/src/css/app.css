@@ -2,26 +2,103 @@
 	@apply flex flex-col h-full;
 }
 
-.app__header {
-	@apply bg-neutral-800;
-}
-
 .app__main {
-	@apply flex-grow bg-neutral-700 overflow-y-auto;
+	@apply flex-grow min-h-0 overflow-y-auto;
+	background-color: var(--app-bg);
 }
 
-.app__footer {
-
+/*
+ * Shared page building blocks. Every page is either
+ *   .page (row): .page-sidebar on the left + content, or
+ *   .page.page--column: .page-toolbar on top + .page-body.
+ */
+.page {
+	@apply flex w-full h-full min-h-0;
 }
 
-#logo {
-	display: block;
-	width: 50%;
-	height: 50%;
-	margin: auto;
-	padding: 10% 0 0;
-	background-position: center;
-	background-repeat: no-repeat;
-	background-size: 100% 100%;
-	background-origin: content-box;
+.page--column {
+	@apply flex-col;
+}
+
+.page-sidebar {
+	@apply flex flex-col gap-3 p-3 flex-none w-64 min-h-0 overflow-y-auto;
+	background-color: var(--app-panel);
+	border-right: 1px solid var(--surface-border);
+}
+
+.page-toolbar {
+	@apply flex flex-wrap items-center gap-2 px-3 py-2 flex-none;
+	min-height: 3.5rem;
+	background-color: var(--app-panel);
+	border-bottom: 1px solid var(--surface-border);
+}
+
+.page-toolbar__spacer {
+	@apply flex-1;
+}
+
+.page-body {
+	@apply flex-1 min-h-0 overflow-y-auto p-3;
+}
+
+.page-title {
+	@apply text-lg font-bold m-0;
+	color: var(--text-color);
+}
+
+.page-subtitle {
+	@apply text-sm m-0;
+	color: var(--text-color-secondary);
+}
+
+.field {
+	@apply flex flex-col gap-1;
+}
+
+.field__label {
+	@apply text-xs font-semibold;
+	color: var(--text-color-secondary);
+}
+
+.field__hint {
+	@apply text-xs;
+	color: var(--text-color-secondary);
+}
+
+.check-row {
+	@apply flex items-center gap-2 text-sm select-none;
+}
+
+.check-row label {
+	@apply cursor-pointer;
+}
+
+.card {
+	@apply rounded-md p-3;
+	background-color: var(--app-card);
+	border: 1px solid var(--surface-border);
+}
+
+.empty-state {
+	@apply flex flex-col items-center justify-center gap-2 h-full p-8 text-center text-sm;
+	color: var(--text-color-secondary);
+}
+
+.empty-state .pi {
+	@apply text-3xl mb-1;
+	color: #6b6b6b;
+}
+
+.unsaved-note {
+	@apply text-xs flex items-center gap-1;
+	color: var(--accent-text);
+}
+
+.text-secondary {
+	color: var(--text-color-secondary);
+}
+
+/* Settings form fields (components/config/*) */
+.config-field__label {
+	font-size: 0.875rem;
 }

@@ -3,6 +3,7 @@ package enginetest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,31 +20,63 @@ const appName = "Narration Studio"
 func Configure(t *testing.T) string {
 	t.Helper()
 
+	if err := initializeTemporaryConfig(filepath.Join(t.TempDir(), "config.json")); err != nil {
+		t.Fatalf("initialize test config: %v", err)
+	}
+
+	return UseNewOutputPath(t)
+}
+
+// Configure re-initializes config per test, which races the Activity Log
+// flusher reading the config path; packages whose tests log through response
+// initialize once here instead and take a fresh output path per test.
+func RunWithTemporaryConfig(m *testing.M) int {
+	configRootPath, err := os.MkdirTemp("", "nstudio-test-config")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "create test config folder:", err)
+		return 1
+	}
+	defer os.RemoveAll(configRootPath)
+
+	if err := initializeTemporaryConfig(filepath.Join(configRootPath, "config.json")); err != nil {
+		fmt.Fprintln(os.Stderr, "initialize test config:", err)
+		return 1
+	}
+
+	return m.Run()
+}
+
+func UseNewOutputPath(t *testing.T) string {
+	t.Helper()
+	outputPath := t.TempDir()
+
+	base := config.Get()
+	base.Settings.OutputPath = outputPath
+	if err := config.Set(base); err != nil {
+		t.Fatalf("set test output path: %v", err)
+	}
+
+	return outputPath
+}
+
+func initializeTemporaryConfig(configPath string) error {
 	log.SetLevel(log.FatalLevel)
 
 	info := config.Info{Name: appName, OS: runtime.GOOS}
 	realConfig := readRealConfig(info)
 
-	configPath := filepath.Join(t.TempDir(), "config.json")
 	if err := config.InitializeWithPath(info, configPath); err != nil {
-		t.Fatalf("initialize test config: %v", err)
+		return err
 	}
 
-	outputPath := t.TempDir()
-
 	base := config.Get()
-	base.Settings.OutputPath = outputPath
 	base.Engine.Local = realConfig.Engine.Local
 	base.Engine.Api.OpenAI.ApiKey = resolveKey("OPENAI_API_KEY", realConfig.Engine.Api.OpenAI.ApiKey)
 	base.Engine.Api.ElevenLabs.ApiKey = resolveKey("ELEVENLABS_API_KEY", realConfig.Engine.Api.ElevenLabs.ApiKey)
 	base.Engine.Api.Google.ApiKey = resolveKey("GOOGLE_API_KEY", realConfig.Engine.Api.Google.ApiKey)
 	base.Engine.Api.Gemini.ApiKey = resolveKey("GEMINI_API_KEY", realConfig.Engine.Api.Gemini.ApiKey)
 
-	if err := config.Set(base); err != nil {
-		t.Fatalf("apply test config: %v", err)
-	}
-
-	return outputPath
+	return config.Set(base)
 }
 
 type Case struct {

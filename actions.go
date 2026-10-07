@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"nstudio/app/cache"
 	"nstudio/app/common/activity"
@@ -22,6 +23,7 @@ import (
 	"nstudio/app/tts/engine/piper"
 	"nstudio/app/tts/engine/piper/native"
 	"nstudio/app/tts/engine/python/pack"
+	"nstudio/app/tts/enginehost"
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 	"os"
@@ -79,13 +81,16 @@ func (app *App) Play(
 
 	fileIndex.Reset()
 	err := tts.GenerateSpeech(messages, false, profileID)
-	if err != nil {
+	switch {
+	case errors.Is(err, tts.ErrStopped):
+		response.Info(util.MessageData{Summary: "Playback stopped"})
+	case err != nil:
 		response.Error(util.MessageData{
 			Summary: "Failed to play script",
 			Detail:  err.Error(),
 			Cause:   err,
 		})
-	} else {
+	default:
 		response.Success(util.MessageData{
 			Summary: "Success",
 			Detail:  "Generation completed",
@@ -140,6 +145,10 @@ func (app *App) ProcessScript(script string, profileID string) {
 	status.Set(status.Generating, "")
 	fileIndex.Reset()
 	err := tts.GenerateSpeech(messages, true, profileID)
+	if errors.Is(err, tts.ErrStopped) {
+		response.Info(util.MessageData{Summary: "Script processing stopped"})
+		return
+	}
 	if err != nil {
 		response.Error(util.MessageData{
 			Summary: "Failed to process script",
@@ -814,19 +823,37 @@ func (app *App) StartDaemonServer(mode string, port int, host string, configFile
 		arguments = append(arguments, "-config", configFile)
 	}
 
-	command := exec.Command(cliExecutablePath, arguments...)
-	process.HideCommandLine(command)
+	launchDaemon := func() error {
+		command := exec.Command(cliExecutablePath, arguments...)
+		process.HideCommandLine(command)
 
-	output, err := command.CombinedOutput()
+		if output, err := command.CombinedOutput(); err != nil {
+			return response.Err("%s: %w", strings.TrimSpace(string(output)), err)
+		}
+		return nil
+	}
+
+	if mode == "http" {
+		status.Set(status.Loading, "Starting the server; loading its voice models can take a while")
+		err = enginehost.StartDaemon(launchDaemon)
+		status.Set(status.Ready, "")
+	} else {
+		err = launchDaemon()
+		time.Sleep(1 * time.Second)
+	}
+
+	if errors.Is(err, enginehost.ErrStartCancelled) {
+		response.Info(util.MessageData{Summary: "Server start cancelled"})
+		return app.GetServerStatus()
+	}
 	if err != nil {
 		response.Error(util.MessageData{
 			Summary: "Failed to start server",
-			Detail:  string(output),
+			Detail:  err.Error(),
+			Cause:   err,
 		})
-		return jsonError("Failed to start server", string(output))
+		return jsonError("Failed to start server", err.Error())
 	}
-
-	time.Sleep(1 * time.Second)
 
 	response.Success(util.MessageData{
 		Summary: "Server started",
@@ -847,10 +874,17 @@ func (app *App) StopDaemonServer() string {
 		return jsonError("Failed to locate CLI executable", err.Error())
 	}
 
-	command := exec.Command(cliExecutablePath, "-stop")
-	process.HideCommandLine(command)
+	var output []byte
+	status.Set(status.Loading, "Stopping server")
+	err = enginehost.StopDaemon(func() error {
+		command := exec.Command(cliExecutablePath, "-stop")
+		process.HideCommandLine(command)
 
-	output, err := command.CombinedOutput()
+		var stopErr error
+		output, stopErr = command.CombinedOutput()
+		return stopErr
+	})
+	status.Set(status.Ready, "")
 
 	if err != nil {
 		response.Error(util.MessageData{
@@ -964,6 +998,12 @@ func (app *App) GetServerLogs() string {
 
 	jsonData, _ := json.Marshal(result)
 	return string(jsonData)
+}
+
+// GetConfigFilePath is the config file this app instance uses; the Server page offers it as the
+// default when the server should run with a custom config.
+func (app *App) GetConfigFilePath() string {
+	return config.GetCurrentConfigFile()
 }
 
 func (app *App) GenerateServerCommand(mode string, port int, host string, configFile string) string {
@@ -1166,11 +1206,16 @@ func (app *App) PiperDeleteModel(modelID string) string {
 
 // <editor-fold desc="Engine Packs">
 
+type enginePackListing struct {
+	Packs     []pack.AvailablePack `json:"packs"`
+	Installed []pack.InstalledPack `json:"installed"`
+}
+
 func (app *App) EnginePackFetchAvailable() string {
 	status.Set(status.Loading, "Fetching engine packs")
 	defer status.Set(status.Ready, "")
 
-	var availablePacks []pack.AvailablePack
+	listing := enginePackListing{Packs: []pack.AvailablePack{}, Installed: []pack.InstalledPack{}}
 	var firstErr error
 
 	if localPath := config.GetSettings().LocalEnginePacksPath; localPath != "" {
@@ -1178,32 +1223,37 @@ func (app *App) EnginePackFetchAvailable() string {
 		if err != nil {
 			firstErr = err
 		}
-		availablePacks = append(availablePacks, localPacks...)
+		listing.Packs = append(listing.Packs, localPacks...)
 	}
 
 	remotePacks, err := pack.FetchAvailable()
 	if err != nil && firstErr == nil {
 		firstErr = err
 	}
-	availablePacks = append(availablePacks, remotePacks...)
+	listing.Packs = append(listing.Packs, remotePacks...)
 
-	if len(availablePacks) == 0 && firstErr != nil {
+	installedPacks, err := pack.ScanInstalled()
+	if err != nil && firstErr == nil {
+		firstErr = err
+	}
+	listing.Installed = append(listing.Installed, installedPacks...)
+
+	if len(listing.Packs) == 0 && firstErr != nil {
 		response.Error(util.MessageData{
 			Summary: "Failed to fetch engine packs",
 			Detail:  firstErr.Error(),
 			Cause:   firstErr,
 		})
-		return "[]"
 	}
 
-	jsonData, err := json.Marshal(availablePacks)
+	jsonData, err := json.Marshal(listing)
 	if err != nil {
 		response.Error(util.MessageData{
 			Summary: "Failed to marshal engine pack list",
 			Detail:  err.Error(),
 			Cause:   err,
 		})
-		return "[]"
+		return "{}"
 	}
 	return string(jsonData)
 }
@@ -1218,23 +1268,40 @@ func (app *App) EnginePackInstall(packJSON string) string {
 		})
 		return err.Error()
 	}
+	return installEnginePack(availablePack, "Installed")
+}
 
-	status.Set(status.Loading, "Installing "+availablePack.Manifest.Name)
+func installEnginePack(availablePack pack.AvailablePack, successVerb string) string {
+	packLabel := availablePack.Manifest.Name + " " + availablePack.Manifest.Version
+	status.Set(status.Loading, "Installing "+packLabel)
 	defer status.Set(status.Ready, "")
 
-	if err := pack.Install(availablePack); err != nil {
-		response.Error(util.MessageData{
-			Summary: "Failed to install " + availablePack.Manifest.Name,
-			Detail:  err.Error(),
-			Cause:   err,
-		})
-		return err.Error()
+	err := pack.Install(availablePack)
+	switch {
+	case err == nil:
+		response.Success(util.MessageData{Summary: successVerb + " " + packLabel})
+		return ""
+	case errors.Is(err, pack.ErrInstallPaused):
+		response.Info(util.MessageData{Summary: "Paused installing " + packLabel})
+		return ""
+	case errors.Is(err, pack.ErrInstallCancelled):
+		response.Info(util.MessageData{Summary: "Cancelled installing " + packLabel})
+		return ""
 	}
-
-	response.Success(util.MessageData{
-		Summary: "Installed " + availablePack.Manifest.Name,
+	response.Error(util.MessageData{
+		Summary: "Failed to install " + packLabel,
+		Detail:  err.Error(),
+		Cause:   err,
 	})
-	return ""
+	return err.Error()
+}
+
+func (app *App) EnginePackPauseInstall(engineID string) {
+	pack.PauseInstall(engineID)
+}
+
+func (app *App) EnginePackCancelInstall(engineID string) {
+	pack.CancelInstall(engineID)
 }
 
 func (app *App) EnginePackUninstall(engineID string) string {
@@ -1305,27 +1372,12 @@ func (app *App) EnginePackImport(filePath string) string {
 		bundleSize = info.Size()
 	}
 
-	status.Set(status.Loading, "Importing "+manifest.Name)
-	defer status.Set(status.Ready, "")
-
-	importedPack := pack.AvailablePack{
+	return installEnginePack(pack.AvailablePack{
 		Manifest:   *manifest,
 		BundleURL:  filePath,
 		BundleSize: bundleSize,
-	}
-	if err := pack.Install(importedPack); err != nil {
-		response.Error(util.MessageData{
-			Summary: "Failed to import " + manifest.Name,
-			Detail:  err.Error(),
-			Cause:   err,
-		})
-		return err.Error()
-	}
-
-	response.Success(util.MessageData{
-		Summary: "Imported " + manifest.Name,
-	})
-	return ""
+		Local:      true,
+	}, "Imported")
 }
 
 //</editor-fold>

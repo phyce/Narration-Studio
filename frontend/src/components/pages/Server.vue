@@ -11,6 +11,7 @@ import Panel from 'primevue/panel';
 import {computed, nextTick, onBeforeMount, onBeforeUnmount, ref, watch} from 'vue';
 import {
 	GenerateServerCommand,
+	GetConfigFilePath,
 	GetServerLogs,
 	GetServerStatus,
 	SelectFile,
@@ -32,8 +33,15 @@ const serverModes = [
 const selectedMode = ref<string>('http');
 const port = ref<number>(8989);
 const host = ref<string>('localhost');
-const configFile = ref<string>('');
+const appConfigFile = ref<string>('');
+const customConfigFile = ref<string>('');
 const useCustomConfig = ref<boolean>(false);
+// The field shows the app's own config file until "Use custom config file" is ticked.
+const configFile = computed({
+	get: () => useCustomConfig.value ? customConfigFile.value : appConfigFile.value,
+	set: (value: string) => { customConfigFile.value = value; },
+});
+const serverConfigFile = computed(() => useCustomConfig.value ? customConfigFile.value : '');
 const serverStatus = ref<ServerStatus>({
 	running: false,
 	output: '',
@@ -43,7 +51,8 @@ const serverStatus = ref<ServerStatus>({
 	uptime: '',
 	processedMessages: 0
 });
-const loading = ref<boolean>(false);
+const starting = ref<boolean>(false);
+const stopping = ref<boolean>(false);
 const generatedCommand = ref<string>('');
 const statusCheckInterval = ref<number | null>(null);
 const serverLogs = ref<string>('');
@@ -55,6 +64,7 @@ const logsPanelRef = ref<HTMLElement | null>(null);
 const autoScrollEnabled = ref<boolean>(true);
 
 const isServerRunning = computed(() => serverStatus.value.running);
+const settingsLocked = computed(() => isServerRunning.value || starting.value);
 const commandDisplay = computed(() => {
 	if (isServerRunning.value) {
 		return `http://${host.value}:${port.value}`;
@@ -97,26 +107,29 @@ function handleLogsScroll() {
 	autoScrollEnabled.value = isAtBottom;
 }
 
+// Starting waits for the server to load its models, which can take minutes; Stop cancels it.
 async function startServer() {
-	loading.value = true;
+	starting.value = true;
 	try {
 		const result = await StartDaemonServer(
 			selectedMode.value,
 			port.value,
 			host.value,
-			configFile.value
+			serverConfigFile.value
 		);
 		serverStatus.value = JSON.parse(result);
-		startStatusPolling();
+		if (serverStatus.value.running) {
+			startStatusPolling();
+		}
 	} catch (error) {
 		console.error('Failed to start server:', error);
 	} finally {
-		loading.value = false;
+		starting.value = false;
 	}
 }
 
 async function stopServer() {
-	loading.value = true;
+	stopping.value = true;
 	try {
 		const result = await StopDaemonServer();
 		serverStatus.value = JSON.parse(result);
@@ -124,12 +137,12 @@ async function stopServer() {
 	} catch (error) {
 		console.error('Failed to stop server:', error);
 	} finally {
-		loading.value = false;
+		stopping.value = false;
 	}
 }
 
 async function toggleServer() {
-	if (isServerRunning.value) {
+	if (isServerRunning.value || starting.value) {
 		await stopServer();
 	} else {
 		await startServer();
@@ -151,7 +164,7 @@ async function updateGeneratedCommand() {
 			selectedMode.value,
 			port.value,
 			host.value,
-			configFile.value
+			serverConfigFile.value
 		);
 	} catch (error) {
 		console.error('Failed to generate command:', error);
@@ -161,7 +174,7 @@ async function updateGeneratedCommand() {
 async function selectConfigFile() {
 	const selected = await SelectFile(configFile.value);
 	if (selected) {
-		configFile.value = selected;
+		customConfigFile.value = selected;
 		await updateGeneratedCommand();
 	}
 }
@@ -231,7 +244,11 @@ watch(isServerRunning, (running) => {
 	}
 });
 
+watch(useCustomConfig, updateGeneratedCommand);
+
 onBeforeMount(async () => {
+	appConfigFile.value = await GetConfigFilePath();
+	customConfigFile.value = appConfigFile.value;
 	await refreshStatus();
 	await updateGeneratedCommand();
 
@@ -247,148 +264,154 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-	<div class="server">
-		<div class="server__header">
+	<div class="page page--column">
+		<div class="page-toolbar">
 			<Button
-				:class="isServerRunning ? 'button-stop' : 'button-start'"
+				:icon="settingsLocked ? 'pi pi-stop' : 'pi pi-play'"
+				:label="settingsLocked ? 'Stop server' : 'Start server'"
+				:severity="settingsLocked ? 'danger' : 'success'"
+				:loading="stopping"
+				:disabled="stopping"
 				@click="toggleServer"
-				:disabled="loading"
-				:title="isServerRunning ? 'Stop Server' : 'Start Server'"
-				:aria-label="isServerRunning ? 'Stop Server' : 'Start Server'"
-			>
-				<i :class="isServerRunning ? 'pi pi-stop' : 'pi pi-play'"/>&nbsp;{{ isServerRunning ? 'Stop' : 'Start' }}
-			</Button>
-
-			<Dropdown
-				id="mode"
-				v-model="selectedMode"
-				:options="serverModes"
-				optionLabel="label"
-				optionValue="value"
-				placeholder="Select server mode"
-				disabled
-				@change="updateGeneratedCommand"
-				title="Server Mode"
-				class="server__header__mode"
 			/>
+			<span v-if="starting" class="server__state server__state--starting">
+				<i class="pi pi-spin pi-spinner"/>
+				Starting… loading the voice models might take a while
+			</span>
+			<span v-else class="server__state" :class="{'server__state--running': isServerRunning}">
+				<i class="pi pi-circle-fill"/>
+				{{ isServerRunning ? 'Running' : 'Stopped' }}
+			</span>
+			<template v-if="isServerRunning && !starting">
+				<div class="page-toolbar__spacer"/>
+				<div class="server__stats">
+					<div class="server__stat">
+						<span class="field__label">Uptime</span>
+						<span class="server__stat__value">{{ serverStatus.uptime || '—' }}</span>
+					</div>
+					<div class="server__stat">
+						<span class="field__label">Messages processed</span>
+						<span class="server__stat__value">{{ serverStatus.processedMessages }}</span>
+					</div>
+					<div class="server__stat">
+						<span class="field__label">Process ID</span>
+						<span class="server__stat__value">{{ serverStatus.pid }}</span>
+					</div>
+				</div>
+			</template>
+		</div>
 
-			<InputText
-				id="host"
-				v-model="host"
-				placeholder="localhost"
-				@input="updateGeneratedCommand"
-				:disabled="isServerRunning"
-				class="server__header__host"
-				title="Host"
-			/>
-
-			<InputNumber
-				id="port"
-				v-model="port"
-				:min="1"
-				:max="65535"
-				:useGrouping="false"
-				placeholder="8989"
-				@input="updateGeneratedCommand"
-				:disabled="isServerRunning"
-				class="server__header__port"
-				title="Port"
-			/>
-
-			<div class="flex items-center gap-2 server__header__custom-config-wrapper">
-				<Checkbox
-					v-model="useCustomConfig"
-					inputId="useCustomConfig"
-					:binary="true"
-					:disabled="isServerRunning"
-					class="server__header__custom-config"
-				/>
-				<label for="useCustomConfig" class="server__header__custom-config-label">
-					Custom config
+		<div class="page-body server__body">
+			<div class="card field">
+				<label class="field__label" for="server-command">
+					{{ isServerRunning ? 'Server address' : 'Command line' }}
 				</label>
+				<InputGroup>
+					<InputText
+						id="server-command"
+						:value="commandDisplay"
+						readonly
+						class="server__command"
+						:title="commandDisplay"
+					/>
+					<Button
+						icon="pi pi-copy"
+						title="Copy"
+						aria-label="Copy"
+						@click="copyCommandToClipboard"
+					/>
+				</InputGroup>
 			</div>
-		</div>
 
-		<div v-if="useCustomConfig" class="server__config-row">
-			<InputGroup>
-				<InputText
-					id="config"
-					v-model="configFile"
-					placeholder="Path to config file"
-					@input="updateGeneratedCommand"
-					:title="configFile"
-					:disabled="isServerRunning"
-				/>
-				<Button
-					icon="pi pi-folder-open"
-					@click="selectConfigFile"
-					title="Browse"
-					aria-label="Browse for config file"
-					:disabled="isServerRunning"
-				/>
-			</InputGroup>
-		</div>
+			<div class="card server__settings">
+				<div class="server__fields">
+					<div class="field">
+						<label class="field__label" for="server-mode">Mode</label>
+						<Dropdown
+							inputId="server-mode"
+							v-model="selectedMode"
+							:options="serverModes"
+							optionLabel="label"
+							optionValue="value"
+							disabled
+							@change="updateGeneratedCommand"
+						/>
+					</div>
+					<div class="field">
+						<label class="field__label" for="server-host">Host</label>
+						<InputText
+							id="server-host"
+							v-model="host"
+							placeholder="localhost"
+							@input="updateGeneratedCommand"
+							:disabled="settingsLocked"
+						/>
+					</div>
+					<div class="field">
+						<label class="field__label" for="server-port">Port</label>
+						<InputNumber
+							inputId="server-port"
+							v-model="port"
+							:min="1"
+							:max="65535"
+							:useGrouping="false"
+							placeholder="8989"
+							@input="updateGeneratedCommand"
+							:disabled="settingsLocked"
+							class="w-full"
+							inputClass="w-full min-w-0"
+						/>
+					</div>
+				</div>
 
-		<div class="server__command-row">
-			<InputText
-				id="command"
-				:value="commandDisplay"
-				readonly
-				@click="copyCommandToClipboard"
-				class="w-full font-mono text-sm cursor-pointer"
-				title="Click to copy"
-			/>
-		</div>
+				<InputGroup>
+					<InputText
+						v-model="configFile"
+						placeholder="Path to a config file"
+						aria-label="Config file"
+						@input="updateGeneratedCommand"
+						:title="configFile"
+						:disabled="!useCustomConfig || settingsLocked"
+					/>
+					<Button
+						icon="pi pi-folder-open"
+						@click="selectConfigFile"
+						title="Browse"
+						aria-label="Browse for a config file"
+						:disabled="!useCustomConfig || settingsLocked"
+					/>
+				</InputGroup>
+				<div class="check-row">
+					<Checkbox
+						v-model="useCustomConfig"
+						inputId="server-custom-config"
+						:binary="true"
+						:disabled="settingsLocked"
+					/>
+					<label for="server-custom-config">Use custom config file</label>
+				</div>
+			</div>
 
-		<div v-if="isServerRunning" class="server__status-row">
-			<div class="server__status-item">
-				<span class="server__status-label">Status:</span>
-				<span class="server__status-value">
-					{{ isServerRunning ? 'Running' : 'Stopped' }}
-				</span>
-			</div>
-			<div class="server__status-item">
-				<span class="server__status-label">Uptime:</span>
-				<span class="server__status-value">{{ serverStatus.uptime }}</span>
-			</div>
-			<div class="server__status-item">
-				<span class="server__status-label">Processed Messages:</span>
-				<span class="server__status-value">{{ serverStatus.processedMessages }}</span>
-			</div>
-			<div class="server__status-item">
-				<span class="server__status-label">PID:</span>
-				<span class="server__status-value">{{ serverStatus.pid }}</span>
-			</div>
-		</div>
-
-		<div v-if="isServerRunning" class="server__logs-row">
-			<div ref="logsPanelRef">
+			<div v-if="isServerRunning" ref="logsPanelRef">
 				<Panel v-model:collapsed="logsCollapsed" toggleable>
 					<template #header>
-						<div class="flex items-center gap-2">
-							<i class="pi pi-file-edit"></i>
-							<span>Server Logs</span>
-							<small v-if="logsMetadata.showing" class="text-gray-400 ml-2">
-								(showing {{ logsMetadata.showing }} of {{ logsMetadata.lineCount }} lines)
+						<div class="server__logs-header">
+							<i class="pi pi-align-left"></i>
+							<span>Server logs</span>
+							<small v-if="logsMetadata.showing" class="text-secondary">
+								showing {{ logsMetadata.showing }} of {{ logsMetadata.lineCount }} lines
 							</small>
 						</div>
 					</template>
-					<div class="server__logs-content">
-						<pre
-							v-if="serverLogs"
-							ref="logsContainerRef"
-							@scroll="handleLogsScroll"
-							class="server__logs-text"
-						>{{ serverLogs }}</pre>
-						<p v-else class="text-gray-400">Loading logs...</p>
-					</div>
+					<pre
+						v-if="serverLogs"
+						ref="logsContainerRef"
+						@scroll="handleLogsScroll"
+						class="server__logs-text"
+					>{{ serverLogs }}</pre>
+					<p v-else class="text-secondary m-0">Loading logs…</p>
 				</Panel>
 			</div>
 		</div>
-
 	</div>
 </template>
-
-<style scoped>
-
-</style>

@@ -147,8 +147,13 @@ func registerEngines() {
 		}
 	}
 
+	pack.RemoveLeftovers()
 	if installedPacks, err := pack.ScanInstalled(); err == nil {
 		for _, installedPack := range installedPacks {
+			if !installedPack.Compatible {
+				response.NewWarn(installedPack.Manifest.Name + " " + installedPack.Manifest.Version + " needs a different version of Narration Studio; install another version of it on the Voice Packs page")
+				continue
+			}
 			if err := modelManager.RegisterEngine(python.ToEngine(installedPack.Manifest, installedPack.BundlePath)); err != nil {
 				response.Err("%w", err)
 			}

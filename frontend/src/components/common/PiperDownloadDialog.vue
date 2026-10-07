@@ -3,7 +3,6 @@ import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import DataView from 'primevue/dataview';
-import ProgressSpinner from 'primevue/progressspinner';
 import Tag from 'primevue/tag';
 import {
 	PiperDeleteModel,
@@ -123,14 +122,16 @@ onBeforeUnmount(() => {
 					icon="pi pi-refresh"
 					label="Refresh"
 					size="small"
+					severity="secondary"
+					text
 					@click="loadModels"
 					:disabled="loading"
 				/>
 			</div>
 
 			<div v-if="loading" class="piper-download__loading">
-				<ProgressSpinner style="width: 40px; height: 40px"/>
-				<span>Loading models...</span>
+				<i class="pi pi-spin pi-spinner" style="font-size: 1.75rem"></i>
+				<span>Loading models…</span>
 			</div>
 
 			<div v-else-if="error" class="piper-download__error">
@@ -189,8 +190,9 @@ onBeforeUnmount(() => {
 									icon="pi pi-trash"
 									label="Delete"
 									size="small"
+									severity="danger"
+									outlined
 									:loading="isBusy(m.id)"
-									class="piper-download__delete-btn"
 									@click="onDelete(m)"
 								/>
 							</div>
@@ -206,7 +208,7 @@ onBeforeUnmount(() => {
 		</div>
 
 		<template #footer>
-			<Button label="Close" class="p-button-text" @click="visibleModel = false"/>
+			<Button label="Close" severity="secondary" @click="visibleModel = false"/>
 		</template>
 	</Dialog>
 </template>
@@ -221,7 +223,9 @@ onBeforeUnmount(() => {
 
 .piper-download__header {
 	display: flex;
+	align-items: center;
 	justify-content: flex-end;
+	gap: 1rem;
 }
 
 .piper-download__loading,
@@ -256,7 +260,7 @@ onBeforeUnmount(() => {
 	justify-content: space-between;
 	gap: 1rem;
 	padding: 0.5rem 0.75rem;
-	border-bottom: 1px solid #3a3a3a;
+	border-bottom: 1px solid var(--surface-border);
 }
 
 .piper-download__row:last-child {
@@ -307,20 +311,5 @@ onBeforeUnmount(() => {
 
 .piper-download__row__actions {
 	flex-shrink: 0;
-}
-
-.piper-download__delete-btn {
-	background: #2a2a2a !important;
-	border-color: #4a4a4a !important;
-	color: #ffffff !important;
-}
-
-.piper-download__delete-btn:hover {
-	background: #353535 !important;
-	border-color: #5a5a5a !important;
-}
-
-.piper-download__delete-btn :deep(.p-button-icon) {
-	color: #ef4444 !important;
 }
 </style>

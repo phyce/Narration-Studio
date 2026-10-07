@@ -10,35 +10,33 @@ interface Props {
 	getValueByPath: (path: string) => any;
 	setValueByPath: (path: string, value: any) => void;
 	disabled?: boolean;
+	// Nesting level below the first field the form renders (Settings starts at the root, the
+	// Voice Packs settings dialog at one engine), so only the outermost boxes start expanded.
+	level?: number;
 }
 
-const props = defineProps<Props>();
-
-// Get direct children of this field
-const children = computed(() => {
-	if (!props.schema?.fields) return [];
-
-	return props.schema.fields.filter(f => {
-		const fieldParts = f.path.split('.');
-		const parentParts = props.field.path.split('.');
-
-		if (fieldParts.length !== parentParts.length + 1) {
-			return false;
-		}
-
-		for (let i = 0; i < parentParts.length; i++) {
-			if (fieldParts[i] !== parentParts[i]) {
-				return false;
-			}
-		}
-
-		return true;
-	});
+const props = withDefaults(defineProps<Props>(), {
+	level: 0
 });
+
+function childrenOf(path: string): ConfigField[] {
+	if (!props.schema?.fields) return [];
+	const prefix = path + '.';
+	return props.schema.fields.filter(f =>
+		f.path.startsWith(prefix) && !f.path.slice(prefix.length).includes('.'));
+}
+
+// A section whose fields are all hidden (e.g. a server pool entry with no settings) isn't rendered.
+function hasVisibleContent(f: ConfigField): boolean {
+	if (f.metadata?.hidden || isFieldHidden(f)) return false;
+	if (f.metadata?.type !== 'object') return true;
+	return childrenOf(f.path).some(hasVisibleContent);
+}
+
+const visibleChildren = computed(() => childrenOf(props.field.path).filter(hasVisibleContent));
 
 const isObject = computed(() => props.field.metadata?.type === 'object');
 
-const depth = computed(() => props.field.path.split('.').length - 1);
 
 function evalConditions(conditions: FieldCondition | FieldCondition[] | undefined): boolean {
 	if (!conditions) return false;
@@ -59,20 +57,21 @@ function isFieldDisabled(f: ConfigField): boolean {
 	<!-- If it's an object type, render as a section with recursive children -->
 	<FormSection
 		v-if="isObject"
+		v-show="visibleChildren.length > 0"
 		:path="field.path"
 		:metadata="field.metadata"
-		:depth="depth"
+		:depth="level"
 	>
-		<template v-for="childField in children" :key="childField.path">
-			<RecursiveField
-				v-if="!childField.metadata?.hidden && !isFieldHidden(childField)"
-				:field="childField"
-				:schema="schema"
-				:get-value-by-path="getValueByPath"
-				:set-value-by-path="setValueByPath"
-				:disabled="isFieldDisabled(childField)"
-			/>
-		</template>
+		<RecursiveField
+			v-for="childField in visibleChildren"
+			:key="childField.path"
+			:field="childField"
+			:schema="schema"
+			:get-value-by-path="getValueByPath"
+			:set-value-by-path="setValueByPath"
+			:disabled="isFieldDisabled(childField)"
+			:level="level + 1"
+		/>
 	</FormSection>
 
 	<!-- If it's a regular field, render the field factory -->

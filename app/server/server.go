@@ -35,7 +35,7 @@ type ServerAppInterface interface {
 }
 
 func StartServer(serverConfig ServerConfig) error {
-	stats.Initialize()
+	stats.Initialize(string(serverConfig.Mode), serverConfig.Host, serverConfig.Port)
 
 	switch serverConfig.Mode {
 	case ModeHTTP:

@@ -119,13 +119,6 @@ func (piper *Piper) Start(modelName string) error {
 	var err error
 	err = piper.Initialize()
 	if err != nil {
-		configuration := config.Get()
-		configuration.ModelToggles[fmt.Sprintf("piper:%s", modelName)] = false
-
-		err := config.Set(configuration)
-		if err != nil {
-			return response.Err("%w", err)
-		}
 		return response.Err("%w", err)
 	}
 
@@ -143,19 +136,8 @@ func (piper *Piper) Start(modelName string) error {
 		return response.Err("%w", err)
 	}
 
-	metadataPath := filepath.Join(modelPath, modelName, fmt.Sprintf("%s.metadata.json", modelName))
-	response.Debug(util.MessageData{
-		Summary: "Metadata for Model:" + modelName,
-		Detail:  metadataPath,
-	})
-
-	data, err := os.ReadFile(metadataPath)
+	voices, err := readModelVoices(modelPath, modelName)
 	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	var voices []engine.Voice
-	if err := json.Unmarshal(data, &voices); err != nil {
 		return response.Err("%w", err)
 	}
 
@@ -405,16 +387,34 @@ func (piper *Piper) ensureRunning(model string) (*PiperInstance, error) {
 }
 
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
-	if piper.native != nil && piper.isNativeMode() {
-		return piper.native.GetVoices(model)
+	if piper.isNativeMode() {
+		if piper.native != nil && piper.native.IsLoaded(model) {
+			return piper.native.GetVoices(model)
+		}
+	} else if modelData, exists := piper.models[model]; exists {
+		return modelData.Voices, nil
 	}
 
-	modelData, exists := piper.models[model]
-	if !exists {
-		return nil, response.Err("Model %s is not initialized", model)
+	modelsPath, err := getModelsDir()
+	if err != nil {
+		return nil, response.Err("%w", err)
 	}
 
-	return modelData.Voices, nil
+	return readModelVoices(modelsPath, model)
+}
+
+func readModelVoices(modelsPath, modelName string) ([]engine.Voice, error) {
+	data, err := os.ReadFile(filepath.Join(modelsPath, modelName, modelName+".metadata.json"))
+	if err != nil {
+		return nil, response.Err("read voices for piper model %s: %w", modelName, err)
+	}
+
+	var voices []engine.Voice
+	if err := json.Unmarshal(data, &voices); err != nil {
+		return nil, response.Err("parse voices for piper model %s: %w", modelName, err)
+	}
+
+	return voices, nil
 }
 
 func (piper *Piper) FetchModels() map[string]engine.Model {

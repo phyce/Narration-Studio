@@ -35,15 +35,18 @@ export default {
 	labelContainer: {
 		class: ['overflow-hidden flex flex-auto cursor-pointer']
 	},
-	label: {
+	label: ({props}) => ({
 		class: [
 			'block leading-[normal]',
 
 			// Space
 			'py-2 px-3',
 
-			// Color
-			'text-surface-800 dark:text-white/80',
+			// Color: placeholder grey while nothing is selected (Dropdown does the same)
+			{
+				'text-surface-800 dark:text-white/80': props.modelValue && Object.keys(props.modelValue).length > 0,
+				'text-surface-400 dark:text-surface-500': !props.modelValue || Object.keys(props.modelValue).length === 0
+			},
 
 			// Transition
 			'transition duration-200',
@@ -51,7 +54,7 @@ export default {
 			// Misc
 			'overflow-hidden whitespace-nowrap cursor-pointer overflow-ellipsis'
 		]
-	},
+	}),
 	trigger: {
 		class: [
 			// Flexbox

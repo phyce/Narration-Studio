@@ -1,9 +1,14 @@
 .footer {
-	@apply
-	bg-neutral-800
-	text-gray-200
-	py-1
-	text-xs
-	cursor-pointer
-	;
+	@apply flex items-center justify-center gap-2 py-1 text-xs cursor-pointer select-none;
+	color: var(--text-color);
+	background-color: var(--app-bar);
+	border-top: 1px solid var(--surface-border);
+}
+
+.footer:hover {
+	background-color: #262626;
+}
+
+.footer__hint {
+	color: var(--text-color-secondary);
 }

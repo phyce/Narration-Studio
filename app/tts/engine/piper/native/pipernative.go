@@ -211,6 +211,11 @@ func (piper *Piper) synthesizePCM(model, text string, speakerID int) ([]byte, in
 	return pcmBytes, sampleRate, nil
 }
 
+func (piper *Piper) IsLoaded(model string) bool {
+	_, loaded := piper.models[model]
+	return loaded
+}
+
 func (piper *Piper) GetVoices(model string) ([]engine.Voice, error) {
 	instance, exists := piper.models[model]
 	if !exists {

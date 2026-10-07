@@ -17,6 +17,10 @@ export function DeleteProfile(profileID: string): $CancellablePromise<void> {
     return $Call.ByID(2457157279, profileID);
 }
 
+export function EnginePackCancelInstall(engineID: string): $CancellablePromise<void> {
+    return $Call.ByID(3356789759, engineID);
+}
+
 export function EnginePackFetchAvailable(): $CancellablePromise<string> {
     return $Call.ByID(3165275761);
 }
@@ -27,6 +31,10 @@ export function EnginePackImport(filePath: string): $CancellablePromise<string> 
 
 export function EnginePackInstall(packJSON: string): $CancellablePromise<string> {
     return $Call.ByID(1088484885, packJSON);
+}
+
+export function EnginePackPauseInstall(engineID: string): $CancellablePromise<void> {
+    return $Call.ByID(960362331, engineID);
 }
 
 export function EnginePackUninstall(engineID: string): $CancellablePromise<string> {
@@ -58,6 +66,14 @@ export function GetActivityLogOlder(beforeID: number, limit: number): $Cancellab
 
 export function GetAvailableModels(): $CancellablePromise<string> {
     return $Call.ByID(2005304584);
+}
+
+/**
+ * GetConfigFilePath is the config file this app instance uses; the Server page offers it as the
+ * default when the server should run with a custom config.
+ */
+export function GetConfigFilePath(): $CancellablePromise<string> {
+    return $Call.ByID(612796076);
 }
 
 export function GetConfigSchema(): $CancellablePromise<string> {

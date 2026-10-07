@@ -15,22 +15,30 @@ onMounted(async () => {
 
 <template>
 	<div class="start" v-if="!loading">
-		<h1 class="start__header">{{ config.info.name }} v{{ config.info.version }}</h1>
-		<img class="start__logo" id="logo" alt="Wails logo" src="../../assets/images/logo.png"/>
+		<img class="start__logo" alt="Narration Studio logo" src="../../assets/images/logo.png"/>
+		<h1 class="start__header">{{ config.info.name }}</h1>
+		<p class="start__version">Version {{ config.info.version }}</p>
 		<a target="_blank" class="link" :href="config.info.website">{{ config.info.website }}</a>
 	</div>
 </template>
 
 <style scoped>
 .start {
-	@apply w-full h-full pt-2;
-}
-
-.start__header {
-	@apply text-3xl mb-3;
+	@apply flex flex-col items-center justify-center gap-2 w-full h-full p-6 text-center;
 }
 
 .start__logo {
-	@apply object-contain w-full h-full;
+	@apply object-contain mb-4;
+	width: min(40vh, 280px);
+	height: min(40vh, 280px);
+}
+
+.start__header {
+	@apply text-3xl font-bold m-0;
+}
+
+.start__version {
+	@apply text-sm m-0;
+	color: var(--text-color-secondary);
 }
 </style>

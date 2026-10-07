@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import '../../css/pages/script-editor.css';
+import '../../css/pages/sandbox.css';
 
 import Button from 'primevue/button';
 import InputGroup from 'primevue/inputgroup';
 import InputText from 'primevue/inputtext';
 import Editor from "../common/Editor.vue";
 import ProfileSelector from '../common/ProfileSelector.vue';
-import {GetSettings, ProcessScript, SaveSettings, SelectDirectory} from '../../../bindings/nstudio/app';
+import {
+	GetSettings,
+	ProcessScript,
+	SaveSettings,
+	SelectDirectory,
+	SetPlaybackPaused,
+	StopPlayback
+} from '../../../bindings/nstudio/app';
 import {useLocalStorage} from "@vueuse/core";
 import {onMounted, ref} from "vue";
 import * as configuration from "../../../bindings/nstudio/app/config/models";
@@ -16,6 +23,8 @@ const text = useLocalStorage<string>('scriptText', 'user: hello world');
 const selectedProfile = useLocalStorage<string>('scriptProfile', 'default');
 const config = ref<configBase>({} as configBase);
 const loading = ref<boolean>(true);
+const isProcessing = ref<boolean>(false);
+const isPaused = ref<boolean>(false);
 
 const regexes = [
 	{regex: /^[^\S\r\n]*([^:\r\n]+):\s*(.*?)(?=\r?\n|$)/gm, className: 'matching-sentence'},
@@ -31,8 +40,24 @@ const handleBrowseClick = async () => {
 	}
 }
 
-const processScript = () => {
-	ProcessScript(text.value, selectedProfile.value)
+async function processScript() {
+	isProcessing.value = true;
+	isPaused.value = false;
+	try {
+		await ProcessScript(text.value, selectedProfile.value);
+	} finally {
+		isProcessing.value = false;
+		isPaused.value = false;
+	}
+}
+
+function togglePause() {
+	isPaused.value = !isPaused.value;
+	SetPlaybackPaused(isPaused.value);
+}
+
+function stopProcessing() {
+	StopPlayback();
 }
 
 onMounted(async () => {
@@ -42,33 +67,49 @@ onMounted(async () => {
 </script>
 
 <template>
-	<div class="script" v-if="!loading">
-		<div class="script__panel">
-			<ProfileSelector v-model="selectedProfile"/>
-			<InputGroup v-if="!loading" :title="config.settings.outputPath" class="mt-2">
-				<InputText class="script__panel__input"
-						   :value="config.settings.outputPath"
-						   placeholder="Output Path"
-						   disabled
-				/>
-				<Button class="script__panel__browse"
-						@click="handleBrowseClick"
-						title="Browse"
-						aria-label="Browse"
-				>
-					<i class="pi pi-folder-open"/>
-				</Button>
-			</InputGroup>
-			<Button class="script__panel__generate"
+	<div class="page" v-if="!loading">
+		<aside class="page-sidebar">
+			<div class="field">
+				<label class="field__label">Profile</label>
+				<ProfileSelector v-model="selectedProfile"/>
+			</div>
+
+			<div class="field">
+				<label class="field__label" for="script-output-path">Output folder</label>
+				<InputGroup :title="config.settings.outputPath">
+					<InputText id="script-output-path"
+							   :value="config.settings.outputPath"
+							   placeholder="Not set"
+							   readonly
+					/>
+					<Button icon="pi pi-folder-open"
+							@click="handleBrowseClick"
+							title="Choose the output folder"
+							aria-label="Choose the output folder"
+					/>
+				</InputGroup>
+			</div>
+
+			<Button v-if="!isProcessing"
+					icon="pi pi-upload"
+					label="Generate audio"
 					@click="processScript"
-					title="Generate"
-					aria-label="Generate"
-			>
-				<i class="pi pi-upload"/>
-			</Button>
-		</div>
-		<div class="script__editor">
-			<Editor v-model:text="text" :regexes="regexes" model-value=""/>
+			/>
+			<div v-else class="sandbox__playback">
+				<Button :icon="isPaused ? 'pi pi-play' : 'pi pi-pause'"
+						:label="isPaused ? 'Resume' : 'Pause'"
+						severity="secondary"
+						@click="togglePause"
+				/>
+				<Button icon="pi pi-stop"
+						label="Stop"
+						severity="danger"
+						@click="stopProcessing"
+				/>
+			</div>
+		</aside>
+		<div class="sandbox__editor">
+			<Editor v-model:text="text" :regexes="regexes"/>
 		</div>
 	</div>
 </template>

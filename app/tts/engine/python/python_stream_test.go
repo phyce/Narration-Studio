@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ func TestMain(m *testing.M) {
 		runFakeStreamRunner()
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	os.Exit(enginetest.RunWithTemporaryConfig(m))
 }
 
 func fakePCMForText(text string) []byte {
@@ -57,13 +58,23 @@ func runFakeStreamRunner() {
 		}
 		switch request.Op {
 		case "load":
+			if os.Getenv("NSTUDIO_FAKE_LOAD") == "fail" {
+				emit(map[string]interface{}{"id": request.ID, "event": "error", "error": "model file missing"})
+				continue
+			}
 			emit(map[string]interface{}{"id": request.ID, "event": "done", "sampleRate": 24000, "channels": 1, "bits": 16})
 		case "synth":
 			if request.Voice == "explode" {
 				emit(map[string]interface{}{"id": request.ID, "event": "error", "error": "synthetic failure"})
 				continue
 			}
+			if os.Getenv("NSTUDIO_FAKE_SYNTH_VOICE_LOG") != "" {
+				os.WriteFile(os.Getenv("NSTUDIO_FAKE_SYNTH_VOICE_LOG"), []byte(request.Voice), 0o644)
+			}
 			pcm := fakePCMForText(request.Text)
+			if os.Getenv("NSTUDIO_FAKE_SYNTH") == "silent" {
+				pcm = make([]byte, len(pcm))
+			}
 			half := len(pcm) / 2
 			os.Stdout.Write(pcm[:half])
 			time.Sleep(20 * time.Millisecond)
@@ -73,6 +84,18 @@ func runFakeStreamRunner() {
 				"sampleRate": 24000, "channels": 1, "bits": 16,
 				"totalSamples": len(pcm) / 2,
 			})
+		case "prepare":
+			switch os.Getenv("NSTUDIO_FAKE_PREPARE") {
+			case "fail":
+				emit(map[string]interface{}{"id": request.ID, "event": "error", "error": "network unreachable"})
+			case "stall":
+			default:
+				for downloaded := 0; downloaded <= 300; downloaded += 100 {
+					emit(map[string]interface{}{"id": request.ID, "event": "progress", "downloaded": downloaded, "total": 300})
+					time.Sleep(10 * time.Millisecond)
+				}
+				emit(map[string]interface{}{"id": request.ID, "event": "done"})
+			}
 		case "shutdown":
 			emit(map[string]interface{}{"id": request.ID, "event": "done"})
 			return
@@ -80,9 +103,147 @@ func runFakeStreamRunner() {
 	}
 }
 
-func TestPythonStreamSynthesize(t *testing.T) {
-	enginetest.Configure(t)
+func fakeRunnerManifest(t *testing.T, extraEnvironment map[string]string) (Manifest, string) {
+	t.Helper()
+	executablePath, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
 
+	environment := map[string]string{"NSTUDIO_FAKE_STREAM_RUNNER": "1"}
+	for name, value := range extraEnvironment {
+		environment[name] = value
+	}
+
+	return Manifest{
+		ID:   "fake-pack",
+		Name: "Fake Pack",
+		Runtime: Runtime{
+			Python:     filepath.Base(executablePath),
+			Entrypoint: filepath.Base(executablePath),
+			Env:        environment,
+		},
+	}, filepath.Dir(executablePath)
+}
+
+func TestPrepareBundle(t *testing.T) {
+	t.Run("ReportsProgressUntilDone", func(t *testing.T) {
+		manifest, bundlePath := fakeRunnerManifest(t, nil)
+
+		var reported [][2]int64
+		err := PrepareBundle(context.Background(), manifest, bundlePath, func(downloaded, total int64) {
+			reported = append(reported, [2]int64{downloaded, total})
+		})
+		if err != nil {
+			t.Fatalf("PrepareBundle: %v", err)
+		}
+		if len(reported) != 4 || reported[len(reported)-1] != [2]int64{300, 300} {
+			t.Errorf("progress = %v, want four reports ending at 300 of 300", reported)
+		}
+	})
+
+	t.Run("SurfacesRunnerError", func(t *testing.T) {
+		manifest, bundlePath := fakeRunnerManifest(t, map[string]string{"NSTUDIO_FAKE_PREPARE": "fail"})
+
+		err := PrepareBundle(context.Background(), manifest, bundlePath, func(int64, int64) {})
+		if err == nil || !strings.Contains(err.Error(), "network unreachable") {
+			t.Errorf("PrepareBundle error = %v, want the runner's error", err)
+		}
+	})
+
+	t.Run("FailsWhenDownloadStalls", func(t *testing.T) {
+		previousStallTimeout := prepareStallTimeout
+		prepareStallTimeout = 300 * time.Millisecond
+		t.Cleanup(func() { prepareStallTimeout = previousStallTimeout })
+
+		manifest, bundlePath := fakeRunnerManifest(t, map[string]string{"NSTUDIO_FAKE_PREPARE": "stall"})
+
+		err := PrepareBundle(context.Background(), manifest, bundlePath, func(int64, int64) {})
+		if !errors.Is(err, ErrRunnerTimeout) {
+			t.Errorf("PrepareBundle error = %v, want ErrRunnerTimeout", err)
+		}
+	})
+
+	t.Run("StopsWhenCancelled", func(t *testing.T) {
+		manifest, bundlePath := fakeRunnerManifest(t, map[string]string{"NSTUDIO_FAKE_PREPARE": "stall"})
+		ctx, cancel := context.WithCancel(context.Background())
+		time.AfterFunc(300*time.Millisecond, cancel)
+
+		started := time.Now()
+		err := PrepareBundle(ctx, manifest, bundlePath, func(int64, int64) {})
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("PrepareBundle error = %v, want context.Canceled", err)
+		}
+		if elapsed := time.Since(started); elapsed > 10*time.Second {
+			t.Errorf("PrepareBundle took %s to stop after cancel", elapsed)
+		}
+	})
+}
+
+func shortenVerificationDuration(t *testing.T) {
+	previousDuration := minimumVerificationDuration
+	minimumVerificationDuration = 10 * time.Millisecond
+	t.Cleanup(func() { minimumVerificationDuration = previousDuration })
+}
+
+func TestVerifyBundle(t *testing.T) {
+	shortenVerificationDuration(t)
+
+	t.Run("PassesWhenTheModelSpeaks", func(t *testing.T) {
+		manifest, bundlePath := fakeRunnerManifest(t, nil)
+		manifest.Models = []ManifestModel{{ID: "fake-model", Voices: []ManifestVoice{{ID: "alice"}}}}
+
+		if err := VerifyBundle(context.Background(), manifest, bundlePath); err != nil {
+			t.Fatalf("VerifyBundle: %v", err)
+		}
+	})
+
+	t.Run("UsesTheBundledTestVoiceForCloningModels", func(t *testing.T) {
+		voiceLogPath := filepath.Join(t.TempDir(), "voice.txt")
+		manifest, bundlePath := fakeRunnerManifest(t, map[string]string{"NSTUDIO_FAKE_SYNTH_VOICE_LOG": voiceLogPath})
+		manifest.Models = []ManifestModel{{ID: "cloning-model", TestVoice: "selftest.wav"}}
+
+		if err := VerifyBundle(context.Background(), manifest, bundlePath); err != nil {
+			t.Fatalf("VerifyBundle: %v", err)
+		}
+		usedVoice, _ := os.ReadFile(voiceLogPath)
+		if want := filepath.Join(bundlePath, "selftest.wav"); string(usedVoice) != want {
+			t.Errorf("synthesized with voice %q, want %q", usedVoice, want)
+		}
+	})
+
+	t.Run("FailsOnSilence", func(t *testing.T) {
+		manifest, bundlePath := fakeRunnerManifest(t, map[string]string{"NSTUDIO_FAKE_SYNTH": "silent"})
+		manifest.Models = []ManifestModel{{ID: "fake-model", Voices: []ManifestVoice{{ID: "alice"}}}}
+
+		err := VerifyBundle(context.Background(), manifest, bundlePath)
+		if err == nil || !strings.Contains(err.Error(), "no audible audio") {
+			t.Errorf("VerifyBundle error = %v, want a no-audio failure", err)
+		}
+	})
+
+	t.Run("FailsWhenTheModelDoesNotLoad", func(t *testing.T) {
+		manifest, bundlePath := fakeRunnerManifest(t, map[string]string{"NSTUDIO_FAKE_LOAD": "fail"})
+		manifest.Models = []ManifestModel{{ID: "fake-model", Voices: []ManifestVoice{{ID: "alice"}}}}
+
+		err := VerifyBundle(context.Background(), manifest, bundlePath)
+		if err == nil || !strings.Contains(err.Error(), "model file missing") {
+			t.Errorf("VerifyBundle error = %v, want the load failure", err)
+		}
+	})
+
+	t.Run("FailsWhenSynthesisFails", func(t *testing.T) {
+		manifest, bundlePath := fakeRunnerManifest(t, nil)
+		manifest.Models = []ManifestModel{{ID: "fake-model", Voices: []ManifestVoice{{ID: "explode"}}}}
+
+		err := VerifyBundle(context.Background(), manifest, bundlePath)
+		if err == nil || !strings.Contains(err.Error(), "synthetic failure") {
+			t.Errorf("VerifyBundle error = %v, want the synthesis failure", err)
+		}
+	})
+}
+
+func TestPythonStreamSynthesize(t *testing.T) {
 	executablePath, err := os.Executable()
 	if err != nil {
 		t.Fatalf("os.Executable: %v", err)

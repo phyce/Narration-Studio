@@ -23,6 +23,32 @@ const (
 	restartWindow             = time.Minute
 )
 
+const ProtocolVersion = 1
+
+func SupportsProtocol(protocol int) bool {
+	return protocol == ProtocolVersion
+}
+
+var prepareStallTimeout = 2 * time.Minute
+
+func PrepareBundle(ctx context.Context, manifest Manifest, bundlePath string, reportProgress func(downloaded, total int64)) error {
+	preparingRunner, err := newRunner(manifest.ID, bundlePath, &manifest)
+	if err != nil {
+		return response.Err("start runner: %w", err)
+	}
+	defer preparingRunner.close(time.Duration(defaultShutdownGraceSec) * time.Second)
+	stopKillingOnCancel := context.AfterFunc(ctx, func() { _ = preparingRunner.kill() })
+	defer stopKillingOnCancel()
+
+	if err := preparingRunner.prepare(reportProgress, prepareStallTimeout); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return err
+	}
+	return nil
+}
+
 type Python struct {
 	Manifest   Manifest
 	BundlePath string
@@ -175,7 +201,7 @@ func (pythonEngine *Python) ensureModelLoaded(model string) error {
 	installedVoicePaths := pythonEngine.allInstalledVoicePaths()
 
 	status.Set(status.Loading, fmt.Sprintf(
-		"Loading %s model %q + encoding %d voice reference(s) — first run also downloads weights from HuggingFace",
+		"Loading %s model %q + encoding %d voice reference(s)",
 		pythonEngine.Manifest.Name, model, len(installedVoicePaths),
 	))
 	if err := newlyStartedRunner.load(model, installedVoicePaths); err != nil {

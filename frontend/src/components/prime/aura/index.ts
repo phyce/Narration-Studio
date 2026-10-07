@@ -57,7 +57,7 @@ import panel from './panel';
 // import panelmenu from './panelmenu';
 import password from './password';
 // import picklist from './picklist';
-// import progressbar from './progressbar';
+import progressbar from './progressbar';
 // import progressspinner from './progressspinner';
 import radiobutton from './radiobutton';
 // import rating from './rating';
@@ -196,7 +196,7 @@ export default {
 	// avatargroup,
 	tag,
 	// chip,
-	// progressbar,
+	progressbar,
 	// skeleton,
 	// scrolltop,
 	// terminal,

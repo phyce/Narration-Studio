@@ -55,8 +55,8 @@ const description = computed(() => props.metadata?.description);
 .config-field {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
-	margin-bottom: 1rem;
+	gap: 0.375rem;
+	margin-bottom: 0.75rem;
 }
 
 .config-field--disabled {

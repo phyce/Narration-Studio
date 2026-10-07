@@ -1,5 +1,5 @@
 <template>
-	<div class="overflow-y-auto h-full">
+	<div class="h-full">
 		<vue-monaco-editor
 			v-model:value="internalText"
 			language="plaintext"
@@ -26,6 +26,16 @@ const MONACO_EDITOR_OPTIONS = {
 	automaticLayout: true,
 	formatOnType: true,
 	formatOnPaste: true,
+	wordWrap: 'on',
+	minimap: {enabled: false},
+	scrollBeyondLastLine: false,
+	fontSize: 14,
+	lineHeight: 22,
+	padding: {top: 8, bottom: 8},
+	renderLineHighlight: 'none',
+	overviewRulerLanes: 0,
+	hideCursorInOverviewRuler: true,
+	unicodeHighlight: {ambiguousCharacters: false},
 };
 
 const internalText = ref(props.text);
@@ -50,7 +60,7 @@ onUnmounted(() => {
 	editorRef.value?.deltaDecorations(decorations.value, []);
 });
 
-watch(props.regexes, () => {
+watch(() => props.regexes, () => {
 	applyRegexHighlighting();
 }, {deep: true});
 

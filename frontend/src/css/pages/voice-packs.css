@@ -1,69 +1,86 @@
-.voice-packs {
-	@apply flex w-full h-full;
-}
-
 /* Sidebar */
 .voice-packs__sidebar {
-	@apply w-1/5 flex flex-col;
+	@apply gap-2 p-0;
 }
 
-.voice-packs__sidebar__toolbar {
-	@apply flex items-stretch gap-1 p-1;
-	border-bottom: 1px solid #4a4a4a;
+.voice-packs__sidebar__row {
+	@apply flex items-center gap-2 px-3 pt-3;
 }
 
-.voice-packs__sidebar__toolbar--row {
-	@apply items-center;
+.voice-packs__sidebar__row + .voice-packs__sidebar__row {
+	@apply pt-0 pb-1;
 }
 
-.voice-packs__filter-label {
-	@apply text-xs cursor-pointer select-none;
+.voice-packs__sidebar__import {
+	@apply flex-1 min-w-0 whitespace-nowrap;
+}
+
+.voice-packs__sidebar__filter {
+	@apply flex-1 min-w-0;
+}
+
+.voice-packs__sidebar__filter [data-pc-section="input"] {
+	@apply py-1.5 text-sm;
+}
+
+.voice-packs__installed-only {
+	@apply text-xs flex-none;
 	color: var(--text-color-secondary);
 }
 
-.voice-packs__toolbar-btn {
-	@apply flex-1 whitespace-nowrap;
+.voice-packs__sidebar__list {
+	@apply flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5 px-3 pb-3 pt-2;
+	border-top: 1px solid var(--surface-border);
 }
 
-.voice-packs__sidebar__list {
-	@apply flex-1 overflow-y-auto p-1 flex flex-col gap-1;
+.voice-packs__sidebar__empty {
+	@apply text-xs text-center py-6;
+	color: var(--text-color-secondary);
 }
 
 /* Engine card */
 .voice-packs__engine-card {
-	@apply py-2 px-2.5 rounded cursor-pointer select-none;
-	background: #363636;
-	border: 1px solid #4a4a4a;
-	transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.1s;
+	@apply py-2 px-2.5 rounded-md cursor-pointer select-none;
+	background-color: var(--app-card);
+	border: 1px solid var(--surface-border);
+	transition: background-color 0.15s, border-color 0.15s;
 }
 
 .voice-packs__engine-card:hover {
-	background: #424242;
-	border-color: #e8803a;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+	background-color: var(--app-card-hover);
+	border-color: #5c5c5c;
 }
 
-.voice-packs__engine-card:active {
-	transform: scale(0.98);
-}
-
-.voice-packs__engine-card--active {
-	background: #3d2e1e !important;
-	border-color: #e8803a !important;
-	box-shadow: 0 0 0 1px #e8803a, 0 2px 8px rgba(232, 128, 58, 0.15) !important;
+.voice-packs__engine-card--active,
+.voice-packs__engine-card--active:hover {
+	background-color: var(--app-selected);
+	border-color: #ea580c;
 }
 
 .voice-packs__engine-card__header {
-	@apply flex justify-between items-center;
+	@apply flex justify-between items-center gap-2;
 }
 
 .voice-packs__engine-card__name {
-	@apply font-bold text-sm;
-	color: #e0e0e0;
+	@apply font-bold text-sm truncate;
+	color: var(--text-color);
 }
 
 .voice-packs__engine-card--active .voice-packs__engine-card__name {
-	color: #f0a060;
+	color: var(--accent-text);
+}
+
+.voice-packs__engine-card__count {
+	@apply text-xs font-semibold px-1.5 rounded-full;
+	min-width: 1.4rem;
+	text-align: center;
+	color: var(--text-color);
+	background-color: rgba(255, 255, 255, 0.1);
+}
+
+.voice-packs__engine-card__status {
+	@apply text-sm;
+	color: var(--text-color-secondary);
 }
 
 .voice-packs__engine-card__tags {
@@ -71,91 +88,89 @@
 }
 
 .voice-packs__engine-card--available {
-	opacity: 0.78;
 	border-style: dashed;
 }
 
-.voice-packs__engine-card--available:hover {
-	opacity: 1;
-}
-
-.voice-packs__engine-card__status {
+.voice-packs__engine-card--available .voice-packs__engine-card__name {
 	color: var(--text-color-secondary);
-	font-size: 0.85rem;
 }
 
 .voice-packs__engine-card__progress {
-	@apply mt-1;
+	@apply mt-1.5;
 	height: 4px !important;
 }
 
 /* Tiny pill tags */
 .voice-packs__tag-pill {
-	font-size: 0.55rem !important;
-	padding: 0.05rem 0.35rem !important;
+	font-size: 0.6rem !important;
+	padding: 0.05rem 0.4rem !important;
 	line-height: 1.3 !important;
-	min-height: unset !important;
-	height: auto !important;
 	font-weight: 600 !important;
-	letter-spacing: 0.03em;
+	letter-spacing: 0.02em;
 }
 
 /* Content */
 .voice-packs__content {
-	@apply w-4/5 p-2 overflow-y-auto;
-	background-color: #2D2D2D;
+	@apply flex-1 min-w-0 flex flex-col;
 }
 
-.voice-packs__content--empty {
-	@apply flex items-center justify-center;
-	color: var(--text-color-secondary);
+.voice-packs__header__text {
+	@apply flex flex-col min-w-0;
 }
 
-.voice-packs__content__actions {
-	@apply flex flex-wrap gap-2 mb-1 justify-end;
+.voice-packs__body {
+	@apply flex flex-col gap-4;
 }
 
-.voice-packs__content__empty {
-	@apply text-center py-8;
-	color: var(--text-color-secondary);
-}
-
-/* DataView list view (>8 voice packs) */
-.voice-packs__dataview {
-	@apply w-full;
-	background: transparent !important;
-	border: none !important;
-}
-
-.voice-packs__list {
-	@apply flex flex-col;
-}
-
-.voice-packs__list-row {
-	@apply flex items-center gap-4 px-3 py-2;
-	border-bottom: 1px solid #3a3a3a;
-	transition: background-color 0.15s;
-}
-
-.voice-packs__list-row:hover {
-	background: #353535;
-}
-
-.voice-packs__list-row__name {
-	@apply font-semibold text-sm flex-shrink-0 text-left;
-	min-width: 10rem;
+.voice-packs__description {
+	@apply text-sm m-0;
 	color: var(--text-color);
 }
 
+.voice-packs__section-header {
+	@apply flex items-center gap-3 mb-2;
+}
+
+.voice-packs__section-title {
+	@apply text-sm font-bold m-0;
+}
+
+.voice-packs__models-empty {
+	@apply h-auto;
+}
+
+.voice-packs__list {
+	@apply flex flex-col rounded-md overflow-hidden;
+	border: 1px solid var(--surface-border);
+}
+
+.voice-packs__list-row {
+	@apply flex items-center gap-4 px-3 py-2 cursor-pointer;
+	background-color: var(--app-card);
+	transition: background-color 0.15s;
+}
+
+.voice-packs__list-row + .voice-packs__list-row {
+	border-top: 1px solid var(--surface-border);
+}
+
+.voice-packs__list-row:hover {
+	background-color: var(--app-card-hover);
+}
+
+.voice-packs__list-row__name {
+	@apply font-semibold text-sm flex-shrink-0;
+	min-width: 10rem;
+}
+
 .voice-packs__list-row__key {
-	@apply flex-grow text-xs text-left;
+	@apply flex-grow text-xs;
 	color: var(--text-color-secondary);
 }
 
 /* Settings dialog */
 .voice-packs__settings-loading {
-	@apply flex flex-col items-center justify-center py-4;
-	gap: 1rem;
+	@apply flex flex-col items-center justify-center py-4 gap-4;
 	color: var(--text-color-secondary);
 }
 
@@ -164,52 +179,88 @@
 }
 
 .voice-packs__settings-none {
+	@apply italic;
 	color: var(--text-color-secondary);
-	font-style: italic;
 }
 
-/* Pack detail (available-but-not-installed engine) */
-.voice-packs__pack-detail {
-	@apply flex flex-col gap-3 mt-2 p-3 rounded;
-	background: #343434;
-	border: 1px solid #4a4a4a;
+/* Local install trust prompt */
+.voice-packs__trust {
+	@apply flex flex-col gap-3 text-sm;
 }
 
-.voice-packs__pack-detail__title {
-	@apply text-lg font-bold m-0;
-	color: #f0a060;
+.voice-packs__trust__warning {
+	@apply flex gap-2 m-0;
+	color: var(--accent-text);
 }
 
-.voice-packs__pack-detail__description {
-	@apply text-sm m-0;
+.voice-packs__trust__details {
+	@apply flex flex-col gap-1 text-xs break-all;
+	color: var(--text-color-secondary);
+}
+
+.voice-packs__trust__details strong {
 	color: var(--text-color);
 }
 
-.voice-packs__pack-detail__meta {
+/* Engine pack versions (EnginePackBuilds.vue): installed version, picker, progress */
+.voice-packs__builds {
+	@apply flex flex-col gap-3;
+}
+
+.voice-packs__builds__installed {
+	@apply flex flex-wrap items-center gap-3 text-sm;
+}
+
+.voice-packs__builds__update {
+	color: var(--accent-text);
+}
+
+.voice-packs__builds__warning {
+	color: #f87171;
+}
+
+.voice-packs__builds__picker {
+	@apply flex flex-wrap items-end gap-2;
+}
+
+.voice-packs__builds__field {
+	@apply flex flex-col gap-1 text-xs font-semibold;
+	color: var(--text-color-secondary);
+}
+
+.voice-packs__builds__progress {
+	@apply flex flex-col gap-1.5 text-xs;
+	color: var(--text-color-secondary);
+}
+
+.voice-packs__builds__bar {
+	height: 6px !important;
+}
+
+.voice-packs__builds__meta {
 	@apply grid gap-1 text-xs;
 	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 	color: var(--text-color-secondary);
 }
 
-.voice-packs__pack-detail__meta strong {
+.voice-packs__builds__meta strong {
 	color: var(--text-color);
 }
 
-.voice-packs__pack-detail__models h4 {
-	@apply text-sm font-semibold mb-1 mt-2;
+.voice-packs__builds__notes {
+	@apply text-xs;
+	color: var(--text-color-secondary);
+}
+
+.voice-packs__builds__notes strong {
 	color: var(--text-color);
 }
 
-.voice-packs__pack-detail__model {
-	@apply flex items-center gap-2 py-1;
-	border-bottom: 1px solid #3a3a3a;
+.voice-packs__builds__notes p {
+	@apply m-0 mt-1 whitespace-pre-line;
 }
 
-.voice-packs__pack-detail__model:last-child {
-	border-bottom: none;
-}
-
-.voice-packs__pack-detail__model-name {
-	@apply flex items-center gap-2 text-sm;
-	color: var(--text-color);
+.voice-packs__builds__none {
+	@apply text-sm m-0;
+	color: var(--text-color-secondary);
 }

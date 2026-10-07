@@ -12,22 +12,22 @@ export default {
 	}),
 	container: ({props}) => ({
 		class: [
-			"my-4 rounded-md w-full",
-			"border-solid border-0 border-l-[6px]",
-			"backdrop-blur-[10px] shadow-md",
+			"my-3 rounded-md w-full overflow-hidden",
+			"border-solid border border-l-4 border-white/10",
+			"backdrop-blur-[10px] shadow-lg shadow-black/40",
 
 			// Colors
 			{
-				"bg-blue-100/70 dark:bg-blue-500/20": props.message?.severity == "info",
-				"bg-green-100/70 dark:bg-green-500/20": props.message?.severity == "success",
-				"bg-orange-100/70 dark:bg-orange-500/20": props.message?.severity == "warn",
-				"bg-red-100/70 dark:bg-red-500/20": props.message?.severity == "error",
+				"bg-blue-500/20": props.message?.severity == "info",
+				"bg-green-500/20": props.message?.severity == "success",
+				"bg-orange-500/20": props.message?.severity == "warn",
+				"bg-red-500/20": props.message?.severity == "error",
 			},
 			{
-				"border-blue-500 dark:border-blue-400": props.message?.severity == "info",
-				"border-green-500 dark:border-green-400": props.message?.severity == "success",
-				"border-orange-500 dark:border-orange-400": props.message?.severity == "warn",
-				"border-red-500 dark:border-red-400": props.message?.severity == "error",
+				"border-l-blue-400": props.message?.severity == "info",
+				"border-l-green-400": props.message?.severity == "success",
+				"border-l-orange-400": props.message?.severity == "warn",
+				"border-l-red-400": props.message?.severity == "error",
 			},
 			{
 				"text-blue-700 dark:text-blue-300": props.message?.severity == "info",
@@ -38,7 +38,7 @@ export default {
 		],
 	}),
 	content: {
-		class: "flex items-start p-4",
+		class: "flex items-center pr-2",
 	},
 	icon: {
 		class: [

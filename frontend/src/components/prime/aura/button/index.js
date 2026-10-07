@@ -64,9 +64,9 @@ export default {
 
 			// Success Button
 			{
-				'text-white dark:text-green-900': props.severity === 'success' && !props.text && !props.outlined && !props.plain,
-				'bg-green-500 dark:bg-green-400': props.severity === 'success' && !props.text && !props.outlined && !props.plain,
-				'border border-green-500 dark:border-green-400': props.severity === 'success' && !props.text && !props.outlined && !props.plain
+				'text-white': props.severity === 'success' && !props.text && !props.outlined && !props.plain,
+				'bg-teal-600': props.severity === 'success' && !props.text && !props.outlined && !props.plain,
+				'border border-teal-600': props.severity === 'success' && !props.text && !props.outlined && !props.plain
 			},
 			// Success Text Button
 			{'text-green-500 dark:text-green-400': props.text && props.severity === 'success' && !props.plain},
@@ -108,9 +108,9 @@ export default {
 
 			// Danger Button
 			{
-				'text-white dark:text-surface-900': props.severity === 'danger' && !props.text && !props.outlined && !props.plain,
-				'bg-red-500 dark:bg-red-400': props.severity === 'danger' && !props.text && !props.outlined && !props.plain,
-				'border border-red-500 dark:border-red-400': props.severity === 'danger' && !props.text && !props.outlined && !props.plain
+				'text-white': props.severity === 'danger' && !props.text && !props.outlined && !props.plain,
+				'bg-red-700': props.severity === 'danger' && !props.text && !props.outlined && !props.plain,
+				'border border-red-700': props.severity === 'danger' && !props.text && !props.outlined && !props.plain
 			},
 			// Danger Text Button
 			{'text-red-500 dark:text-red-400': props.text && props.severity === 'danger' && !props.plain},
@@ -152,7 +152,7 @@ export default {
 			{'hover:bg-surface-300/10': (props.text || props.outlined) && props.severity === 'secondary' && !props.plain},
 
 			// Success
-			{'hover:bg-green-600 dark:hover:bg-green-300 hover:border-green-600 dark:hover:border-green-300': props.severity === 'success' && !props.text && !props.outlined && !props.plain},
+			{'hover:bg-teal-700 hover:border-teal-700': props.severity === 'success' && !props.text && !props.outlined && !props.plain},
 			{'focus:ring-green-500 dark:focus:ring-green-400': props.severity === 'success'},
 			// Text & Outlined Button
 			{'hover:bg-green-300/10': (props.text || props.outlined) && props.severity === 'success' && !props.plain},
@@ -176,7 +176,7 @@ export default {
 			{'hover:bg-purple-300/10': (props.text || props.outlined) && props.severity === 'help' && !props.plain},
 
 			// Danger
-			{'hover:bg-red-600 dark:hover:bg-red-300 hover:border-red-600 dark:hover:border-red-300': props.severity === 'danger' && !props.text && !props.outlined && !props.plain},
+			{'hover:bg-red-800 hover:border-red-800': props.severity === 'danger' && !props.text && !props.outlined && !props.plain},
 			{'focus:ring-red-500 dark:focus:ring-red-400': props.severity === 'danger'},
 			// Text & Outlined Button
 			{'hover:bg-red-300/10': (props.text || props.outlined) && props.severity === 'danger' && !props.plain},

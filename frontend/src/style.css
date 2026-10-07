@@ -2,13 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-.link {
-	@apply
-	text-orange-600 hover:text-orange-500
-	;
-}
-
-
 :root {
 	--primary-50: 255 247 237;
 	--primary-100: 255 237 213;
@@ -21,7 +14,6 @@
 	--primary-800: 154 52 18;
 	--primary-900: 124 45 18;
 	--primary-950: 67 20 7;
-
 
 	--surface-0: 255 255 255;
 	--surface-50: 250 250 250;
@@ -36,65 +28,45 @@
 	--surface-900: 24 24 27;
 	--surface-950: 9 9 11;
 
-
 	--primary: var(--primary-500);
 	--primary-inverse: var(--surface-0);
 	--primary-hover: var(--primary-600);
 	--primary-active-color: var(--primary-600);
 
-	--primary-highlight-opacity: 0.1;
-	--primary-highlight-inverse: var(--primary-700);
-	--primary-highlight-hover-opacity: 0.2;
-}
-
-.dark {
-	--primary: var(--primary-400);
-	--primary-inverse: var(--surface-900);
-	--primary-hover: var(--primary-300);
-	--primary-active-color: var(--primary-300);
-
 	--primary-highlight-opacity: 0.2;
-	--primary-highlight-inverse: var(--surface-0);
+	--primary-highlight-inverse: var(--primary-300);
 	--primary-highlight-hover-opacity: 0.3;
+
+	/* App palette. Bars are darkest, then page content, then panels and cards on top of it. */
+	--app-bar: #1c1c1c;
+	--app-bg: #262626;
+	--app-panel: #2f2f2f;
+	--app-card: #333333;
+	--app-card-hover: #3b3b3b;
+	--app-selected: #3d2e1e;
+	--surface-border: #444444;
+	--text-color: #e5e5e5;
+	--text-color-secondary: #a3a3a3;
+	--accent-text: #fb923c;
+	--red-500: #ef4444;
+	--yellow-500: #eab308;
+	--green-500: #22c55e;
+
+	color-scheme: dark;
 }
 
-.customized-primary {
-	&:not(.dark) {
-		--primary: var(--primary-950);
-		--primary-inverse: var(--surface-0);
-		--primary-hover: var(--primary-800);
-		--primary-active-color: var(--primary-900);
-
-		--primary-highlight-opacity: 1;
-		--primary-highlight-inverse: var(--surface-0);
-		--primary-highlight-hover-opacity: 0.8;
-	}
-
-	&.dark {
-		--primary: var(--primary-50);
-		--primary-inverse: var(--surface-950);
-		--primary-hover: var(--primary-100);
-		--primary-active-color: var(--primary-100);
-
-		--primary-highlight-opacity: 0.1;
-		--primary-highlight-inverse: var(--surface-0);
-		--primary-highlight-hover-opacity: 0.2;
-
-	}
-}
-
-.background-secondary {
-	background-color: #1e1e1e;
+.link {
+	@apply text-orange-500 hover:text-orange-400;
 }
 
 html {
-	background-color: rgba(27, 38, 54, 1);
-	color: white;
+	background-color: var(--app-bar);
+	color: var(--text-color);
 }
 
 body {
 	margin: 0;
-	color: white;
+	color: var(--text-color);
 	font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
 	"Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
 	sans-serif;
@@ -110,35 +82,81 @@ body {
 
 #app {
 	height: 100vh;
-	text-align: center;
 }
 
-.ql-editor {
-	min-height: calc(100vh - 55px - 24px);
-	padding-left: 2px;
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
 }
 
-/*.cm-scroller {*/
-/*    background-color: blue;*/
-/*}*/
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
 
+::-webkit-scrollbar-thumb {
+	background-color: #4a4a4a;
+	background-clip: content-box;
+	border: 2px solid transparent;
+	border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background-color: #5c5c5c;
+}
+
+/* Script highlighting in the Monaco editor (Sandbox, Script Editor) */
 .matching-sentence {
 	color: white !important;
-	font-weight: bold; /* Just to make it more noticeable */
-	background-color: #3F6212FF;
+	background-color: #3f6212;
 }
 
 .matching-character {
-	color: white !important; /* Fallback color */
-	background-color: #c2410c; /* Fallback background color */
-	font-weight: bold; /* Just to make it more noticeable */
+	color: #fdba74 !important;
+	font-weight: bold;
+	background-color: rgba(234, 88, 12, 0.28);
 }
 
+/* PrimeVue ProgressBar (unstyled mode): indeterminate animation */
+.progressbar-value-animate::before {
+	will-change: left, right;
+	animation: progressbar-indeterminate 2.1s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
+}
+
+.progressbar-value-animate::after {
+	will-change: left, right;
+	animation: progressbar-indeterminate-short 2.1s cubic-bezier(0.165, 0.84, 0.44, 1) infinite;
+	animation-delay: 1.15s;
+}
+
+@keyframes progressbar-indeterminate {
+	0% {
+		left: -35%;
+		right: 100%;
+	}
+	60%, 100% {
+		left: 100%;
+		right: -90%;
+	}
+}
+
+@keyframes progressbar-indeterminate-short {
+	0% {
+		left: -200%;
+		right: 100%;
+	}
+	60%, 100% {
+		left: 107%;
+		right: -8%;
+	}
+}
+
+/* Hourglass shown by the footer while the status is Loading */
 .icon {
 	position: relative;
 	display: inline-block;
-	width: 1em; /* Adjust as needed */
-	height: 1em; /* Adjust as needed */
+	width: 1em;
+	height: 1em;
 }
 
 .icon::before,

@@ -227,3 +227,35 @@ func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+func TestGetVoicesWithoutRunningModel(t *testing.T) {
+	enginetest.Configure(t)
+
+	modelsPath := t.TempDir()
+	const model = "en_US-test-medium"
+	modelPath := filepath.Join(modelsPath, model)
+	if err := os.MkdirAll(modelPath, 0755); err != nil {
+		t.Fatalf("create model folder: %v", err)
+	}
+	metadata := `[{"voiceID":0,"name":"First","gender":"Female"},{"voiceID":1,"name":"Second","gender":"Male"}]`
+	if err := os.WriteFile(filepath.Join(modelPath, model+".metadata.json"), []byte(metadata), 0644); err != nil {
+		t.Fatalf("write metadata: %v", err)
+	}
+
+	for _, useExecutable := range []bool{true, false} {
+		base := config.Get()
+		base.Engine.Local.Piper.ModelsDirectory = modelsPath
+		base.Engine.Local.Piper.UseExecutable = useExecutable
+		if err := config.Set(base); err != nil {
+			t.Fatalf("configure piper: %v", err)
+		}
+
+		voices, err := (&piper.Piper{}).GetVoices(model)
+		if err != nil {
+			t.Fatalf("useExecutable=%v: GetVoices on a model that was never started: %v", useExecutable, err)
+		}
+		if len(voices) != 2 || voices[0].Name != "First" || voices[1].ID != "1" {
+			t.Errorf("useExecutable=%v: voices = %+v, want First(0) and Second(1)", useExecutable, voices)
+		}
+	}
+}

@@ -44,7 +44,7 @@ func beginSession() (*playbackSession, func()) {
 	activeSession = session
 	sessionMutex.Unlock()
 
-	audio.SetStreamPaused(false)
+	SetPaused(false)
 
 	endSession := func() {
 		sessionMutex.Lock()
@@ -53,7 +53,7 @@ func beginSession() (*playbackSession, func()) {
 		}
 		sessionMutex.Unlock()
 		cancel()
-		audio.SetStreamPaused(false)
+		SetPaused(false)
 		sessionRunning.Unlock()
 	}
 
@@ -68,8 +68,44 @@ func Stop() {
 	}
 }
 
+var (
+	pauseMutex   sync.Mutex
+	resumeSignal = closedChannel()
+)
+
 func SetPaused(paused bool) {
 	audio.SetStreamPaused(paused)
+
+	pauseMutex.Lock()
+	defer pauseMutex.Unlock()
+
+	select {
+	case <-resumeSignal:
+		if paused {
+			resumeSignal = make(chan struct{})
+		}
+	default:
+		if !paused {
+			close(resumeSignal)
+		}
+	}
+}
+
+func waitWhilePaused(ctx context.Context) {
+	pauseMutex.Lock()
+	currentResumeSignal := resumeSignal
+	pauseMutex.Unlock()
+
+	select {
+	case <-currentResumeSignal:
+	case <-ctx.Done():
+	}
+}
+
+func closedChannel() chan struct{} {
+	channel := make(chan struct{})
+	close(channel)
+	return channel
 }
 
 type audioFuture struct {

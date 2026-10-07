@@ -76,9 +76,9 @@ async function handleBrowse() {
 .config-field {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: 0.375rem;
 	text-align: left;
-	margin-bottom: 1rem;
+	margin-bottom: 0.75rem;
 }
 
 .config-field__label {

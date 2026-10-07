@@ -1,166 +1,72 @@
-.server {
-	@apply flex flex-col w-full h-full;
+.server__state {
+	@apply flex items-center gap-2 text-sm ml-2;
+	color: var(--text-color-secondary);
 }
 
-.server__header {
-	@apply w-full flex items-center gap-2 pt-1 pl-2;
+.server__state .pi {
+	font-size: 0.55rem;
 }
 
-.server__config-row {
-	@apply w-full px-2 py-1;
+.server__state--starting {
+	color: var(--text-color);
 }
 
-.server__command-row {
-	@apply w-full px-2 py-1;
+.server__state--starting .pi {
+	font-size: 0.9rem;
+	color: var(--accent-text);
 }
 
-.server__status-row {
-	@apply px-2 mx-2 py-2 bg-neutral-800 flex items-center justify-evenly border border-neutral-600 rounded;
+.server__state--running {
+	color: var(--text-color);
 }
 
-.server__status-row .server__status-item {
-	@apply flex items-center gap-2 whitespace-nowrap;
+.server__state--running .pi {
+	color: var(--green-500);
 }
 
-.server__status-row .server__status-label {
-	@apply text-base text-neutral-400 font-semibold whitespace-nowrap;
+.server__body {
+	@apply flex flex-col gap-3;
 }
 
-.server__status-row .server__status-value {
-	@apply text-lg font-semibold whitespace-nowrap;
+.server__stats {
+	@apply flex flex-wrap items-center;
 }
 
-.server__logs-row {
-	@apply w-full px-2 py-1;
+.server__stat {
+	@apply flex items-baseline gap-2 px-4;
 }
 
-.server__header__mode,
-.server__header__host:disabled,
-.server__header__port input:disabled,
-.server__header__custom-config input:disabled + div
-{
-	@apply bg-neutral-800 text-neutral-400 !important;
+.server__stat + .server__stat {
+	border-left: 1px solid var(--surface-border);
 }
 
-.server__header__custom-config-label {
-	@apply cursor-pointer select-none;
+.server__stat:last-child {
+	@apply pr-1;
 }
 
-.server__header__custom-config-wrapper:has(input:disabled) .server__header__custom-config-label {
-	@apply text-neutral-400;
+.server__stat__value {
+	@apply text-sm font-semibold;
 }
 
-.server__actions {
-	@apply w-full px-2 mb-1 flex items-center justify-between;
+.server__settings {
+	@apply flex flex-col gap-3;
 }
 
-.server__status-info {
-	@apply mx-2 mb-3;
+.server__fields {
+	@apply grid gap-3;
+	grid-template-columns: 12rem 1fr 8rem;
 }
 
-.server__status-details {
-	@apply p-4 bg-gray-800 border border-gray-600 rounded;
+.server__command {
+	@apply font-mono text-sm;
 }
 
-.server__status-grid {
-	@apply grid grid-cols-2 md:grid-cols-3 gap-4;
-}
-
-.server__status-item {
-	@apply flex flex-col gap-1;
-}
-
-.server__status-label {
-	@apply text-sm text-gray-400 font-semibold;
-}
-
-.server__status-value {
-	@apply text-base;
-}
-
-.server__not-running {
-	@apply flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded text-gray-400;
-}
-
-.server__error {
-	@apply p-3 bg-red-100 border border-red-300 rounded text-red-800;
-}
-
-.server__logs-panel {
-	@apply mx-2 mb-3;
-}
-
-.server__logs-content {
-	@apply p-2;
+.server__logs-header {
+	@apply flex items-center gap-2;
 }
 
 .server__logs-text {
-	@apply
-		m-0
-		p-3
-		bg-neutral-900
-		border
-		border-neutral-700
-		rounded
-		font-mono
-		text-sm
-		max-h-96
-		overflow-auto
-		whitespace-pre-wrap
-		text-left
-	;
-}
-
-.server__config {
-	@apply px-2;
-}
-
-.server__config__group {
-	@apply mb-6 pb-6 border-b border-gray-700 last:border-b-0;
-}
-
-.server__config__row {
-	@apply flex gap-4 mb-3;
-}
-
-.server__config__item {
-	@apply flex flex-col gap-1.5 flex-1 min-w-0;
-}
-
-.server__config__item--full {
-	@apply flex-initial w-full;
-}
-
-.server__config__item label {
-	@apply font-semibold text-sm;
-}
-
-.server__config__item small {
-	@apply block mt-1;
-}
-
-.server__config__item input[readonly].cursor-pointer:hover {
-	@apply bg-gray-700;
-}
-
-.button-start {
-	@apply inline-block;
-	background-color: #3A9E8B;
-	border-color: #3A9E8B;
-}
-
-.button-start:hover {
-	background-color: #276a5c !important;
-	border-color: #276a5c !important;
-}
-
-.button-stop {
-	@apply inline-block;
-	background-color: #B03A2E;
-	border-color: #B03A2E;
-}
-
-.button-stop:hover {
-	background-color: #8a2d24 !important;
-	border-color: #8a2d24 !important;
+	@apply m-0 p-3 rounded font-mono text-xs max-h-96 overflow-auto whitespace-pre-wrap;
+	background-color: #171717;
+	border: 1px solid var(--surface-border);
 }

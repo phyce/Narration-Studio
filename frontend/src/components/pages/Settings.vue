@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import '../../css/pages/settings.css';
-
 import Button from "primevue/button";
-import {onBeforeMount, ref, watch} from "vue";
+import {computed, onBeforeMount, onBeforeUnmount, ref} from "vue";
 import {GetConfigSchema, GetSettings, SaveSettings} from "../../../bindings/nstudio/app";
 import * as configuration from "../../../bindings/nstudio/app/config/models";
 import type {ConfigField, ConfigSchema} from "../../interfaces/config";
@@ -12,31 +10,23 @@ import configBase = configuration.Base;
 const config = ref<configBase>({} as configBase);
 const schema = ref<ConfigSchema | null>(null);
 const loading = ref<boolean>(true);
-const hasUnsavedChanges = ref<boolean>(false);
+const saving = ref<boolean>(false);
 const originalConfig = ref<string>('');
 
-watch(config, () => {
-	const currentConfigStr = JSON.stringify(config.value);
-	if (originalConfig.value && currentConfigStr !== originalConfig.value) {
-		hasUnsavedChanges.value = true;
-	}
-}, {deep: true});
+const hasUnsavedChanges = computed(() =>
+	!!originalConfig.value && JSON.stringify(config.value) !== originalConfig.value);
+
+const rootFields = computed<ConfigField[]>(() =>
+	schema.value?.fields.filter(field => !field.path.includes('.')) ?? []);
 
 async function loadData() {
 	loading.value = true;
 
-	// Load config
 	config.value = await GetSettings();
 	originalConfig.value = JSON.stringify(config.value);
-	console.log('we got settings');
-	console.log(config.value);
 
-	// Load schema
 	try {
-		const schemaResult = await GetConfigSchema();
-		schema.value = JSON.parse(schemaResult);
-		console.log('Schema loaded:', schema.value);
-		console.log('Server fields:', schema.value?.fields.filter(f => f.path.startsWith('settings.server')));
+		schema.value = JSON.parse(await GetConfigSchema());
 	} catch (err) {
 		console.error('Failed to load config schema:', err);
 	}
@@ -45,9 +35,17 @@ async function loadData() {
 }
 
 async function handleSaveSettings() {
-	await SaveSettings(config.value);
-	originalConfig.value = JSON.stringify(config.value);
-	hasUnsavedChanges.value = false;
+	saving.value = true;
+	try {
+		await SaveSettings(config.value);
+		originalConfig.value = JSON.stringify(config.value);
+	} finally {
+		saving.value = false;
+	}
+}
+
+function revertChanges() {
+	config.value = JSON.parse(originalConfig.value);
 }
 
 function getValueByPath(path: string): any {
@@ -80,52 +78,50 @@ function setValueByPath(path: string, value: any) {
 	obj[parts[parts.length - 1]] = value;
 }
 
-// Confirm before leaving if there are unsaved changes
-onBeforeMount(async () => {
-	await loadData();
-
-	window.addEventListener('beforeunload', (e) => {
-		if (hasUnsavedChanges.value) {
-			e.preventDefault();
-			e.returnValue = '';
-		}
-	});
-});
-
-
-
-
-
-function getRootFields(): ConfigField[] {
-	if (!schema.value?.fields) return [];
-
-	return schema.value.fields.filter(field => {
-		const parts = field.path.split('.');
-		return parts.length === 1;
-	});
+function warnBeforeClosing(event: BeforeUnloadEvent) {
+	if (hasUnsavedChanges.value) {
+		event.preventDefault();
+		event.returnValue = '';
+	}
 }
 
+onBeforeMount(async () => {
+	window.addEventListener('beforeunload', warnBeforeClosing);
+	await loadData();
+});
+
+onBeforeUnmount(() => {
+	window.removeEventListener('beforeunload', warnBeforeClosing);
+});
 </script>
 
 <template>
-	<div class="settings">
-		<div class="settings__actions">
+	<div class="page page--column">
+		<div class="page-toolbar">
+			<div class="page-toolbar__spacer"/>
+			<span v-if="hasUnsavedChanges" class="unsaved-note">
+				<i class="pi pi-circle-fill" style="font-size: 0.45rem"/> Unsaved changes
+			</span>
 			<Button
-				class="settings__actions__save"
-				@click="handleSaveSettings()"
-				:disabled="!hasUnsavedChanges"
-				title="Save Settings"
-				aria-label="Save Settings"
-			>
-				<i class="pi pi-save"/>&nbsp;
-				Save Settings
-				<span v-if="hasUnsavedChanges" class="unsaved-indicator">*</span>
-			</Button>
+				v-if="hasUnsavedChanges"
+				label="Revert"
+				severity="secondary"
+				text
+				:disabled="saving"
+				@click="revertChanges"
+			/>
+			<Button
+				icon="pi pi-save"
+				label="Save"
+				:loading="saving"
+				:disabled="!hasUnsavedChanges || saving"
+				@click="handleSaveSettings"
+			/>
 		</div>
 
-		<div class="settings__container" v-if="!loading && schema">
+		<div class="page-body" v-if="!loading && schema">
 			<RecursiveField
-				v-for="field in getRootFields()"
+				v-for="field in rootFields"
 				:key="field.path"
 				:field="field"
 				:schema="schema"
@@ -134,53 +130,9 @@ function getRootFields(): ConfigField[] {
 			/>
 		</div>
 
-		<div v-else-if="loading" class="settings__loading">
-			<i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
-			<p>Loading settings...</p>
+		<div v-else-if="loading" class="empty-state">
+			<i class="pi pi-spin pi-spinner"></i>
+			<span>Loading settings…</span>
 		</div>
 	</div>
 </template>
-
-<style scoped>
-.settings {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	overflow: hidden;
-}
-
-.settings__actions {
-	display: flex;
-	align-items: center;
-	gap: 1rem;
-	padding: 1rem;
-	border-bottom: 1px solid var(--surface-border);
-}
-
-.settings__actions__save {
-	position: relative;
-}
-
-.unsaved-indicator {
-	color: var(--yellow-500);
-	font-weight: bold;
-	margin-left: 0.25rem;
-}
-
-.settings__container {
-	flex: 1;
-	overflow-y: auto;
-	padding: 1.5rem 1.5rem 1.5rem 1.5rem;
-	margin-left: 0;
-}
-
-.settings__loading {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	height: 100%;
-	gap: 1rem;
-	color: var(--text-color-secondary);
-}
-</style>

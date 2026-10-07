@@ -83,6 +83,9 @@ func InitializeWithPath(info Info, customPath string) error {
 
 	err = json.Unmarshal(configFile, &manager.config)
 	manager.config.Info = info
+	if manager.config.Settings.ActivityLogDays < 1 {
+		manager.config.Settings.ActivityLogDays = DefaultActivityLogDays
+	}
 
 	if Debug() {
 		fmt.Println("Config file location", manager.filePath)
@@ -93,6 +96,13 @@ func InitializeWithPath(info Info, customPath string) error {
 
 func GetCurrentConfigPath() string {
 	return filepath.Dir(manager.filePath)
+}
+
+// DefaultActivityLogDays applies to configs saved before the setting existed.
+const DefaultActivityLogDays = 2
+
+func GetCurrentConfigFile() string {
+	return manager.filePath
 }
 
 func GetDefaultConfigPath() string {

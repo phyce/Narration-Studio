@@ -10,7 +10,6 @@ const title = ref<string>("");
 
 function updateStatus(data: { status: Status; message: string }) {
 	status.value = data.status ?? Status.Unknown;
-	console.log('updating status to:', status.value)
 	title.value = data.message;
 }
 
@@ -30,5 +29,8 @@ const currentStatus = computed(() => StatusDisplayNames[status.value as Status])
 </script>
 
 <template>
-	<footer class="footer" :title="title" @click="OpenActivityLog" v-html="currentStatus"/>
+	<footer class="footer" title="Open the Activity Log" @click="OpenActivityLog">
+		<span v-html="currentStatus"/>
+		<span v-if="title" class="footer__hint">{{ title }}</span>
+	</footer>
 </template>

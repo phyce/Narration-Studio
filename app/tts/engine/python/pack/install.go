@@ -2,9 +2,10 @@ package pack
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
-	"net/http"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/response"
 	"nstudio/app/tts/engine/python"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -21,8 +23,23 @@ const (
 	EnginesUpdatedEvent         = "engines.updated"
 )
 
+const (
+	InstallStageDownloading = "downloading"
+	InstallStageExtracting  = "extracting"
+	InstallStageWeights     = "weights"
+	InstallStageVerifying   = "verifying"
+)
+
+var (
+	folderRemovalAttempts = 10
+	folderRemovalDelay    = 500 * time.Millisecond
+	prepareBundle         = python.PrepareBundle
+	verifyBundle          = python.VerifyBundle
+)
+
 type DownloadProgress struct {
 	EngineID   string `json:"engineID"`
+	Stage      string `json:"stage"`
 	Downloaded int64  `json:"downloaded"`
 	Total      int64  `json:"total"`
 	Percent    int    `json:"percent"`
@@ -34,28 +51,33 @@ type EngineUpdate struct {
 	Action   string `json:"action"`
 }
 
-type progressReader struct {
-	underlyingReader io.Reader
-	engineID         string
-	downloadedBytes  int64
-	totalBytes       int64
-	lastEmitTime     time.Time
-	lastEmitPercent  int
+type installProgress struct {
+	engineID        string
+	stage           string
+	completedBytes  int64
+	totalBytes      int64
+	lastEmitTime    time.Time
+	lastEmitPercent int
 }
 
-func (progress *progressReader) Read(buffer []byte) (int, error) {
-	bytesRead, err := progress.underlyingReader.Read(buffer)
-	if bytesRead > 0 {
-		progress.downloadedBytes += int64(bytesRead)
-		progress.emitProgressIfDue(false)
+func newInstallProgress(engineID, stage string, totalBytes int64) *installProgress {
+	progress := &installProgress{engineID: engineID, stage: stage, totalBytes: totalBytes}
+	progress.emitIfDue(true)
+	return progress
+}
+
+func (progress *installProgress) advanceTo(completedBytes, totalBytes int64) {
+	progress.completedBytes = completedBytes
+	if totalBytes > 0 {
+		progress.totalBytes = totalBytes
 	}
-	return bytesRead, err
+	progress.emitIfDue(false)
 }
 
-func (progress *progressReader) emitProgressIfDue(force bool) {
+func (progress *installProgress) emitIfDue(force bool) {
 	percent := 0
 	if progress.totalBytes > 0 {
-		percent = int(progress.downloadedBytes * 100 / progress.totalBytes)
+		percent = int(progress.completedBytes * 100 / progress.totalBytes)
 		if percent > 100 {
 			percent = 100
 		}
@@ -67,111 +89,390 @@ func (progress *progressReader) emitProgressIfDue(force bool) {
 	progress.lastEmitTime = time.Now()
 	eventManager.GetInstance().EmitEvent(EngineDownloadProgressEvent, DownloadProgress{
 		EngineID:   progress.engineID,
-		Downloaded: progress.downloadedBytes,
+		Stage:      progress.stage,
+		Downloaded: progress.completedBytes,
 		Total:      progress.totalBytes,
 		Percent:    percent,
-		Done:       false,
 	})
 }
 
+type progressReader struct {
+	context          context.Context
+	underlyingReader io.Reader
+	progress         *installProgress
+}
+
+func (reader *progressReader) Read(buffer []byte) (int, error) {
+	if err := reader.context.Err(); err != nil {
+		return 0, err
+	}
+	bytesRead, err := reader.underlyingReader.Read(buffer)
+	if bytesRead > 0 {
+		reader.progress.advanceTo(reader.progress.completedBytes+int64(bytesRead), 0)
+	}
+	return bytesRead, err
+}
+
 func Install(availablePack AvailablePack) error {
-	if availablePack.Manifest.ID == "" {
-		return response.Err("install: pack manifest has no id")
+	manifest := availablePack.Manifest
+	if err := validateIdentity(manifest); err != nil {
+		return response.Err("install: %w", err)
 	}
 	if availablePack.BundleURL == "" {
-		return response.Err("install: pack %s has no bundle URL", availablePack.Manifest.ID)
+		return response.Err("install: pack %s has no bundle", manifest.ID)
 	}
+	if !python.SupportsProtocol(manifest.Protocol) {
+		return response.Err("install: %s %s needs a different version of Narration Studio (it uses engine protocol %d, this version supports %d)",
+			manifest.Name, manifest.Version, manifest.Protocol, python.ProtocolVersion)
+	}
+	if modelManager.IsReleased() {
+		return response.Err("install: %w", ErrServerRunning)
+	}
+
+	installContext, finish, err := beginInstall(manifest.ID)
+	if err != nil {
+		return response.Err("install: %w", err)
+	}
+	defer finish()
+
+	err = installBuild(installContext, availablePack)
+	if err == nil {
+		return nil
+	}
+	switch cause := context.Cause(installContext); {
+	case errors.Is(cause, ErrInstallPaused):
+		return ErrInstallPaused
+	case errors.Is(cause, ErrInstallCancelled):
+		discardBuild(manifest)
+		return ErrInstallCancelled
+	}
+	return err
+}
+
+func installBuild(ctx context.Context, availablePack AvailablePack) error {
+	expectedManifest := availablePack.Manifest
+	engineID := expectedManifest.ID
 
 	rootPath, err := ensurePacksRootPath()
 	if err != nil {
 		return response.Err("%w", err)
 	}
-
-	archivePath := filepath.Join(rootPath, availablePack.Manifest.ID+".nstudio")
-	bundlePath := filepath.Join(rootPath, availablePack.Manifest.ID)
-
-	progress := &progressReader{engineID: availablePack.Manifest.ID, totalBytes: availablePack.BundleSize}
-	progress.emitProgressIfDue(true)
-
-	if err := downloadBundle(availablePack.BundleURL, archivePath, progress); err != nil {
-		return response.Err("install: download: %w", err)
+	engineFolderPath := filepath.Join(rootPath, engineID)
+	if err := os.MkdirAll(engineFolderPath, 0o755); err != nil {
+		return response.Err("create %s: %w", engineFolderPath, err)
 	}
 
-	if _, err := os.Stat(bundlePath); err == nil {
-		if err := os.RemoveAll(bundlePath); err != nil {
-			return response.Err("install: clear stale bundle: %w", err)
+	previousRecord, wasInstalled := readInstalledRecord(engineFolderPath)
+	buildFolderName := targetBuildFolderName(engineFolderPath, expectedManifest)
+	buildPath := filepath.Join(engineFolderPath, buildFolderName)
+	archiveFileName := bundleFileName(expectedManifest)
+	discardOtherPartials(engineFolderPath, previousRecord, wasInstalled, buildFolderName, archiveFileName)
+
+	if readInstallState(buildPath) == "" {
+		if err := os.RemoveAll(buildPath); err != nil {
+			return response.Err("clear unfinished install %s: %w", buildPath, err)
+		}
+		bundlePath := availablePack.BundleURL
+		downloaded := !isLocalBundlePath(bundlePath)
+		if downloaded {
+			if bundlePath, err = downloadBundle(ctx, availablePack, rootPath, archiveFileName); err != nil {
+				return err
+			}
+		}
+		if err := extractBundle(ctx, bundlePath, buildPath, expectedManifest); err != nil {
+			return err
+		}
+		if downloaded {
+			_ = os.Remove(bundlePath)
 		}
 	}
 
-	if err := extractZip(archivePath, bundlePath); err != nil {
-		_ = os.RemoveAll(bundlePath)
-		return response.Err("install: extract: %w", err)
-	}
-	_ = os.Remove(archivePath)
-
-	manifest, err := readManifest(bundlePath)
+	manifest, err := checkExtractedBundle(buildPath, expectedManifest)
 	if err != nil {
-		_ = os.RemoveAll(bundlePath)
-		return response.Err("install: read manifest: %w", err)
+		_ = os.RemoveAll(buildPath)
+		return response.Err("%w", err)
 	}
 
-	if err := validateManifest(manifest, bundlePath); err != nil {
-		_ = os.RemoveAll(bundlePath)
-		return response.Err("install: validate: %w", err)
+	if readInstallState(buildPath) == installStateExtracted {
+		if manifest.Runtime.Prepare != nil {
+			if err := prepareWeights(ctx, *manifest, buildPath); err != nil {
+				return err
+			}
+		}
+		if err := writeInstallState(buildPath, installStatePrepared); err != nil {
+			return response.Err("%w", err)
+		}
 	}
 
+	newInstallProgress(engineID, InstallStageVerifying, 0)
+	if err := verifyBundle(ctx, *manifest, buildPath); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		_ = os.RemoveAll(buildPath)
+		return response.Err("%s %s failed its test run: %w", manifest.Name, manifest.Version, err)
+	}
+
+	return switchToBuild(engineFolderPath, *manifest, buildFolderName, previousRecord, wasInstalled)
+}
+
+func downloadBundle(ctx context.Context, availablePack AvailablePack, rootPath, archiveFileName string) (string, error) {
+	downloadsFolderPath := filepath.Join(rootPath, downloadsFolderName)
+	if err := os.MkdirAll(downloadsFolderPath, 0o755); err != nil {
+		return "", response.Err("create %s: %w", downloadsFolderPath, err)
+	}
+	archivePath := filepath.Join(downloadsFolderPath, archiveFileName)
+
+	var downloadedBytes int64
+	if partialInfo, err := os.Stat(archivePath + ".part"); err == nil {
+		downloadedBytes = partialInfo.Size()
+	}
+	neededBytes := max(availablePack.BundleSize-downloadedBytes, 0) + installedSizeBytes(availablePack) + weightsSizeBytes(availablePack.Manifest)
+	if err := ensureDiskSpace(downloadsFolderPath, neededBytes); err != nil {
+		return "", err
+	}
+
+	progress := newInstallProgress(availablePack.Manifest.ID, InstallStageDownloading, availablePack.BundleSize)
+	if err := downloadResumable(ctx, availablePack.BundleURL, archivePath, availablePack.BundleSize, availablePack.SHA256, progress); err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		return "", response.Err("download %s: %w", archiveFileName, err)
+	}
+	return archivePath, nil
+}
+
+func installedSizeBytes(availablePack AvailablePack) int64 {
+	if availablePack.Manifest.ApproxInstallSizeMB > 0 {
+		return int64(availablePack.Manifest.ApproxInstallSizeMB) << 20
+	}
+	return 2 * availablePack.BundleSize
+}
+
+func weightsSizeBytes(manifest python.Manifest) int64 {
+	if manifest.Runtime.Prepare == nil {
+		return 0
+	}
+	return int64(manifest.Runtime.Prepare.DownloadSizeMB) << 20
+}
+
+func extractBundle(ctx context.Context, bundlePath, buildPath string, expectedManifest python.Manifest) error {
+	zipReader, err := zip.OpenReader(bundlePath)
+	if err != nil {
+		return response.Err("open %s: %w", bundlePath, err)
+	}
+	defer zipReader.Close()
+
+	var uncompressedBytes int64
+	for _, zipEntry := range zipReader.File {
+		uncompressedBytes += int64(zipEntry.UncompressedSize64)
+	}
+	if err := ensureDiskSpace(filepath.Dir(buildPath), uncompressedBytes+weightsSizeBytes(expectedManifest)); err != nil {
+		return err
+	}
+
+	progress := newInstallProgress(expectedManifest.ID, InstallStageExtracting, uncompressedBytes)
+	if err := extractZipEntries(ctx, zipReader, buildPath, progress); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		_ = os.RemoveAll(buildPath)
+		return response.Err("extract: %w", err)
+	}
+
+	manifest, err := checkExtractedBundle(buildPath, expectedManifest)
+	if err != nil {
+		_ = os.RemoveAll(buildPath)
+		return response.Err("%w", err)
+	}
 	if runtime.GOOS != "windows" {
-		interpreterPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Python))
-		_ = os.Chmod(interpreterPath, 0o755)
+		_ = os.Chmod(filepath.Join(buildPath, filepath.FromSlash(manifest.Runtime.Python)), 0o755)
 	}
+	return writeInstallState(buildPath, installStateExtracted)
+}
 
-	if err := modelManager.RegisterEngine(python.ToEngine(*manifest, bundlePath)); err != nil {
-		return response.Err("install: register: %w", err)
+func checkExtractedBundle(buildPath string, expectedManifest python.Manifest) (*python.Manifest, error) {
+	manifest, err := readManifest(buildPath)
+	if err != nil {
+		return nil, response.Err("read manifest: %w", err)
 	}
-	_ = modelManager.ReloadModels()
+	if err := validateManifest(manifest, buildPath); err != nil {
+		return nil, response.Err("validate: %w", err)
+	}
+	if manifest.ID != expectedManifest.ID || manifest.Version != expectedManifest.Version || manifest.Variant != expectedManifest.Variant {
+		return nil, response.Err("the bundle contains %s %s (%s), not %s %s (%s)",
+			manifest.ID, manifest.Version, manifest.Variant, expectedManifest.ID, expectedManifest.Version, expectedManifest.Variant)
+	}
+	return manifest, nil
+}
 
-	eventManager.GetInstance().EmitEvent(EngineDownloadProgressEvent, DownloadProgress{
-		EngineID:   availablePack.Manifest.ID,
-		Downloaded: progress.downloadedBytes,
-		Total:      progress.totalBytes,
-		Percent:    100,
-		Done:       true,
+func prepareWeights(ctx context.Context, manifest python.Manifest, buildPath string) error {
+	progress := newInstallProgress(manifest.ID, InstallStageWeights, weightsSizeBytes(manifest))
+	var highestDownloadedBytes atomic.Int64
+	err := retryWhileProgressing(ctx, func() (bool, error) {
+		previousHighest := highestDownloadedBytes.Load()
+		err := prepareBundle(ctx, manifest, buildPath, func(downloaded, total int64) {
+			progress.advanceTo(downloaded, total)
+			if downloaded > highestDownloadedBytes.Load() {
+				highestDownloadedBytes.Store(downloaded)
+			}
+		})
+		return highestDownloadedBytes.Load() > previousHighest, err
 	})
-	eventManager.GetInstance().EmitEvent(EnginesUpdatedEvent, EngineUpdate{
-		EngineID: availablePack.Manifest.ID,
-		Action:   "installed",
-	})
-
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return response.Err("download model weights: %w", err)
+	}
 	return nil
 }
 
+func switchToBuild(engineFolderPath string, manifest python.Manifest, buildFolderName string, previousRecord installedRecord, wasInstalled bool) error {
+	if wasInstalled {
+		if err := modelManager.UnregisterEngine(manifest.ID); err != nil {
+			return response.Err("stop the installed version: %w", err)
+		}
+	}
+
+	record := installedRecord{Version: manifest.Version, Variant: manifest.Variant, Folder: buildFolderName}
+	if wasInstalled {
+		record.LeftoverFolders = append(record.LeftoverFolders, previousRecord.LeftoverFolders...)
+		if previousRecord.Folder != buildFolderName {
+			record.LeftoverFolders = append(record.LeftoverFolders, previousRecord.Folder)
+		}
+	}
+	if err := writeInstalledRecord(engineFolderPath, record); err != nil {
+		if wasInstalled {
+			registerInstalled(engineFolderPath)
+		}
+		return response.Err("record the new version: %w", err)
+	}
+
+	buildPath := filepath.Join(engineFolderPath, buildFolderName)
+	_ = os.Remove(filepath.Join(buildPath, installStateFileName))
+	if err := modelManager.RegisterEngine(python.ToEngine(manifest, buildPath)); err != nil {
+		return response.Err("register: %w", err)
+	}
+	_ = modelManager.ReloadModels()
+
+	if len(record.LeftoverFolders) > 0 {
+		record.LeftoverFolders = removeFoldersPatiently(engineFolderPath, record.LeftoverFolders)
+		if err := writeInstalledRecord(engineFolderPath, record); err != nil {
+			response.Err("update %s after removing the old version: %w", engineFolderPath, err)
+		}
+	}
+
+	eventManager.GetInstance().EmitEvent(EngineDownloadProgressEvent, DownloadProgress{
+		EngineID: manifest.ID,
+		Percent:  100,
+		Done:     true,
+	})
+	eventManager.GetInstance().EmitEvent(EnginesUpdatedEvent, EngineUpdate{
+		EngineID: manifest.ID,
+		Action:   "installed",
+	})
+	return nil
+}
+
+func registerInstalled(engineFolderPath string) {
+	installedPack, installed := readInstalledPack(engineFolderPath)
+	if !installed || !installedPack.Compatible {
+		return
+	}
+	if err := modelManager.RegisterEngine(python.ToEngine(installedPack.Manifest, installedPack.BundlePath)); err != nil {
+		response.Err("register %s again: %w", installedPack.Manifest.ID, err)
+	}
+}
+
+func removeFoldersPatiently(engineFolderPath string, folderNames []string) []string {
+	remainingFolderNames := folderNames
+	for attempt := 1; attempt <= folderRemovalAttempts && len(remainingFolderNames) > 0; attempt++ {
+		if attempt > 1 {
+			time.Sleep(folderRemovalDelay)
+		}
+		remainingFolderNames = removeFolders(engineFolderPath, remainingFolderNames, attempt == folderRemovalAttempts)
+	}
+	return remainingFolderNames
+}
+
+func discardOtherPartials(engineFolderPath string, activeRecord installedRecord, installed bool, keptFolderName, keptArchiveFileName string) {
+	if entries, err := os.ReadDir(engineFolderPath); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() || entry.Name() == keptFolderName || (installed && entry.Name() == activeRecord.Folder) {
+				continue
+			}
+			_ = os.RemoveAll(filepath.Join(engineFolderPath, entry.Name()))
+		}
+	}
+
+	downloadsFolderPath, err := downloadsPath()
+	if err != nil {
+		return
+	}
+	engineID := filepath.Base(engineFolderPath)
+	if entries, err := os.ReadDir(downloadsFolderPath); err == nil {
+		for _, entry := range entries {
+			fileName := entry.Name()
+			if entry.IsDir() || !isDownloadOf(fileName, engineID) || fileName == keptArchiveFileName || fileName == keptArchiveFileName+".part" {
+				continue
+			}
+			_ = os.Remove(filepath.Join(downloadsFolderPath, fileName))
+		}
+	}
+}
+
+func discardBuild(manifest python.Manifest) {
+	engineFolderPath, err := enginePath(manifest.ID)
+	if err != nil {
+		return
+	}
+	buildFolderName := targetBuildFolderName(engineFolderPath, manifest)
+	if record, installed := readInstalledRecord(engineFolderPath); !installed || record.Folder != buildFolderName {
+		_ = os.RemoveAll(filepath.Join(engineFolderPath, buildFolderName))
+	}
+	if downloadsFolderPath, err := downloadsPath(); err == nil {
+		archivePath := filepath.Join(downloadsFolderPath, bundleFileName(manifest))
+		_ = os.Remove(archivePath)
+		_ = os.Remove(archivePath + ".part")
+	}
+	_ = os.Remove(engineFolderPath)
+}
+
 func Uninstall(engineID string) error {
-	if engineID == "" {
-		return response.Err("uninstall: engineID is required")
+	engineFolderPath, err := enginePath(engineID)
+	if err != nil {
+		return response.Err("uninstall: %w", err)
+	}
+	if modelManager.IsReleased() {
+		return response.Err("uninstall: %w", ErrServerRunning)
+	}
+	if isInstalling(engineID) {
+		return response.Err("uninstall: %s is being installed; cancel the install first", engineID)
 	}
 
 	if err := modelManager.UnregisterEngine(engineID); err != nil {
 		return response.Err("uninstall: unregister: %w", err)
 	}
 
-	bundlePath, err := installedPackPath(engineID)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
 	rootPath, err := packsRootPath()
 	if err != nil {
 		return response.Err("%w", err)
 	}
-	absolutePacksRootPath, _ := filepath.Abs(rootPath)
-	absoluteBundlePath, _ := filepath.Abs(bundlePath)
-	if !strings.HasPrefix(absoluteBundlePath, absolutePacksRootPath+string(os.PathSeparator)) {
-		return response.Err("uninstall: refusing to delete outside packs root: %s", absoluteBundlePath)
+	if !isInside(rootPath, engineFolderPath) {
+		return response.Err("uninstall: refusing to delete outside the engine packs folder: %s", engineFolderPath)
+	}
+	if remaining := removeFoldersPatiently(rootPath, []string{engineID}); len(remaining) > 0 {
+		return response.Err("uninstall: some files of %s are still in use; close anything using them and try again", engineID)
 	}
 
-	if _, err := os.Stat(bundlePath); !os.IsNotExist(err) {
-		if err := os.RemoveAll(bundlePath); err != nil {
-			return response.Err("uninstall: remove bundle: %w", err)
+	if downloadsFolderPath, err := downloadsPath(); err == nil {
+		if entries, err := os.ReadDir(downloadsFolderPath); err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() && isDownloadOf(entry.Name(), engineID) {
+					_ = os.Remove(filepath.Join(downloadsFolderPath, entry.Name()))
+				}
+			}
 		}
 	}
 
@@ -183,86 +484,10 @@ func Uninstall(engineID string) error {
 }
 
 func isLocalBundlePath(bundleSource string) bool {
-	if strings.HasPrefix(bundleSource, "http://") || strings.HasPrefix(bundleSource, "https://") {
-		return false
-	}
-	return true
+	return !strings.HasPrefix(bundleSource, "http://") && !strings.HasPrefix(bundleSource, "https://")
 }
 
-func downloadBundle(bundleURL, destinationPath string, progress *progressReader) error {
-	if err := os.MkdirAll(filepath.Dir(destinationPath), 0o755); err != nil {
-		return response.Err("%w", err)
-	}
-
-	if isLocalBundlePath(bundleURL) {
-		return copyLocalBundle(bundleURL, destinationPath, progress)
-	}
-
-	httpClient := &http.Client{Timeout: 60 * time.Minute}
-	downloadResponse, err := httpClient.Get(bundleURL)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	defer downloadResponse.Body.Close()
-
-	if downloadResponse.StatusCode != http.StatusOK {
-		return response.Err("download %s: status %d", bundleURL, downloadResponse.StatusCode)
-	}
-
-	if progress.totalBytes == 0 && downloadResponse.ContentLength > 0 {
-		progress.totalBytes = downloadResponse.ContentLength
-	}
-
-	progress.underlyingReader = downloadResponse.Body
-	return writeThroughTemporaryFile(progress, destinationPath)
-}
-
-func copyLocalBundle(sourcePath, destinationPath string, progress *progressReader) error {
-	sourceFile, err := os.Open(sourcePath)
-	if err != nil {
-		return response.Err("open local bundle %s: %w", sourcePath, err)
-	}
-	defer sourceFile.Close()
-
-	if sourceInfo, err := sourceFile.Stat(); err == nil && progress.totalBytes == 0 {
-		progress.totalBytes = sourceInfo.Size()
-	}
-
-	progress.underlyingReader = sourceFile
-	return writeThroughTemporaryFile(progress, destinationPath)
-}
-
-func writeThroughTemporaryFile(sourceReader io.Reader, destinationPath string) error {
-	temporaryFilePath := destinationPath + ".part"
-	temporaryFile, err := os.Create(temporaryFilePath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-
-	if _, err := io.Copy(temporaryFile, sourceReader); err != nil {
-		temporaryFile.Close()
-		_ = os.Remove(temporaryFilePath)
-		return response.Err("%w", err)
-	}
-	if err := temporaryFile.Close(); err != nil {
-		_ = os.Remove(temporaryFilePath)
-		return response.Err("%w", err)
-	}
-
-	if err := os.Rename(temporaryFilePath, destinationPath); err != nil {
-		_ = os.Remove(temporaryFilePath)
-		return response.Err("%w", err)
-	}
-	return nil
-}
-
-func extractZip(sourcePath, destinationPath string) error {
-	zipReader, err := zip.OpenReader(sourcePath)
-	if err != nil {
-		return response.Err("%w", err)
-	}
-	defer zipReader.Close()
-
+func extractZipEntries(ctx context.Context, zipReader *zip.ReadCloser, destinationPath string, progress *installProgress) error {
 	if err := os.MkdirAll(destinationPath, 0o755); err != nil {
 		return response.Err("%w", err)
 	}
@@ -273,6 +498,9 @@ func extractZip(sourcePath, destinationPath string) error {
 	}
 
 	for _, zipEntry := range zipReader.File {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		cleanedEntryName := filepath.FromSlash(zipEntry.Name)
 		if strings.Contains(cleanedEntryName, "..") || filepath.IsAbs(cleanedEntryName) {
 			return response.Err("zip entry rejected (path traversal): %q", zipEntry.Name)
@@ -296,28 +524,35 @@ func extractZip(sourcePath, destinationPath string) error {
 		if err := os.MkdirAll(filepath.Dir(entryTargetPath), 0o755); err != nil {
 			return response.Err("%w", err)
 		}
+		if err := extractZipEntry(ctx, zipEntry, entryTargetPath, progress); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		entryReader, err := zipEntry.Open()
-		if err != nil {
-			return response.Err("%w", err)
-		}
+func extractZipEntry(ctx context.Context, zipEntry *zip.File, entryTargetPath string, progress *installProgress) error {
+	entryReader, err := zipEntry.Open()
+	if err != nil {
+		return response.Err("%w", err)
+	}
+	defer entryReader.Close()
 
-		entryMode := zipEntry.Mode() & 0o777
-		if entryMode == 0 {
-			entryMode = 0o644
+	entryMode := zipEntry.Mode() & 0o777
+	if entryMode == 0 {
+		entryMode = 0o644
+	}
+	targetFile, err := os.OpenFile(entryTargetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, entryMode)
+	if err != nil {
+		return response.Err("%w", err)
+	}
+	defer targetFile.Close()
+
+	if _, err := io.Copy(targetFile, &progressReader{context: ctx, underlyingReader: entryReader, progress: progress}); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
-		targetFile, err := os.OpenFile(entryTargetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, entryMode)
-		if err != nil {
-			entryReader.Close()
-			return response.Err("%w", err)
-		}
-		if _, err := io.Copy(targetFile, entryReader); err != nil {
-			entryReader.Close()
-			targetFile.Close()
-			return response.Err("%w", err)
-		}
-		entryReader.Close()
-		targetFile.Close()
+		return response.Err("%w", err)
 	}
 	return nil
 }
@@ -368,14 +603,14 @@ func validateManifest(manifest *python.Manifest, bundlePath string) error {
 	if manifest.SchemaVersion != 1 {
 		return response.Err("unsupported manifest schemaVersion %d", manifest.SchemaVersion)
 	}
-	if manifest.ID == "" {
-		return response.Err("manifest missing id")
+	if err := validateIdentity(*manifest); err != nil {
+		return response.Err("%w", err)
 	}
-	if manifest.OS != "" && manifest.OS != runtime.GOOS {
-		return response.Err("bundle is for %s, current OS is %s", manifest.OS, runtime.GOOS)
+	if !python.SupportsProtocol(manifest.Protocol) {
+		return response.Err("bundle uses engine protocol %d; this version of Narration Studio supports %d", manifest.Protocol, python.ProtocolVersion)
 	}
-	if manifest.Arch != "" && manifest.Arch != runtime.GOARCH {
-		return response.Err("bundle is for %s, current arch is %s", manifest.Arch, runtime.GOARCH)
+	if !runsOnThisPlatform(*manifest) {
+		return response.Err("bundle is for %s/%s, this computer is %s/%s", manifest.OS, manifest.Arch, runtime.GOOS, runtime.GOARCH)
 	}
 	if manifest.Runtime.Python == "" || manifest.Runtime.Entrypoint == "" {
 		return response.Err("manifest runtime is missing python or entrypoint")

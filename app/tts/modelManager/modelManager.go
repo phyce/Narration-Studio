@@ -17,6 +17,7 @@ import (
 	"nstudio/app/tts/engine/piper"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/log"
 )
@@ -107,15 +108,17 @@ func restartEngine(engineName string) {
 }
 
 func restartLocalEngines() {
-	manager.Lock()
-	defer manager.Unlock()
-
+	manager.RLock()
+	var localEngineIDs []string
 	for engineID, entry := range manager.Engines {
 		if entry.Engine.Type == tts.Local {
-			manager.Unlock()
-			restartEngine(engineID)
-			manager.Lock()
+			localEngineIDs = append(localEngineIDs, engineID)
 		}
+	}
+	manager.RUnlock()
+
+	for _, engineID := range localEngineIDs {
+		restartEngine(engineID)
 	}
 }
 
@@ -160,22 +163,18 @@ func createModelPool(engineID, modelID string) (*ModelPool, error) {
 		instances = append(instances, engine)
 	}
 
-	poolChannel := make(chan tts.Base, instanceCount)
-	for _, instance := range instances {
-		poolChannel <- instance
-	}
-
 	log.Info(fmt.Sprintf("Created %d instances for %s/%s", instanceCount, engineID, modelID))
 
-	return &ModelPool{
-		Instances: instances,
-		pool:      poolChannel,
-	}, nil
+	return newModelPool(instances), nil
 }
 
 func RefreshModels() error {
 	toggles := config.GetEngineToggles()
 	manager.Lock()
+	if manager.released {
+		manager.Unlock()
+		return nil
+	}
 
 	enabledModels := 0
 	for engineID, models := range toggles {
@@ -233,6 +232,68 @@ func RefreshModels() error {
 	return response.NewWarn("No models enabled")
 }
 
+var releaseDrainTimeout = 30 * time.Second
+
+// Draining happens outside the lock: an in-flight request may still need
+// GetEngineInstance before it can hand its instance back.
+func ReleaseAll() {
+	manager.Lock()
+	manager.released = true
+	detached := make(map[string]map[string]*ModelPool, len(manager.Engines))
+	for engineID, entry := range manager.Engines {
+		if len(entry.Models) == 0 {
+			continue
+		}
+		detached[engineID] = entry.Models
+		entry.Models = make(map[string]*ModelPool)
+		for _, pool := range detached[engineID] {
+			pool.detach()
+		}
+	}
+	manager.Unlock()
+
+	for engineID, pools := range detached {
+		for modelID, pool := range pools {
+			recovered := pool.drain(releaseDrainTimeout)
+			stopInstances(engineID, modelID, recovered)
+
+			if inUse := len(pool.Instances) - len(recovered); inUse > 0 {
+				response.Err("Released %s:%s with %d of %d instances still in use; they will be stopped when they finish",
+					engineID, modelID, inUse, len(pool.Instances))
+				go stopInstancesWhenReturned(engineID, modelID, pool, inUse)
+			}
+		}
+	}
+}
+
+func stopInstancesWhenReturned(engineID, modelID string, pool *ModelPool, count int) {
+	for range count {
+		stopInstances(engineID, modelID, []tts.Base{<-pool.pool})
+	}
+}
+
+func stopInstances(engineID, modelID string, instances []tts.Base) {
+	for _, instance := range instances {
+		if err := instance.Stop(modelID); err != nil {
+			response.Err("Failed to stop model %s:%s: %w", engineID, modelID, err)
+		}
+	}
+}
+
+func Reacquire() error {
+	manager.Lock()
+	manager.released = false
+	manager.Unlock()
+
+	return RefreshModels()
+}
+
+func IsReleased() bool {
+	manager.RLock()
+	defer manager.RUnlock()
+	return manager.released
+}
+
 func ReloadModels() error {
 	manager.Lock()
 
@@ -268,7 +329,7 @@ func RegisterEngine(baseEngine tts.Engine) error {
 			}
 		}
 
-		if !modelEnabled {
+		if !modelEnabled || manager.released {
 			continue
 		}
 
@@ -346,53 +407,75 @@ func RegisterModel(model tts.Model) {
 }
 
 func GetEngineInstance(engineID, modelID string) (tts.Base, func(), bool) {
-	manager.RLock()
-	entry, ok := manager.Engines[engineID]
-	manager.RUnlock()
+	pool, ok := findOrCreatePool(engineID, modelID)
 	if !ok {
 		return nil, nil, false
 	}
 
-	instance, pool, ok := entry.GetModelInstance(modelID)
-	if ok {
-		releaseFunc := func() {
-			pool.Release(instance)
-		}
-		return instance, releaseFunc, true
+	instance, ok := pool.GetNext()
+	if !ok {
+		return nil, nil, false
 	}
 
-	// Model exists but has no pool (not enabled in toggles). Create one on demand.
-	if _, modelExists := entry.Engine.Models[modelID]; modelExists {
-		manager.Lock()
-		// Double-check after acquiring write lock
-		if existingPool, exists := entry.Models[modelID]; exists {
-			manager.Unlock()
-			inst, _, ok := entry.GetModelInstance(modelID)
-			if ok {
-				return inst, func() { existingPool.Release(inst) }, true
-			}
-		} else {
-			newPool, err := createModelPool(engineID, modelID)
-			if err != nil {
-				manager.Unlock()
-				return nil, nil, false
-			}
-			entry.Models[modelID] = newPool
-			manager.Unlock()
+	return instance, func() { pool.Release(instance) }, true
+}
 
-			inst, _, ok := entry.GetModelInstance(modelID)
-			if ok {
-				return inst, func() { newPool.Release(inst) }, true
-			}
-		}
+func findOrCreatePool(engineID, modelID string) (*ModelPool, bool) {
+	manager.RLock()
+	pool, found := manager.findPoolLocked(engineID, modelID)
+	released := manager.released
+	manager.RUnlock()
+
+	if released {
+		return nil, false
+	}
+	if found {
+		return pool, true
 	}
 
-	return nil, nil, false
+	manager.Lock()
+	defer manager.Unlock()
+
+	if manager.released {
+		return nil, false
+	}
+	if pool, found := manager.findPoolLocked(engineID, modelID); found {
+		return pool, true
+	}
+
+	entry, ok := manager.Engines[engineID]
+	if !ok {
+		return nil, false
+	}
+	if _, modelExists := entry.Engine.Models[modelID]; !modelExists {
+		return nil, false
+	}
+
+	pool, err := createModelPool(engineID, modelID)
+	if err != nil {
+		return nil, false
+	}
+	entry.Models[modelID] = pool
+
+	return pool, true
+}
+
+func (manager *modelManager) findPoolLocked(engineID, modelID string) (*ModelPool, bool) {
+	entry, ok := manager.Engines[engineID]
+	if !ok {
+		return nil, false
+	}
+
+	pool, ok := entry.Models[modelID]
+	return pool, ok
 }
 
 func GetAllEngines() []tts.Engine {
 	toggles := config.GetEngineToggles()
 	var availableEngines []tts.Engine
+
+	manager.RLock()
+	defer manager.RUnlock()
 
 	for engineID, entry := range manager.Engines {
 		filteredEngine := tts.Engine{
@@ -471,6 +554,9 @@ func GetActiveEngines() []tts.Engine {
 func GetAllModels() map[string]tts.Model {
 	result := make(map[string]tts.Model)
 
+	manager.RLock()
+	defer manager.RUnlock()
+
 	for _, entry := range manager.Engines {
 		for _, model := range entry.Engine.Models {
 			result[model.Engine+":"+model.ID] = model
@@ -481,29 +567,34 @@ func GetAllModels() map[string]tts.Model {
 }
 
 func GetModelVoices(engineName string, modelID string) ([]tts.Voice, error) {
+	manager.RLock()
 	selectedEngine, exists := manager.Engines[engineName]
+	var voiceSource tts.Base
+	if exists {
+		if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists && len(modelPool.Instances) > 0 {
+			voiceSource = modelPool.Instances[0]
+		} else if _, modelExists := selectedEngine.Engine.Models[modelID]; modelExists {
+			voiceSource = selectedEngine.Engine.Engine
+		}
+	}
+	manager.RUnlock()
 
 	if !exists {
 		return nil, response.Err("Engine %s not found", engineName)
 	}
-
-	if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists && len(modelPool.Instances) > 0 {
-		return modelPool.Instances[0].GetVoices(modelID)
+	if voiceSource == nil {
+		return nil, response.Err("Model %s not found for engine %s", modelID, engineName)
 	}
 
-	// Fall back to the engine directly (handles models not yet pooled/enabled)
-	if _, modelExists := selectedEngine.Engine.Models[modelID]; modelExists {
-		return selectedEngine.Engine.Engine.GetVoices(modelID)
-	}
-
-	return nil, response.Err("Model %s not found for engine %s", modelID, engineName)
+	return voiceSource.GetVoices(modelID)
 }
 
 func GetInstanceCount(engineID string, modelID string) int {
-	if selectedEngine, exists := manager.Engines[engineID]; exists {
-		if modelPool, modelExists := selectedEngine.Models[modelID]; modelExists {
-			return len(modelPool.Instances)
-		}
+	manager.RLock()
+	defer manager.RUnlock()
+
+	if pool, found := manager.findPoolLocked(engineID, modelID); found {
+		return len(pool.Instances)
 	}
 	return 0
 }

@@ -6,9 +6,12 @@ import (
 
 type Manifest struct {
 	SchemaVersion       int             `json:"schemaVersion"`
+	Protocol            int             `json:"protocol"`
 	ID                  string          `json:"id"`
 	Name                string          `json:"name"`
 	Version             string          `json:"version"`
+	Variant             string          `json:"variant"`
+	VariantDescription  string          `json:"variantDescription,omitempty"`
 	Description         string          `json:"description"`
 	Type                string          `json:"type"`
 	Tags                []string        `json:"tags"`
@@ -24,12 +27,19 @@ type Runtime struct {
 	Entrypoint     string            `json:"entrypoint"`
 	BootTimeoutSec int               `json:"bootTimeoutSec"`
 	Env            map[string]string `json:"env"`
+	Prepare        *Prepare          `json:"prepare,omitempty"`
+}
+
+type Prepare struct {
+	DownloadSizeMB int    `json:"downloadSizeMB"`
+	Source         string `json:"source"`
 }
 
 type ManifestModel struct {
-	ID     string          `json:"id"`
-	Name   string          `json:"name"`
-	Voices []ManifestVoice `json:"voices"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Voices    []ManifestVoice `json:"voices"`
+	TestVoice string          `json:"testVoice,omitempty"`
 }
 
 type ManifestVoice struct {

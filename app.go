@@ -7,6 +7,7 @@ import (
 	"nstudio/app/common/issue"
 	"nstudio/app/common/response"
 	"nstudio/app/common/status"
+	"nstudio/app/tts/enginehost"
 	"nstudio/app/tts/modelManager"
 	"os"
 
@@ -25,6 +26,7 @@ func (app *App) ServiceStartup(ctx context.Context, options application.ServiceO
 	}
 
 	modelManager.Initialize(true)
+	enginehost.Initialize()
 	registerEngines()
 	response.Initialize()
 	status.Set(status.Ready, "")

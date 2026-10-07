@@ -3,6 +3,7 @@
 		"outputType": 0,
 		"outputPath": "%USERPROFILE%\\Narration Studio\\output",
 		"debug": false,
+		"activityLogDays": 2,
 		"audioCache": {
 			"enabled": true,
 			"location": "%USERPROFILE%\\Narration Studio\\cache"

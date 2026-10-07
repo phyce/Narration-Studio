@@ -129,6 +129,7 @@ async function getCharacterVoices() {
 	const characterVoiceData = JSON.parse(result);
 
 	characterVoices.value = characterVoiceData;
+	savedFingerprint.value = voicesFingerprint(characterVoiceData);
 
 	for (const name in characterVoiceData) {
 		const data = characterVoiceData[name];
@@ -158,15 +159,13 @@ async function loadProfiles() {
 		const result = await GetProfiles();
 		profileOptions.value = JSON.parse(result);
 
-		if (selectedProfile.value) {
-			const profile = profileOptions.value.find(p => p.id === selectedProfile.value);
-			if (profile) {
-				selectedProfileObj.value = profile;
-			}
-		} else if (profileOptions.value.length > 0) {
-			const defaultProfile = profileOptions.value.find(p => p.id === 'default');
-			selectedProfileObj.value = defaultProfile || profileOptions.value[0];
-			selectedProfile.value = selectedProfileObj.value.id;
+		// The remembered profile may have been deleted since; fall back to the default one.
+		const profile = profileOptions.value.find(p => p.id === selectedProfile.value)
+			?? profileOptions.value.find(p => p.id === 'default')
+			?? profileOptions.value[0];
+		if (profile) {
+			selectedProfileObj.value = profile;
+			selectedProfile.value = profile.id;
 		}
 	} catch (error) {
 		console.error('Failed to load profiles:', error);
@@ -221,7 +220,9 @@ async function deleteCurrentProfile() {
 
 	try {
 		await DeleteProfile(selectedProfileObj.value.id);
+		selectedProfile.value = 'default';
 		await loadProfiles();
+		await onProfileChange();
 		showDeleteDialog.value = false;
 	} catch (error) {
 		console.error('Failed to delete profile:', error);
@@ -296,6 +297,10 @@ async function saveSettingsDialog() {
 	}
 }
 
+function isModelOptionSelected(option: {key: string}): boolean {
+	return selectedModelKeys.value.some(selected => selected.key === option.key);
+}
+
 function cancelSettingsDialog() {
 	showSettingsDialog.value = false;
 }
@@ -335,6 +340,7 @@ async function onProfileDropdownChange() {
 }
 
 async function onProfileChange() {
+	savedFingerprint.value = null;
 	characterVoices.value = {};
 	Object.keys(selectedModels).forEach(key => delete selectedModels[key]);
 	Object.keys(selectedVoices).forEach(key => delete selectedVoices[key]);
@@ -370,8 +376,8 @@ async function onVoiceSelect(key: string, event: DropdownChangeEvent) {
 	await previewVoice(key);
 }
 
-const saveProfileVoices = () => {
-	const dataToSave = Object.entries(characterVoices.value)
+function buildProfileVoices(): Record<string, CharacterVoice> {
+	return Object.entries(characterVoices.value)
 		.filter(([key, voice]) => voice.name && voice.name.trim() !== '')
 		.reduce((accumulator, [key, voice]) => {
 			const selectionKeys = selectedModels[key] ? Object.keys(selectedModels[key]) : [];
@@ -397,14 +403,39 @@ const saveProfileVoices = () => {
 
 			return accumulator;
 		}, {} as Record<string, CharacterVoice>);
+}
 
-	const dataString = JSON.stringify(dataToSave);
+// Compares what the page would save with what the backend has stored.
+function voicesFingerprint(voices: Record<string, CharacterVoice>): string {
+	return JSON.stringify(Object.entries(voices)
+		.filter(([, voice]) => voice.key && voice.name?.trim())
+		.map(([key, voice]) => [key, voice.name, voice.key, voice.voice || ''])
+		.sort());
+}
 
-	SaveProfileVoices(selectedProfile.value, dataString);
-};
+const savedFingerprint = ref<string | null>(null);
+const saving = ref(false);
+const hasUnsavedChanges = computed(() =>
+	savedFingerprint.value !== null && voicesFingerprint(buildProfileVoices()) !== savedFingerprint.value);
+
+async function saveProfileVoices() {
+	saving.value = true;
+	try {
+		await SaveProfileVoices(selectedProfile.value, JSON.stringify(buildProfileVoices()));
+		savedFingerprint.value = voicesFingerprint(JSON.parse(await GetProfileVoices(selectedProfile.value)));
+	} finally {
+		saving.value = false;
+	}
+}
+
+function isPlaceholderRow(key: string): boolean {
+	const keys = Object.keys(characterVoices.value);
+	return key === keys[keys.length - 1] && !characterVoices.value[key]?.name?.trim();
+}
 
 async function previewVoice(key: string) {
 	const voice = characterVoices.value[key];
+	if (!selectedVoices[key] || !selectedModels[key]) return;
 
 	const modelVoiceID = "::" + Object.keys(selectedModels[key])[0] + ":" + selectedVoices[key].voiceID;
 
@@ -413,10 +444,10 @@ async function previewVoice(key: string) {
 	await EventTrigger('notification.enabled', true);
 }
 
-async function removeVoice(key: string) {
-	if (key == "_" + (Object.keys(characterVoices.value).length - 1)) return;
+function removeVoice(key: string) {
+	if (isPlaceholderRow(key)) return;
 
-	if (key in characterVoices.value) delete characterVoices.value[key];
+	delete characterVoices.value[key];
 }
 
 function onNameInput(voice: any, key: string) {
@@ -460,140 +491,151 @@ onUnmounted(() => {
 
 </script>
 <template>
-	<div class="voices">
-		<div class="voices__actions">
-			<div class="flex items-center gap-2 mt-2 mr-2">
-				<label class="font-semibold whitespace-nowrap">Profile</label>
-				<Dropdown
-					v-model="selectedProfileObj"
-					:options="profileOptions"
-					optionLabel="name"
-					placeholder="Select Profile"
-					class="w-64 text-left"
-					@change="onProfileDropdownChange"
-				/>
-				<div class="flex border border-gray-600 rounded overflow-hidden">
-					<Button
-						icon="pi pi-plus"
-						title="Create New Profile"
-						class="voices__action-button"
-						@click="openCreateDialog"
-					/>
-					<Button
-						icon="pi pi-cog"
-						title="Profile Settings"
-						class="voices__action-button"
-						:disabled="!selectedProfileObj"
-						@click="openSettingsDialog"
-					/>
-					<Button
-						icon="pi pi-trash"
-						title="Delete Profile"
-						class="voices__action-button"
-						:disabled="!selectedProfileObj || selectedProfileObj.id === 'default'"
-						@click="openDeleteDialog"
-					/>
-				</div>
-			</div>
-			<Button class="voices__actions__save"
-					title="Save All"
-					aria-label="Save All"
-					@click="saveProfileVoices()"
-			>
-				<i class="pi pi-save"/>&nbsp;
-				Save All
-			</Button>
+	<div class="page page--column">
+		<div class="page-toolbar">
+			<label class="field__label" for="profiles-profile">Profile</label>
+			<Dropdown
+				v-model="selectedProfileObj"
+				inputId="profiles-profile"
+				:options="profileOptions"
+				optionLabel="name"
+				placeholder="Select a profile"
+				class="w-64"
+				@change="onProfileDropdownChange"
+			/>
+			<Button
+				icon="pi pi-plus"
+				severity="secondary"
+				title="New profile"
+				aria-label="New profile"
+				@click="openCreateDialog"
+			/>
+			<Button
+				icon="pi pi-cog"
+				severity="secondary"
+				title="Profile settings"
+				aria-label="Profile settings"
+				:disabled="!selectedProfileObj"
+				@click="openSettingsDialog"
+			/>
+			<Button
+				icon="pi pi-trash"
+				severity="secondary"
+				title="Delete this profile"
+				aria-label="Delete this profile"
+				:disabled="!selectedProfileObj || selectedProfileObj.id === 'default'"
+				@click="openDeleteDialog"
+			/>
+			<div class="page-toolbar__spacer"/>
+			<span v-if="hasUnsavedChanges" class="unsaved-note">
+				<i class="pi pi-circle-fill" style="font-size: 0.45rem"/> Unsaved changes
+			</span>
+			<Button
+				icon="pi pi-save"
+				label="Save"
+				:loading="saving"
+				:disabled="!hasUnsavedChanges || saving"
+				@click="saveProfileVoices"
+			/>
 		</div>
-		<div class="voices__entry"
-			 :key="key"
-			 v-for="(voice, key) in characterVoices"
-		>
-			<div class="voices__entry__name" :data-key="key">
-				<InputText class="voices__entry__name__input"
-						   v-model="voice.name"
-						   type="text"
-						   placeholder="Character name"
-						   @input="onNameInput(voice, key)"
-				/>
-			</div>
-			<div class="voices__entry__model">
-				<TreeSelect class="voices__entry__model__tree"
-							:class="{'voices__entry__model__tree--invalid': voiceIssues[key]}"
-							v-tooltip.top="voiceIssues[key]"
-							v-if="engineModelNodes && engineModelNodes.length > 0"
-							:options="engineModelNodes"
-							v-model="selectedModels[key]"
-							@node-select="node => onModelSelect(node, key)"
-							placeholder="Select a model"
-				/>
-			</div>
-			<div class="voices__entry__voice">
-				<Dropdown class="voices__entry__voice__dropdown"
-						  @change="(event) => onVoiceSelect(key, event)"
-						  v-model="selectedVoices[key]"
-						  :options="voiceOptionsMap[key]"
-						  filter
-						  optionLabel="name"
-						  placeholder="Select a voice"
-				/>
-			</div>
-			<div class="voices__entry__actions">
-				<div class="voices__entry__actions__container">
-					<Button class="button-start"
-							@click="previewVoice(key)"
-							icon="pi pi-volume-up"
-							title="Preview"
-							aria-label="Preview"
+
+		<div class="page-body">
+			<div class="profiles__grid">
+				<div class="profiles__grid__header">
+					<span>Character</span>
+					<span>Model</span>
+					<span>Voice</span>
+					<span/>
+				</div>
+				<div class="profiles__row"
+					 :key="key"
+					 v-for="(voice, key) in characterVoices"
+				>
+					<InputText v-model="voice.name"
+							   type="text"
+							   placeholder="Add a character…"
+							   aria-label="Character name"
+							   @input="onNameInput(voice, key)"
 					/>
-					<Button class="button-stop"
-							@click="removeVoice(key)"
-							icon="pi pi-trash"
-							title="Remove"
-							aria-label="Remove"
+					<TreeSelect v-if="engineModelNodes && engineModelNodes.length > 0"
+								class="w-full"
+								:class="{'profiles__model--invalid': voiceIssues[key]}"
+								v-tooltip.top="voiceIssues[key]"
+								:options="engineModelNodes"
+								v-model="selectedModels[key]"
+								@node-select="node => onModelSelect(node, key)"
+								placeholder="Select a model"
 					/>
+					<span v-else class="field__hint">No models enabled</span>
+					<Dropdown class="w-full"
+							  @change="(event) => onVoiceSelect(key, event)"
+							  v-model="selectedVoices[key]"
+							  :options="voiceOptionsMap[key]"
+							  filter
+							  optionLabel="name"
+							  placeholder="Select a voice"
+					/>
+					<div class="profiles__row__actions">
+						<Button icon="pi pi-volume-up"
+								text
+								severity="secondary"
+								title="Preview this voice"
+								aria-label="Preview this voice"
+								:disabled="!selectedVoices[key]"
+								@click="previewVoice(key)"
+						/>
+						<Button v-if="!isPlaceholderRow(key)"
+								icon="pi pi-trash"
+								text
+								severity="danger"
+								title="Remove this character"
+								aria-label="Remove this character"
+								@click="removeVoice(key)"
+						/>
+					</div>
 				</div>
 			</div>
 		</div>
 
 		<Dialog
 			v-model:visible="showCreateDialog"
-			header="Create New Profile"
+			header="New profile"
 			:modal="true"
-			:style="{ width: '400px' }"
+			:style="{ width: '420px' }"
 		>
 			<div class="profile-dialog">
-				<div class="profile-dialog__field">
-					<label for="profile-id">Profile ID*</label>
+				<div class="field">
+					<label class="field__label" for="profile-id">Profile ID</label>
 					<InputText
 						id="profile-id"
 						v-model="newProfileId"
-						placeholder="appname"
-						class="profile-dialog__input"
+						placeholder="my-game"
+						class="w-full"
 					/>
-					<small>Unique identifier (no spaces or special characters)</small>
+					<small class="field__hint">Unique identifier, no spaces or special characters. Used by the server API.</small>
 				</div>
-				<div class="profile-dialog__field">
-					<label for="profile-name">Display Name</label>
+				<div class="field">
+					<label class="field__label" for="profile-name">Display name</label>
 					<InputText
 						id="profile-name"
 						v-model="newProfileName"
-						placeholder="App Display Name"
-						class="profile-dialog__input"
+						placeholder="My Game"
+						class="w-full"
 					/>
-					<small>Optional display name (defaults to ID)</small>
+					<small class="field__hint">Optional, defaults to the ID.</small>
 				</div>
-				<div class="profile-dialog__field">
-					<label for="profile-description">Description</label>
+				<div class="field">
+					<label class="field__label" for="profile-description">Description</label>
 					<InputText
 						id="profile-description"
 						v-model="newProfileDescription"
-						placeholder="Voice profile for My Game"
-						class="profile-dialog__input"
+						placeholder="Voices for My Game"
+						class="w-full"
 					/>
 				</div>
 			</div>
 			<template #footer>
-				<Button label="Cancel" @click="showCreateDialog = false" class="p-button-text"/>
+				<Button label="Cancel" text severity="secondary" @click="showCreateDialog = false"/>
 				<Button
 					label="Create"
 					@click="createNewProfile"
@@ -604,62 +646,63 @@ onUnmounted(() => {
 
 		<Dialog
 			v-model:visible="showDeleteDialog"
-			header="Delete Profile"
+			header="Delete profile"
 			:modal="true"
-			:style="{ width: '400px' }"
+			:style="{ width: '420px' }"
 		>
-			<p>Are you sure you want to delete the profile "{{ selectedProfileObj?.name }}"?</p>
-			<p>This action cannot be undone.</p>
+			<p class="m-0">Delete the profile "{{ selectedProfileObj?.name }}" and all its character voices? This can't be undone.</p>
 			<template #footer>
-				<Button label="Cancel" @click="showDeleteDialog = false" class="p-button-text"/>
+				<Button label="Cancel" text severity="secondary" @click="showDeleteDialog = false"/>
 				<Button
 					label="Delete"
+					icon="pi pi-trash"
+					severity="danger"
 					@click="deleteCurrentProfile"
-					class="p-button-danger"
 				/>
 			</template>
 		</Dialog>
 
 		<Dialog
 			v-model:visible="showSettingsDialog"
-			header="Profile Settings"
+			header="Profile settings"
 			:modal="true"
-			:style="{ width: '500px' }"
+			:style="{ width: '520px' }"
 		>
-			<div class="settings-dialog">
-				<div class="settings-dialog__section">
-					<div class="settings-dialog__field">
-						<div class="flex items-center gap-2">
-							<Checkbox
-								v-model="settingsCacheEnabled"
-								:binary="true"
-								inputId="cache-enabled"
-								:indeterminate="settingsCacheEnabled === null"
-							/>
-							<label for="cache-enabled">Enable Cache for this Profile</label>
-						</div>
-					</div>
+			<div class="profile-dialog">
+				<div class="check-row">
+					<Checkbox
+						v-model="settingsCacheEnabled"
+						:binary="true"
+						inputId="cache-enabled"
+						:indeterminate="settingsCacheEnabled === null"
+					/>
+					<label for="cache-enabled">Cache audio</label>
 				</div>
 
-				<div class="settings-dialog__section">
-					<p class="settings-dialog__description">
-						Select which models are available for this profile. When no models are selected, all globally enabled models will be available.
-					</p>
+				<div class="field">
+					<label class="field__label">Models</label>
+					<p class="field__hint m-0">If no models are selected, all available ones will be used</p>
 					<Listbox
 						v-model="selectedModelKeys"
 						:options="modelOptions"
 						optionLabel="label"
 						filter
 						multiple
-						checkbox
 						:filterPlaceholder="'Search models...'"
 						listStyle="max-height:300px"
 						class="w-full"
-					/>
+					>
+						<template #option="{ option }">
+							<span class="flex items-center gap-2">
+								<i class="pi" :class="isModelOptionSelected(option) ? 'pi-check-square' : 'pi-stop'"></i>
+								{{ option.label }}
+							</span>
+						</template>
+					</Listbox>
 				</div>
 			</div>
 			<template #footer>
-				<Button label="Cancel" @click="cancelSettingsDialog" class="p-button-text"/>
+				<Button label="Cancel" text severity="secondary" @click="cancelSettingsDialog"/>
 				<Button
 					label="Save"
 					@click="saveSettingsDialog"
@@ -670,71 +713,10 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.voices__action-button {
-	border: 0 !important;
-	border-radius: 0 !important;
-}
-
 .profile-dialog {
 	display: flex;
 	flex-direction: column;
-	gap: 1.5rem;
-	padding: 1rem 0;
-}
-
-.profile-dialog__field {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
-}
-
-.profile-dialog__field label {
-	font-weight: 600;
-}
-
-.profile-dialog__input {
-	width: 100%;
-}
-
-.profile-dialog__field small {
-	color: var(--text-color-secondary);
-	font-size: 0.75rem;
-}
-
-.settings-dialog {
-	display: flex;
-	flex-direction: column;
-	gap: 1.5rem;
-	padding: 0.5rem 0;
-}
-
-.settings-dialog__section {
-	display: flex;
-	flex-direction: column;
-	gap: 0.75rem;
-}
-
-.settings-dialog__section-title {
-	font-weight: 600;
-	font-size: 1rem;
-	margin: 0;
-	padding-bottom: 0.5rem;
-	border-bottom: 1px solid var(--surface-border);
-}
-
-.settings-dialog__description {
-	color: var(--text-color-secondary);
-	font-size: 0.875rem;
-	margin: 0;
-}
-
-.settings-dialog__field {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
-}
-
-.text-left :deep(.p-dropdown-label) {
-	text-align: left;
+	gap: 1.25rem;
+	padding: 0.25rem 0;
 }
 </style>

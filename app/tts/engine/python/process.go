@@ -51,8 +51,9 @@ type runner struct {
 	sink        *audio.StreamWriter
 	routedBytes int64
 
-	pendingMutex sync.Mutex
-	pending      map[string]chan runnerEvent
+	pendingMutex     sync.Mutex
+	pending          map[string]chan runnerEvent
+	progressHandlers map[string]func(runnerEvent)
 
 	nextRequestID atomic.Uint64
 	exited        atomic.Bool
@@ -72,14 +73,17 @@ type runnerEvent struct {
 	Channels     int    `json:"channels,omitempty"`
 	Bits         int    `json:"bits,omitempty"`
 	TotalSamples int    `json:"totalSamples,omitempty"`
+	Downloaded   int64  `json:"downloaded,omitempty"`
+	Total        int64  `json:"total,omitempty"`
 }
 
 func newRunner(engineID, bundlePath string, manifest *Manifest) (*runner, error) {
 	pythonRunner := &runner{
-		engineID:    engineID,
-		bundlePath:  bundlePath,
-		pending:     make(map[string]chan runnerEvent),
-		processDone: make(chan struct{}),
+		engineID:         engineID,
+		bundlePath:       bundlePath,
+		pending:          make(map[string]chan runnerEvent),
+		progressHandlers: make(map[string]func(runnerEvent)),
+		processDone:      make(chan struct{}),
 	}
 
 	interpreterPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Python))
@@ -208,6 +212,14 @@ func (pythonRunner *runner) dispatch(event runnerEvent) {
 	case "ready":
 		eventID = "__ready__"
 	case "chunk":
+		return
+	case "progress":
+		pythonRunner.pendingMutex.Lock()
+		handleProgress := pythonRunner.progressHandlers[eventID]
+		pythonRunner.pendingMutex.Unlock()
+		if handleProgress != nil {
+			handleProgress(event)
+		}
 		return
 	case "done", "error":
 	default:
@@ -338,6 +350,62 @@ func (pythonRunner *runner) load(model string, voicePaths []string) error {
 	}
 	pythonRunner.format = audio.StreamFormat{SampleRate: event.SampleRate, Channels: channels, BitDepth: bits}
 	return nil
+}
+
+func (pythonRunner *runner) prepare(reportProgress func(downloaded, total int64), stallTimeout time.Duration) error {
+	if pythonRunner.exited.Load() {
+		return pythonRunner.exitFailure()
+	}
+
+	requestID := fmt.Sprintf("r%d", pythonRunner.nextRequestID.Add(1))
+	eventChannel := pythonRunner.registerPending(requestID)
+	defer pythonRunner.cancelPending(requestID)
+
+	progressArrived := make(chan struct{}, 1)
+	pythonRunner.setProgressHandler(requestID, func(event runnerEvent) {
+		reportProgress(event.Downloaded, event.Total)
+		select {
+		case progressArrived <- struct{}{}:
+		default:
+		}
+	})
+	defer pythonRunner.setProgressHandler(requestID, nil)
+
+	if err := pythonRunner.writeRequest(runnerRequest{ID: requestID, Op: "prepare"}); err != nil {
+		return err
+	}
+
+	stallTimer := time.NewTimer(stallTimeout)
+	defer stallTimer.Stop()
+
+	for {
+		select {
+		case event, ok := <-eventChannel:
+			if !ok {
+				return pythonRunner.exitFailure()
+			}
+			if event.Event == "error" {
+				return response.Err("%s", event.Error)
+			}
+			return nil
+		case <-progressArrived:
+			stallTimer.Reset(stallTimeout)
+		case <-pythonRunner.processDone:
+			return pythonRunner.exitFailure()
+		case <-stallTimer.C:
+			return response.Err("no download progress for %s: %w", stallTimeout, ErrRunnerTimeout)
+		}
+	}
+}
+
+func (pythonRunner *runner) setProgressHandler(requestID string, handleProgress func(runnerEvent)) {
+	pythonRunner.pendingMutex.Lock()
+	defer pythonRunner.pendingMutex.Unlock()
+	if handleProgress == nil {
+		delete(pythonRunner.progressHandlers, requestID)
+		return
+	}
+	pythonRunner.progressHandlers[requestID] = handleProgress
 }
 
 func (pythonRunner *runner) streamSynth(ctx context.Context, request runnerRequest, writer *audio.StreamWriter) error {

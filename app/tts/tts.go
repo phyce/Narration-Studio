@@ -2,6 +2,7 @@ package tts
 
 import (
 	"context"
+	"errors"
 
 	"nstudio/app/common/audio"
 	"nstudio/app/common/response"
@@ -12,6 +13,8 @@ import (
 	"nstudio/app/tts/modelManager"
 	"nstudio/app/tts/profile"
 )
+
+var ErrStopped = errors.New("speech generation stopped")
 
 func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID string) error {
 	session, endSession := beginSession()
@@ -43,38 +46,35 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 	queue := dispatchFutures(session, resolved, saveOutput, profileID)
 
 	for future := range queue {
+		if saveOutput {
+			waitWhilePaused(session.ctx)
+		}
+
 		select {
 		case <-future.ready:
 		case <-session.ctx.Done():
+		}
+
+		if session.ctx.Err() != nil {
 			go discardFuture(future)
 			drainFutures(queue)
-			return nil
+			return ErrStopped
 		}
 
 		if future.err != nil {
-			session.cancel()
-			drainFutures(queue)
-			return response.Err("%w", future.err)
+			return abortSession(session, queue, future.err)
 		}
 
 		if saveOutput {
 			if err := saveFutureToFile(future, outputPath); err != nil {
-				session.cancel()
-				drainFutures(queue)
-				return response.Err("%w", err)
+				return abortSession(session, queue, err)
 			}
 			continue
 		}
 
 		status.Set(status.Playing, "")
 		if err := audio.PlayStream(session.ctx, future.stream); err != nil {
-			if session.ctx.Err() != nil {
-				drainFutures(queue)
-				return nil
-			}
-			session.cancel()
-			drainFutures(queue)
-			return response.Err("%w", err)
+			return abortSession(session, queue, err)
 		}
 
 		storeCacheCapture(future, profileID)
@@ -83,10 +83,33 @@ func GenerateSpeech(messages []util.CharacterMessage, saveOutput bool, profileID
 	return nil
 }
 
+func abortSession(session *playbackSession, queue chan *audioFuture, err error) error {
+	stopped := session.ctx.Err() != nil
+	session.cancel()
+	drainFutures(queue)
+
+	if stopped {
+		return ErrStopped
+	}
+	return response.Err("%w", err)
+}
+
 func SynthesizeStream(ctx context.Context, voice *util.CharacterVoice, text string) (*audio.Stream, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	engineInstance, releaseInstance, ok := modelManager.GetEngineInstance(voice.Engine, voice.Model)
 	if !ok {
+		if modelManager.IsReleased() {
+			return nil, response.Err("%s/%s is hosted by the background server; stop the server to use it here", voice.Engine, voice.Model)
+		}
 		return nil, response.Err("Failed to retrieve engine instance: %s/%s", voice.Engine, voice.Model)
+	}
+
+	if err := ctx.Err(); err != nil {
+		releaseInstance()
+		return nil, err
 	}
 
 	stream, err := engineInstance.Synthesize(ctx, engine.SpeechRequest{

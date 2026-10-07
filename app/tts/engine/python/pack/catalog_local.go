@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"nstudio/app/common/response"
@@ -57,13 +56,7 @@ func FetchAvailableFromPath(localPacksPath string) ([]AvailablePack, error) {
 		if err := json.Unmarshal(rawManifest, &manifest); err != nil {
 			continue
 		}
-		if manifest.ID == "" {
-			continue
-		}
-		if manifest.OS != "" && manifest.OS != runtime.GOOS {
-			continue
-		}
-		if manifest.Arch != "" && manifest.Arch != runtime.GOARCH {
+		if validateIdentity(manifest) != nil || !runsOnThisPlatform(manifest) {
 			continue
 		}
 
@@ -76,8 +69,9 @@ func FetchAvailableFromPath(localPacksPath string) ([]AvailablePack, error) {
 			Manifest:   manifest,
 			BundleURL:  bundlePath,
 			BundleSize: bundleSize,
-			Installed:  IsInstalled(manifest.ID),
-			TagName:    "local",
+			Local:      true,
+			Compatible: python.SupportsProtocol(manifest.Protocol),
+			Paused:     hasPausedInstall(manifest),
 		})
 	}
 

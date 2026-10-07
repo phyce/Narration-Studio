@@ -36,7 +36,6 @@ var (
 	recentEntries  []Entry
 	pendingEntries []Entry
 	lastID         uint64
-	startupOnce    sync.Once
 	flusherOnce    sync.Once
 	flushSignal    = make(chan struct{}, 1)
 )
@@ -46,7 +45,6 @@ func Record(entry Entry) Entry {
 		_ = recover()
 	}()
 
-	startupOnce.Do(loadLastID)
 	flusherOnce.Do(startFlusher)
 
 	if entry.Timestamp.IsZero() {

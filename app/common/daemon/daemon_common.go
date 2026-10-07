@@ -1,11 +1,15 @@
 package daemon
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -16,13 +20,19 @@ const (
 	StatusFileName = "narration-studio-status.json"
 )
 
-var statusMutex sync.Mutex
+var (
+	statusMutex       sync.Mutex
+	lastWrittenStatus []byte
+)
 
 type DaemonStatusInfo struct {
 	PID               int       `json:"pid"`
 	Version           string    `json:"version"`
 	StartTime         time.Time `json:"start_time"`
 	ProcessedMessages int64     `json:"processed_messages"`
+	Mode              string    `json:"mode"`
+	Host              string    `json:"host"`
+	Port              int       `json:"port"`
 }
 
 func GetPidFilePath() string {
@@ -52,6 +62,12 @@ func SetupDaemonLogger() (*os.File, error) {
 	return logFile, nil
 }
 
+// WriteDaemonStatus persists the status file, skipping the write when the
+// serialized status is byte-identical to what this process last wrote. Every
+// field but ProcessedMessages is fixed for the life of the daemon, so without
+// this an idle server rewrites the same ~250 bytes on every poll tick for as
+// long as it runs. The file-exists check keeps the cache self-healing: a temp
+// directory cleaner wiping the file must not leave the daemon looking dead.
 func WriteDaemonStatus(status DaemonStatusInfo) error {
 	statusMutex.Lock()
 	defer statusMutex.Unlock()
@@ -62,7 +78,18 @@ func WriteDaemonStatus(status DaemonStatusInfo) error {
 		return fmt.Errorf("error marshaling status: %v", err)
 	}
 
-	return os.WriteFile(statusFile, data, 0644)
+	if bytes.Equal(data, lastWrittenStatus) {
+		if _, err := os.Stat(statusFile); err == nil {
+			return nil
+		}
+	}
+
+	if err := os.WriteFile(statusFile, data, 0644); err != nil {
+		return err
+	}
+
+	lastWrittenStatus = data
+	return nil
 }
 
 func ReadDaemonStatus() (*DaemonStatusInfo, error) {
@@ -81,4 +108,36 @@ func ReadDaemonStatus() (*DaemonStatusInfo, error) {
 	}
 
 	return &status, nil
+}
+
+func ServerEndpoint() (string, error) {
+	running, pid, err := GetDaemonStatus()
+	if err != nil {
+		return "", err
+	}
+	if !running {
+		return "", fmt.Errorf("server is not running")
+	}
+
+	status, err := ReadDaemonStatus()
+	if err != nil {
+		return "", err
+	}
+	if status.PID != pid {
+		return "", fmt.Errorf("status file belongs to PID %d, not the running server (PID %d)", status.PID, pid)
+	}
+	if status.Mode != "http" {
+		return "", fmt.Errorf("server is running in %q mode, not http", status.Mode)
+	}
+
+	return "http://" + net.JoinHostPort(dialableHost(status.Host), strconv.Itoa(status.Port)), nil
+}
+
+func dialableHost(listenHost string) string {
+	listenHost = strings.Trim(listenHost, "[]")
+	switch listenHost {
+	case "", "0.0.0.0", "::":
+		return "127.0.0.1"
+	}
+	return listenHost
 }

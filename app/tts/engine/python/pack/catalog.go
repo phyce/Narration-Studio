@@ -2,123 +2,88 @@ package pack
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"runtime"
-	"strings"
 	"time"
 
 	"nstudio/app/common/response"
 	"nstudio/app/tts/engine/python"
 )
 
-var CatalogURL = "https://api.github.com/repos/phyce/NarrationStudio-Engines/releases"
+var CatalogURL = "https://raw.githubusercontent.com/phyce/NarrationStudio-Engines/catalog/catalog.json"
+
+const supportedCatalogSchemaVersion = 1
 
 type AvailablePack struct {
-	Manifest   python.Manifest `json:"manifest"`
-	BundleURL  string          `json:"bundleUrl"`
-	BundleSize int64           `json:"bundleSize"`
-	Installed  bool            `json:"installed"`
-	TagName    string          `json:"tagName"`
+	Manifest    python.Manifest `json:"manifest"`
+	BundleURL   string          `json:"bundleUrl"`
+	BundleSize  int64           `json:"bundleSize"`
+	SHA256      string          `json:"sha256,omitempty"`
+	Notes       string          `json:"notes,omitempty"`
+	PublishedAt string          `json:"publishedAt,omitempty"`
+	Local       bool            `json:"local"`
+	Compatible  bool            `json:"compatible"`
+	Paused      bool            `json:"paused"`
 }
 
-type githubRelease struct {
-	Name       string `json:"name"`
-	TagName    string `json:"tag_name"`
-	Body       string `json:"body"`
-	Draft      bool   `json:"draft"`
-	Prerelease bool   `json:"prerelease"`
-	Assets     []struct {
-		Name               string `json:"name"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-		Size               int64  `json:"size"`
-	} `json:"assets"`
+type catalogFile struct {
+	SchemaVersion int            `json:"schemaVersion"`
+	Packs         []catalogEntry `json:"packs"`
+}
+
+type catalogEntry struct {
+	Manifest    python.Manifest `json:"manifest"`
+	URL         string          `json:"url"`
+	Size        int64           `json:"size"`
+	SHA256      string          `json:"sha256"`
+	Notes       string          `json:"notes"`
+	PublishedAt string          `json:"publishedAt"`
 }
 
 func FetchAvailable() ([]AvailablePack, error) {
 	httpClient := &http.Client{Timeout: 20 * time.Second}
-	catalogRequest, err := http.NewRequest(http.MethodGet, CatalogURL, nil)
+	catalogResponse, err := httpClient.Get(CatalogURL)
 	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-	catalogRequest.Header.Set("Accept", "application/vnd.github+json")
-
-	catalogResponse, err := httpClient.Do(catalogRequest)
-	if err != nil {
-		return nil, response.Err("%w", err)
+		return nil, response.Err("fetch engine pack catalog: %w", err)
 	}
 	defer catalogResponse.Body.Close()
 
+	if catalogResponse.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
 	if catalogResponse.StatusCode != http.StatusOK {
-		errorBody, _ := io.ReadAll(catalogResponse.Body)
-		return nil, response.Err("github API returned %d: %s", catalogResponse.StatusCode, string(errorBody))
+		errorBody, _ := io.ReadAll(io.LimitReader(catalogResponse.Body, 4096))
+		return nil, response.Err("engine pack catalog returned %d: %s", catalogResponse.StatusCode, string(errorBody))
 	}
 
-	var releases []githubRelease
-	if err := json.NewDecoder(catalogResponse.Body).Decode(&releases); err != nil {
-		return nil, response.Err("%w", err)
+	var catalog catalogFile
+	if err := json.NewDecoder(catalogResponse.Body).Decode(&catalog); err != nil {
+		return nil, response.Err("read engine pack catalog: %w", err)
 	}
-
-	platformSuffix := strings.ToLower(fmt.Sprintf("-%s-%s", runtime.GOOS, runtime.GOARCH))
+	if catalog.SchemaVersion != supportedCatalogSchemaVersion {
+		return nil, response.Err("the engine pack catalog uses format %d; this version of Narration Studio reads format %d", catalog.SchemaVersion, supportedCatalogSchemaVersion)
+	}
 
 	var availablePacks []AvailablePack
-	for _, release := range releases {
-		if release.Draft || release.Prerelease {
+	for _, entry := range catalog.Packs {
+		if !runsOnThisPlatform(entry.Manifest) || validateIdentity(entry.Manifest) != nil {
 			continue
 		}
-
-		var bundleURL, metadataURL string
-		var bundleSize int64
-
-		for _, asset := range release.Assets {
-			lowerCaseAssetName := strings.ToLower(asset.Name)
-			if !strings.Contains(lowerCaseAssetName, platformSuffix) {
-				continue
-			}
-			switch {
-			case strings.HasSuffix(lowerCaseAssetName, ".nstudio"):
-				bundleURL = asset.BrowserDownloadURL
-				bundleSize = asset.Size
-			case strings.HasSuffix(lowerCaseAssetName, ".metadata.json"):
-				metadataURL = asset.BrowserDownloadURL
-			}
-		}
-
-		if bundleURL == "" || metadataURL == "" {
-			continue
-		}
-
-		manifest, err := fetchMetadata(metadataURL)
-		if err != nil {
-			continue
-		}
-
 		availablePacks = append(availablePacks, AvailablePack{
-			Manifest:   *manifest,
-			BundleURL:  bundleURL,
-			BundleSize: bundleSize,
-			Installed:  IsInstalled(manifest.ID),
-			TagName:    release.TagName,
+			Manifest:    entry.Manifest,
+			BundleURL:   entry.URL,
+			BundleSize:  entry.Size,
+			SHA256:      entry.SHA256,
+			Notes:       entry.Notes,
+			PublishedAt: entry.PublishedAt,
+			Compatible:  python.SupportsProtocol(entry.Manifest.Protocol),
+			Paused:      hasPausedInstall(entry.Manifest),
 		})
 	}
-
 	return availablePacks, nil
 }
 
-func fetchMetadata(metadataURL string) (*python.Manifest, error) {
-	httpClient := &http.Client{Timeout: 20 * time.Second}
-	metadataResponse, err := httpClient.Get(metadataURL)
-	if err != nil {
-		return nil, response.Err("%w", err)
-	}
-	defer metadataResponse.Body.Close()
-	if metadataResponse.StatusCode != http.StatusOK {
-		return nil, response.Err("metadata %s: status %d", metadataURL, metadataResponse.StatusCode)
-	}
-	var manifest python.Manifest
-	if err := json.NewDecoder(metadataResponse.Body).Decode(&manifest); err != nil {
-		return nil, response.Err("%w", err)
-	}
-	return &manifest, nil
+func runsOnThisPlatform(manifest python.Manifest) bool {
+	return (manifest.OS == "" || manifest.OS == runtime.GOOS) && (manifest.Arch == "" || manifest.Arch == runtime.GOARCH)
 }

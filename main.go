@@ -34,7 +34,9 @@ func main() {
 		Title:            "Narration Studio",
 		Width:            1024,
 		Height:           768,
-		BackgroundColour: application.RGBA{Red: 27, Green: 38, Blue: 54, Alpha: 255},
+		MinWidth:         800,
+		MinHeight:        560,
+		BackgroundColour: application.RGBA{Red: 28, Green: 28, Blue: 28, Alpha: 255},
 	})
 
 	activityLogWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -44,7 +46,7 @@ func main() {
 		Height:           700,
 		Hidden:           true,
 		URL:              "/activitylog.html",
-		BackgroundColour: application.RGBA{Red: 27, Green: 38, Blue: 54, Alpha: 255},
+		BackgroundColour: application.RGBA{Red: 28, Green: 28, Blue: 28, Alpha: 255},
 	})
 	activityLogWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		event.Cancel()

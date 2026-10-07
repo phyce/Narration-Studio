@@ -1,36 +1,22 @@
 .header {
-	@apply bg-neutral-800;
+	background-color: var(--app-bar);
+	border-bottom: 1px solid var(--surface-border);
 }
 
 .header__list {
-	@apply
-	flex
-	flex-wrap
-	justify-center
-	text-center
-	text-sm
-	font-medium
-	text-gray-400
-	border-b
-	border-gray-200
-	;
-}
-
-.header__list__item {
-	@apply mr-2;
+	@apply flex flex-wrap justify-center text-center text-sm font-medium gap-1;
+	color: var(--text-color-secondary);
 }
 
 .header__list__item__button {
-	@apply
-	inline-block
-	p-4
-	border-b-2
-	rounded-t-lg
-	border-transparent
-	hover:border-gray-300
-	;
+	@apply inline-block px-4 py-3 border-b-2 border-transparent transition-colors duration-150;
 }
 
-.button--active {
-	@apply border-orange-600 text-orange-600;
+.header__list__item__button:hover {
+	color: var(--text-color);
+	border-bottom-color: #5c5c5c;
+}
+
+.header__list__item__button.button--active {
+	@apply border-orange-500 text-orange-500;
 }

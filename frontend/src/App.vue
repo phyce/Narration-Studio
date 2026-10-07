@@ -89,11 +89,13 @@ onUnmounted(() => {
 		<Footer class="app__footer"/>
 		<Toast position="bottom-center">
 			<template #message="slotProps">
-				<div class="toast-content" :title="'Open in Activity Log'" @click="openToastInActivityLog(slotProps.message)">
-					<span :class="['p-toast-message-icon', 'pi', toastIcon(slotProps.message.severity ?? 'info')]"/>
-					<div class="p-toast-message-text">
-						<span class="p-toast-summary">{{ slotProps.message.summary }}</span>
-						<div class="p-toast-detail">{{ slotProps.message.detail }}</div>
+				<div class="toast-content" title="Open in Activity Log" @click="openToastInActivityLog(slotProps.message)">
+					<div class="toast-content__icon">
+						<i :class="['pi', toastIcon(slotProps.message.severity ?? 'info')]"></i>
+					</div>
+					<div class="toast-content__text">
+						<span class="toast-content__summary">{{ slotProps.message.summary }}</span>
+						<span v-if="slotProps.message.detail" class="toast-content__detail">{{ slotProps.message.detail }}</span>
 					</div>
 				</div>
 			</template>
@@ -104,11 +106,45 @@ onUnmounted(() => {
 <style scoped>
 .toast-content {
 	display: flex;
-	align-items: flex-start;
-	gap: 8px;
+	align-items: stretch;
 	flex: 1;
+	min-width: 0;
 	cursor: pointer;
 	text-align: left;
 	overflow-wrap: anywhere;
+}
+
+/* The icon is centred in its own column, whatever the height of the text next to it. */
+.toast-content__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 3rem;
+}
+
+.toast-content__icon .pi {
+	font-size: 1.35rem;
+}
+
+.toast-content__text {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 0.2rem;
+	flex: 1;
+	min-width: 0;
+	padding: 0.75rem 0.5rem 0.75rem 0;
+}
+
+.toast-content__summary {
+	font-weight: 700;
+	line-height: 1.25;
+}
+
+.toast-content__detail {
+	font-size: 0.875rem;
+	line-height: 1.35;
+	color: var(--text-color);
 }
 </style>

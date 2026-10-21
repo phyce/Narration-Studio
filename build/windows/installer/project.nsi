@@ -144,39 +144,6 @@ Section "CLI Tool" SEC_CLI
     File "nstudio-cli.exe"
 SectionEnd
 
-Section "Microsoft Speech API 4" SEC_MSAPI4
-    DetailPrint "Installing Microsoft Speech API 4..."
-
-    InitPluginsDir
-
-    File /oname=$PLUGINSDIR\SAPI4SDK.exe "engines\mssapi4\SAPI4SDK.exe"
-    File /oname=$PLUGINSDIR\spchapi.exe "engines\mssapi4\spchapi.exe"
-    File /oname=$PLUGINSDIR\msttsl.exe "engines\mssapi4\msttsl.exe"
-    File /oname=$PLUGINSDIR\tv_enua.exe "engines\mssapi4\tv_enua.exe"
-
-    DetailPrint "Installing SAPI4 SDK..."
-    ExecWait '"$PLUGINSDIR\SAPI4SDK.exe"'
-
-    DetailPrint "Installing spchapi..."
-    ExecWait '"$PLUGINSDIR\spchapi.exe"'
-
-    DetailPrint "Installing msttsl..."
-    ExecWait '"$PLUGINSDIR\msttsl.exe"'
-
-    DetailPrint "Installing tv_enua..."
-    ExecWait '"$PLUGINSDIR\tv_enua.exe"'
-
-    ; Clean up the installer files from the temporary directory.
-    Delete "$PLUGINSDIR\SAPI4SDK.exe"
-    Delete "$PLUGINSDIR\spchapi.exe"
-    Delete "$PLUGINSDIR\msttsl.exe"
-    Delete "$PLUGINSDIR\tv_enua.exe"
-
-    SetOutPath "$INSTDIR\engines\mssapi4"
-
-    File /r "engines\mssapi4\sapi4out"
-SectionEnd
-
 Section "Uninstall"
     !insertmacro wails.setShellContext
 

@@ -12,7 +12,6 @@ import (
 	"nstudio/app/common/process"
 	"nstudio/app/common/response"
 	"os/exec"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,7 +28,7 @@ var (
 	ErrRunnerTimeout = errors.New("python runner timed out")
 )
 
-// runner drives the bundle's runner.py over the streaming stdio protocol
+// runner drives the bundle's runner (runner.py, or its own program) over the streaming stdio protocol
 // (docs/python-engine-protocol.md): stdin carries JSON-line requests, stdout
 // is a raw s16le PCM firehose routed straight into the active stream writer,
 // stderr carries JSON event lines (ready/done/error) interleaved with
@@ -86,13 +85,7 @@ func newRunner(engineID, bundlePath string, manifest *Manifest) (*runner, error)
 		processDone:      make(chan struct{}),
 	}
 
-	interpreterPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Python))
-	entrypointPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Entrypoint))
-
-	command := exec.Command(interpreterPath, entrypointPath, "--bundle-dir", bundlePath)
-	command.Dir = bundlePath
-	command.Env = childProcessEnvironment(bundlePath, manifest.Runtime.Env)
-
+	command := runnerCommand(bundlePath, manifest.Runtime)
 	process.HideCommandLine(command)
 
 	stdin, err := command.StdinPipe()
@@ -109,7 +102,7 @@ func newRunner(engineID, bundlePath string, manifest *Manifest) (*runner, error)
 	}
 
 	if err := command.Start(); err != nil {
-		return nil, response.Err("start %s: %w", interpreterPath, err)
+		return nil, response.Err("start %s: %w", command.Path, err)
 	}
 
 	pythonRunner.command = command
@@ -408,7 +401,7 @@ func (pythonRunner *runner) setProgressHandler(requestID string, handleProgress 
 	pythonRunner.progressHandlers[requestID] = handleProgress
 }
 
-func (pythonRunner *runner) streamSynth(ctx context.Context, request runnerRequest, writer *audio.StreamWriter) error {
+func (pythonRunner *runner) streamSynth(ctx context.Context, request runnerRequest, format audio.StreamFormat, writer *audio.StreamWriter) error {
 	if pythonRunner.exited.Load() {
 		return pythonRunner.exitFailure()
 	}
@@ -463,9 +456,9 @@ func (pythonRunner *runner) streamSynth(ctx context.Context, request runnerReque
 	if terminalReceived {
 		expectedBytes := int64(terminalEvent.TotalSamples) * 2
 		pythonRunner.awaitRoutedBytes(expectedBytes)
-		if terminalEvent.SampleRate > 0 && terminalEvent.SampleRate != pythonRunner.format.SampleRate {
-			log.Warnf("[python:%s] synth sample rate %d differs from loaded format %d",
-				pythonRunner.engineID, terminalEvent.SampleRate, pythonRunner.format.SampleRate)
+		if terminalEvent.SampleRate > 0 && terminalEvent.SampleRate != format.SampleRate {
+			log.Warnf("[python:%s] synth sample rate %d differs from the voice's format %d",
+				pythonRunner.engineID, terminalEvent.SampleRate, format.SampleRate)
 		}
 	}
 

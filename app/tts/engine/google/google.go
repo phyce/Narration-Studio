@@ -102,6 +102,16 @@ func (google *Google) FetchModels() map[string]engine.Model {
 
 // </editor-fold>
 
+func (google *Google) CheckAvailability(ctx context.Context) error {
+	apiKey := config.GetEngine().Api.Google.ApiKey
+	if apiKey == "" {
+		return engine.ErrApiKeyNotSet
+	}
+	return engine.CheckApiAnswers(ctx, "Google Cloud", "https://texttospeech.googleapis.com/v1/voices?languageCode=en-US", map[string]string{
+		"x-goog-api-key": apiKey,
+	})
+}
+
 // <editor-fold desc="Other">
 func FetchModels() map[string]engine.Model {
 	if config.GetEngine().Api.Google.ApiKey == "" {

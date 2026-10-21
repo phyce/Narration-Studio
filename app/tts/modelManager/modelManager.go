@@ -1,6 +1,8 @@
 package modelManager
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"nstudio/app/common/eventManager"
 	"nstudio/app/common/response"
@@ -512,6 +514,38 @@ func GetAllEngines() []tts.Engine {
 
 	tts.SortEngines(availableEngines)
 	return availableEngines
+}
+
+func CheckApiEngines(ctx context.Context) map[string]ApiAvailability {
+	checkers := make(map[string]tts.AvailabilityChecker)
+	manager.RLock()
+	for engineID, entry := range manager.Engines {
+		if entry.Engine.Type != tts.Api {
+			continue
+		}
+		if checker, canCheck := entry.Engine.Engine.(tts.AvailabilityChecker); canCheck {
+			checkers[engineID] = checker
+		}
+	}
+	manager.RUnlock()
+
+	availability := make(map[string]ApiAvailability, len(checkers))
+	var availabilityMutex sync.Mutex
+	var checks sync.WaitGroup
+	for engineID, checker := range checkers {
+		checks.Go(func() {
+			err := checker.CheckAvailability(ctx)
+			result := ApiAvailability{Available: err == nil, MissingApiKey: errors.Is(err, tts.ErrApiKeyNotSet)}
+			if err != nil {
+				result.Reason = err.Error()
+			}
+			availabilityMutex.Lock()
+			availability[engineID] = result
+			availabilityMutex.Unlock()
+		})
+	}
+	checks.Wait()
+	return availability
 }
 
 func GetActiveEngines() []tts.Engine {

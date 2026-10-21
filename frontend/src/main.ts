@@ -4,7 +4,7 @@ import App from './App.vue'
 import './style.css';
 import Aura from './components/prime/aura';
 import ToastService from 'primevue/toastservice';
-import Tooltip from 'primevue/tooltip';
+import Tooltip from './util/tooltip';
 //@ts-ignore
 import {install as VueMonacoEditorPlugin, loader} from '@guolao/vue-monaco-editor'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'

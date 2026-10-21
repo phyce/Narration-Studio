@@ -5,16 +5,16 @@ import Button from 'primevue/button';
 import InputSwitch from 'primevue/inputswitch';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
-import Dropdown from 'primevue/dropdown';
 import Tag from 'primevue/tag';
 import ProgressBar from 'primevue/progressbar';
 import PiperDownloadDialog from '../common/PiperDownloadDialog.vue';
 import EnginePackBuilds from '../common/EnginePackBuilds.vue';
-import {computed, onBeforeUnmount, onMounted, reactive, ref} from 'vue';
-import {Engine, Model} from '../interfaces/engine';
+import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue';
+import {ApiAvailability, Engine, Model} from '../interfaces/engine';
 import type {AvailablePack, EnginePackListing, InstalledPack, PythonManifest} from '../interfaces/enginePack';
 import {findUpdate, newestFirst} from '../../util/enginePacks';
 import {
+	CheckApiEngines,
 	EnginePackCancelInstall,
 	EnginePackFetchAvailable,
 	EnginePackImport,
@@ -136,12 +136,21 @@ const settingsLoading = ref(false);
 const settingsHasChanges = ref(false);
 const settingsOriginalConfig = ref('');
 
-const engineFilter = ref<'all' | 'local' | 'api'>('all');
-const engineFilterOptions = [
-	{label: 'All', value: 'all'},
+type EngineTab = 'local' | 'api';
+const engineTab = ref<EngineTab>('local');
+const engineTabs: {label: string; value: EngineTab}[] = [
 	{label: 'Local', value: 'local'},
-	{label: 'Online', value: 'api'},
+	{label: 'API', value: 'api'},
 ];
+const availableOnly = ref<boolean>(false);
+
+const apiAvailability = ref<Record<string, ApiAvailability>>({});
+const checkingApiEngines = ref<boolean>(false);
+let latestApiCheck = 0;
+
+function isUnavailable(engineID: string): boolean {
+	return apiAvailability.value[engineID]?.available === false;
+}
 
 interface SidebarEntry {
 	id: string;
@@ -218,15 +227,22 @@ const sidebarEntries = computed<SidebarEntry[]>(() => {
 });
 
 const filteredEngines = computed<SidebarEntry[]>(() => {
-	let list = sidebarEntries.value;
-	if (installedOnly.value) {
+	let list = sidebarEntries.value.filter(entry => entry.type === engineTab.value);
+	if (engineTab.value === 'local' && installedOnly.value) {
 		list = list.filter(entry => entry.installed);
 	}
-	if (engineFilter.value !== 'all') {
-		list = list.filter(entry => entry.type === engineFilter.value);
+	if (engineTab.value === 'api' && availableOnly.value) {
+		list = list.filter(entry => !isUnavailable(entry.id));
 	}
 	return list;
 });
+
+function selectFirstVisibleEngine() {
+	if (filteredEngines.value.some(entry => entry.id === selectedEngineId.value)) return;
+	selectedEngineId.value = filteredEngines.value[0]?.id ?? '';
+}
+
+watch(filteredEngines, selectFirstVisibleEngine);
 
 const selectedEngine = computed(() =>
 	engines.value.find(engine => engine.id === selectedEngineId.value)
@@ -247,6 +263,15 @@ const selectedShowcaseManifest = computed<PythonManifest | undefined>(() => {
 });
 
 const selectedIsUninstallable = computed(() => !!selectedEntry.value?.installedPack);
+
+const selectedApiProblem = computed(() => {
+	const entry = selectedEntry.value;
+	if (entry?.type !== 'api') return '';
+	const availability = apiAvailability.value[entry.id];
+	if (!availability || availability.available) return '';
+	if (availability.missingApiKey) return 'No API key is set. Add one in Settings to use this engine.';
+	return availability.reason || 'The service isn\'t responding.';
+});
 
 const selectedEngineModels = computed(() => {
 	if (!selectedEngineId.value) return {};
@@ -299,6 +324,16 @@ const selectedSubtitle = computed(() => {
 	} else {
 		parts.push('installed, not loaded');
 	}
+	if (entry.type === 'api') {
+		const availability = apiAvailability.value[entry.id];
+		if (!availability) {
+			if (checkingApiEngines.value) parts.push('checking…');
+		} else if (availability.available) {
+			parts.push('available');
+		} else {
+			parts.push(availability.missingApiKey ? 'no API key' : 'not available');
+		}
+	}
 	const installedManifest = entry.installedPack?.manifest;
 	if (installedManifest) {
 		parts.push(`version ${installedManifest.version}${installedManifest.variant ? ` (${installedManifest.variant})` : ''}`);
@@ -331,10 +366,20 @@ async function loadData() {
 		const toggleKey = `${model.engine}:${model.id}`;
 		modelToggles[toggleKey] = savedToggles[toggleKey] ?? false;
 	});
+}
 
-	if (engines.value.length > 0 && !selectedEngineId.value) {
-		selectedEngineId.value = engines.value[0].id;
+async function checkApiEngines() {
+	const apiCheck = ++latestApiCheck;
+	checkingApiEngines.value = true;
+	let availability: Record<string, ApiAvailability> = {};
+	try {
+		availability = JSON.parse(await CheckApiEngines()) || {};
+	} catch {
+		availability = {};
 	}
+	if (apiCheck !== latestApiCheck) return;
+	apiAvailability.value = availability;
+	checkingApiEngines.value = false;
 }
 
 async function installPack(pack: AvailablePack) {
@@ -414,9 +459,7 @@ async function uninstallPack(engineID: string) {
 				selectedEngineId.value = '';
 			}
 			await loadData();
-			if (!selectedEngineId.value && engines.value.length > 0) {
-				selectedEngineId.value = engines.value[0].id;
-			}
+			selectFirstVisibleEngine();
 		}
 	} finally {
 		installBusy[engineID] = false;
@@ -449,6 +492,7 @@ async function disableAll() {
 
 async function reloadEngines() {
 	reloadModelsButtonDisabled.value = true;
+	checkApiEngines();
 	await ReloadVoicePacks();
 
 	const [modelsResult, settings] = await Promise.all([
@@ -515,10 +559,12 @@ async function saveSettings() {
 	settingsHasChanges.value = false;
 	showSettingsDialog.value = false;
 	await loadData();
+	await checkApiEngines();
 }
 
 onMounted(() => {
 	loadData();
+	checkApiEngines();
 
 	Events.On('engine.download.progress', (event: any) => {
 		const progress = event.data as { engineID: string; stage: string; percent: number; done: boolean };
@@ -581,21 +627,37 @@ onBeforeUnmount(() => {
 					@click="reloadEngines"
 				/>
 			</div>
-			<div class="voice-packs__sidebar__row">
-				<Dropdown
-					v-model="engineFilter"
-					:options="engineFilterOptions"
-					optionLabel="label"
-					optionValue="value"
-					aria-label="Engine type"
-					class="voice-packs__sidebar__filter"
-				/>
-				<div class="check-row voice-packs__installed-only">
+			<div class="voice-packs__sidebar__row voice-packs__sidebar__row--tabs">
+				<div class="voice-packs__tabs" role="tablist" aria-label="Engine type">
+					<button
+						v-for="tab in engineTabs"
+						:key="tab.value"
+						type="button"
+						role="tab"
+						class="voice-packs__tab"
+						:class="{'voice-packs__tab--active': engineTab === tab.value}"
+						:aria-selected="engineTab === tab.value"
+						aria-controls="vp-engine-list"
+						@click="engineTab = tab.value"
+					>
+						{{ tab.label }}
+					</button>
+				</div>
+				<div v-if="engineTab === 'local'" class="check-row voice-packs__sidebar__switch">
 					<InputSwitch v-model="installedOnly" inputId="vp-installed-only"/>
 					<label for="vp-installed-only">Installed</label>
 				</div>
+				<div
+					v-else
+					class="check-row voice-packs__sidebar__switch"
+					title="Online engines with an API key that answered when this page loaded"
+				>
+					<i v-if="checkingApiEngines" class="pi pi-spin pi-spinner" aria-label="Checking the online engines"></i>
+					<InputSwitch v-model="availableOnly" inputId="vp-available-only"/>
+					<label for="vp-available-only">Available</label>
+				</div>
 			</div>
-			<div class="voice-packs__sidebar__list">
+			<div id="vp-engine-list" class="voice-packs__sidebar__list" role="tabpanel">
 				<div
 					v-for="entry in filteredEngines"
 					:key="entry.id"
@@ -603,6 +665,7 @@ onBeforeUnmount(() => {
 					:class="{
 						'voice-packs__engine-card--active': selectedEngineId === entry.id,
 						'voice-packs__engine-card--available': !entry.installed,
+						'voice-packs__engine-card--unavailable': entry.type === 'api' && isUnavailable(entry.id),
 					}"
 					@click="selectEngine(entry.id)"
 				>
@@ -623,6 +686,14 @@ onBeforeUnmount(() => {
 							class="voice-packs__tag-pill"
 						/>
 						<Tag v-if="!entry.installed" value="available" rounded class="voice-packs__tag-pill"/>
+						<Tag
+							v-if="entry.type === 'api' && isUnavailable(entry.id)"
+							:value="apiAvailability[entry.id].missingApiKey ? 'no API key' : 'not available'"
+							:severity="apiAvailability[entry.id].missingApiKey ? 'secondary' : 'danger'"
+							:title="apiAvailability[entry.id].reason"
+							rounded
+							class="voice-packs__tag-pill"
+						/>
 						<Tag v-if="entry.hasUpdate" value="update" severity="warning" rounded class="voice-packs__tag-pill"/>
 						<Tag
 							v-if="entry.paused && !installBusy[entry.id]"
@@ -689,6 +760,11 @@ onBeforeUnmount(() => {
 			</div>
 
 			<div class="page-body voice-packs__body">
+				<p v-if="selectedApiProblem" class="voice-packs__api-problem">
+					<i class="pi pi-exclamation-triangle"></i>
+					<span>{{ selectedApiProblem }}</span>
+				</p>
+
 				<p v-if="selectedIsAvailable && selectedShowcaseManifest?.description" class="voice-packs__description">
 					{{ selectedShowcaseManifest.description }}
 				</p>
@@ -764,8 +840,12 @@ onBeforeUnmount(() => {
 		<div class="voice-packs__content" v-else>
 			<div class="empty-state">
 				<i class="pi pi-box"></i>
-				<span v-if="installedOnly && availablePacks.length > 0">
+				<span v-if="engineTab === 'local' && installedOnly && availablePacks.length > 0">
 					Showing installed engines only. Turn off "Installed" to browse engines you can download.
+				</span>
+				<span v-else-if="engineTab === 'api' && availableOnly">
+					No online engine is ready to use. Turn off "Available" to see them all, then add an API key in an
+					engine's Settings.
 				</span>
 				<span v-else>Select an engine on the left.</span>
 			</div>
@@ -786,7 +866,7 @@ onBeforeUnmount(() => {
 				<i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
 				<p>Loading settings…</p>
 			</div>
-			<div v-else-if="settingsSchema" class="voice-packs__settings-content">
+			<div v-else-if="settingsSchema" class="voice-packs__settings-content config-fields">
 				<RecursiveField
 					v-for="field in engineSettingsFields"
 					:key="field.path"

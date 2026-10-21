@@ -7,6 +7,7 @@ export default {
 			"absolute",
 			"shadow-md",
 			"p-fadein",
+			"max-w-xs",
 			// Spacing
 			{
 				"py-0 px-1":
@@ -49,7 +50,7 @@ export default {
 			"p-3",
 			"bg-surface-600 dark:bg-surface-700",
 			"text-white",
-			"leading-none",
+			"leading-snug",
 			"rounded-md",
 			"whitespace-pre-line",
 			"break-words",

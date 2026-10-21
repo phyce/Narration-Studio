@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed} from 'vue';
 import Password from 'primevue/password';
-import Tooltip from 'primevue/tooltip';
+import Tooltip from '../../util/tooltip';
 import type {ConfigFieldMetadata} from '../../interfaces/config';
 
 interface Props {
@@ -56,7 +56,6 @@ const placeholder = computed(() => props.metadata?.placeholder || '');
 	flex-direction: column;
 	gap: 0.375rem;
 	text-align: left;
-	margin-bottom: 0.75rem;
 }
 
 .config-field__label {

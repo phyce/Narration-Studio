@@ -119,7 +119,7 @@ onBeforeUnmount(() => {
 			/>
 		</div>
 
-		<div class="page-body" v-if="!loading && schema">
+		<div class="page-body config-fields" v-if="!loading && schema">
 			<RecursiveField
 				v-for="field in rootFields"
 				:key="field.path"

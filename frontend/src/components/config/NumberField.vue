@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed} from 'vue';
 import InputNumber from 'primevue/inputnumber';
-import Tooltip from 'primevue/tooltip';
+import Tooltip from '../../util/tooltip';
 import type {ConfigFieldMetadata} from '../../interfaces/config';
 
 interface Props {
@@ -57,7 +57,6 @@ const max = computed(() => props.metadata?.max);
 	flex-direction: column;
 	gap: 0.375rem;
 	text-align: left;
-	margin-bottom: 0.75rem;
 }
 
 .config-field__label {

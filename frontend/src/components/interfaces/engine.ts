@@ -6,6 +6,12 @@ export interface Engine {
 	models: Record<string, Model>;
 }
 
+export interface ApiAvailability {
+	available: boolean;
+	missingApiKey: boolean;
+	reason?: string;
+}
+
 export interface Model {
 	id: string;
 	name: string;

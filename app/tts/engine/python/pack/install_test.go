@@ -103,6 +103,7 @@ func buildFakeBundle(t *testing.T, manifest python.Manifest, weightsSize int) fa
 		"manifest.json":      rawManifest,
 		"python/python.exe":  []byte("not really python"),
 		"runner.py":          []byte("print('hello')"),
+		"runner/runner.exe":  []byte("not really a program"),
 		"models/weights.bin": weights,
 	} {
 		entryWriter, err := zipWriter.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store})
@@ -693,6 +694,49 @@ func TestLocalBundleInstallsWithoutDownloading(t *testing.T) {
 	}
 	if _, err := os.Stat(bundle.path); err != nil {
 		t.Errorf("local bundle was removed: %v", err)
+	}
+}
+
+func TestBundleWithItsOwnRunnerProgramInstalls(t *testing.T) {
+	usePacksRoot(t)
+	stubRunnerSteps(t, nil)
+
+	manifest := testManifest("1.0.0")
+	manifest.Runtime = python.Runtime{Executable: "runner/runner.exe"}
+	bundle := buildFakeBundle(t, manifest, 1024)
+	if err := Install(AvailablePack{Manifest: manifest, BundleURL: bundle.path, Local: true}); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if _, installed := installedVersion(t); !installed || !isRegistered(testEngineID) {
+		t.Error("a bundle with its own runner program is not installed and registered")
+	}
+}
+
+func TestBundleRunnerFilesMustBeInTheBundle(t *testing.T) {
+	for _, testCase := range []struct {
+		name          string
+		packRuntime   python.Runtime
+		expectedError string
+	}{
+		{"MissingProgram", python.Runtime{Executable: "runner/missing.exe"}, "bundle missing its runner file"},
+		{"ProgramOutsideTheBundle", python.Runtime{Executable: "../runner.exe"}, "outside the bundle"},
+		{"NoRunner", python.Runtime{}, "names neither an executable nor python and an entrypoint"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			usePacksRoot(t)
+			stubRunnerSteps(t, nil)
+
+			manifest := testManifest("1.0.0")
+			manifest.Runtime = testCase.packRuntime
+			bundle := buildFakeBundle(t, manifest, 1024)
+			err := Install(AvailablePack{Manifest: manifest, BundleURL: bundle.path, Local: true})
+			if err == nil || !strings.Contains(err.Error(), testCase.expectedError) {
+				t.Fatalf("Install error = %v, want %q", err, testCase.expectedError)
+			}
+			if _, installed := installedVersion(t); installed {
+				t.Error("the bundle was installed")
+			}
+		})
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"nstudio/app/tts/engine"
 	"nstudio/app/tts/engine/python/voicepack"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -72,13 +73,11 @@ func (pythonEngine *Python) Initialize() error {
 	if pythonEngine.BundlePath == "" {
 		return response.Err("python engine has no bundle path")
 	}
-	interpreterPath := filepath.Join(pythonEngine.BundlePath, filepath.FromSlash(pythonEngine.Manifest.Runtime.Python))
-	if _, err := os.Stat(interpreterPath); err != nil {
-		return response.Err("bundle missing python interpreter at %s: %w", interpreterPath, err)
-	}
-	entrypointPath := filepath.Join(pythonEngine.BundlePath, filepath.FromSlash(pythonEngine.Manifest.Runtime.Entrypoint))
-	if _, err := os.Stat(entrypointPath); err != nil {
-		return response.Err("bundle missing runner entrypoint at %s: %w", entrypointPath, err)
+	for _, runnerFile := range pythonEngine.Manifest.Runtime.RunnerFiles() {
+		runnerFilePath := bundleFilePath(pythonEngine.BundlePath, runnerFile)
+		if _, err := os.Stat(runnerFilePath); err != nil {
+			return response.Err("bundle missing its runner file %s: %w", runnerFilePath, err)
+		}
 	}
 	return nil
 }
@@ -115,6 +114,9 @@ func (pythonEngine *Python) Synthesize(ctx context.Context, request engine.Speec
 
 	loadedRunner := pythonEngine.runner
 	format := loadedRunner.format
+	if manifestModel, found := pythonEngine.Manifest.findModel(request.Model); found {
+		format = manifestModel.VoiceFormat(request.Voice, format)
+	}
 
 	voice := request.Voice
 	if resolvedVoicePath, found := voicepack.ResolvePath(pythonEngine.Manifest.ID, voice); found {
@@ -136,23 +138,16 @@ func (pythonEngine *Python) Synthesize(ctx context.Context, request engine.Speec
 		if pythonEngine.runner != loadedRunner {
 			return response.Err("python: runner restarted before synthesis started")
 		}
-		return loadedRunner.streamSynth(ctx, synthRequest, writer)
+		return loadedRunner.streamSynth(ctx, synthRequest, format, writer)
 	}), nil
 }
 
 func (pythonEngine *Python) GetVoices(model string) ([]engine.Voice, error) {
-	var modelFound bool
-	var voices []engine.Voice
-	for index := range pythonEngine.Manifest.Models {
-		if pythonEngine.Manifest.Models[index].ID == model {
-			voices = append(voices, pythonEngine.Manifest.Models[index].ToVoices()...)
-			modelFound = true
-			break
-		}
-	}
-	if !modelFound {
+	manifestModel, found := pythonEngine.Manifest.findModel(model)
+	if !found {
 		return nil, response.Err("python: model %q not found in manifest %q", model, pythonEngine.Manifest.ID)
 	}
+	voices := manifestModel.ToVoices()
 
 	if packVoices, err := voicepack.AllVoices(pythonEngine.Manifest.ID); err == nil {
 		voices = append(voices, packVoices...)
@@ -254,35 +249,56 @@ func (pythonEngine *Python) allowRestart() bool {
 	return true
 }
 
-func childProcessEnvironment(bundlePath string, extraEnvironmentVariables map[string]string) []string {
-	sitePackagesPath := filepath.Join(bundlePath, "site-packages")
+func bundleFilePath(bundlePath, bundleRelativePath string) string {
+	return filepath.Join(bundlePath, filepath.FromSlash(bundleRelativePath))
+}
 
+func runnerCommand(bundlePath string, packRuntime Runtime) *exec.Cmd {
+	arguments := []string{"--bundle-dir", bundlePath}
+	if packRuntime.RunsPython() {
+		arguments = append([]string{bundleFilePath(bundlePath, packRuntime.Entrypoint)}, arguments...)
+	}
+	command := exec.Command(bundleFilePath(bundlePath, packRuntime.Program()), arguments...)
+	command.Dir = bundlePath
+	command.Env = childProcessEnvironment(bundlePath, packRuntime)
+	return command
+}
+
+func childProcessEnvironment(bundlePath string, packRuntime Runtime) []string {
+	extraEnvironmentVariables := packRuntime.Env
 	parentEnvironment := os.Environ()
-	mergedEnvironment := make([]string, 0, len(parentEnvironment)+len(extraEnvironmentVariables)+2)
+	mergedEnvironment := make([]string, 0, len(parentEnvironment)+len(extraEnvironmentVariables)+3)
 
 	for _, environmentEntry := range parentEnvironment {
 		name, _, _ := strings.Cut(environmentEntry, "=")
 		if _, overridden := extraEnvironmentVariables[name]; overridden {
 			continue
 		}
-		if name == "PYTHONPATH" {
+		if packRuntime.RunsPython() && name == "PYTHONPATH" {
 			continue
 		}
 		mergedEnvironment = append(mergedEnvironment, environmentEntry)
 	}
 
-	pythonPath := sitePackagesPath
-	if existingPythonPath, ok := os.LookupEnv("PYTHONPATH"); ok && existingPythonPath != "" {
-		pythonPath = sitePackagesPath + string(os.PathListSeparator) + existingPythonPath
-	}
-	mergedEnvironment = append(mergedEnvironment, "PYTHONPATH="+pythonPath)
-	mergedEnvironment = append(mergedEnvironment, "PYTHONUNBUFFERED=1")
-	if runtime.GOOS == "windows" {
-		mergedEnvironment = append(mergedEnvironment, "PYTHONIOENCODING=utf-8")
+	if packRuntime.RunsPython() {
+		mergedEnvironment = append(mergedEnvironment, pythonEnvironment(bundlePath)...)
 	}
 
 	for name, value := range extraEnvironmentVariables {
 		mergedEnvironment = append(mergedEnvironment, name+"="+value)
 	}
 	return mergedEnvironment
+}
+
+func pythonEnvironment(bundlePath string) []string {
+	sitePackagesPath := filepath.Join(bundlePath, "site-packages")
+	pythonPath := sitePackagesPath
+	if existingPythonPath, ok := os.LookupEnv("PYTHONPATH"); ok && existingPythonPath != "" {
+		pythonPath = sitePackagesPath + string(os.PathListSeparator) + existingPythonPath
+	}
+	environment := []string{"PYTHONPATH=" + pythonPath, "PYTHONUNBUFFERED=1"}
+	if runtime.GOOS == "windows" {
+		environment = append(environment, "PYTHONIOENCODING=utf-8")
+	}
+	return environment
 }

@@ -4,7 +4,7 @@
 }
 
 .voice-packs__sidebar__row {
-	@apply flex items-center gap-2 px-3 pt-3;
+	@apply flex items-stretch gap-2 px-3 pt-3;
 }
 
 .voice-packs__sidebar__row + .voice-packs__sidebar__row {
@@ -15,16 +15,42 @@
 	@apply flex-1 min-w-0 whitespace-nowrap;
 }
 
-.voice-packs__sidebar__filter {
-	@apply flex-1 min-w-0;
+.voice-packs__sidebar__row.voice-packs__sidebar__row--tabs {
+	@apply items-end pb-0;
 }
 
-.voice-packs__sidebar__filter [data-pc-section="input"] {
-	@apply py-1.5 text-sm;
+.voice-packs__tabs {
+	@apply flex flex-1 min-w-0;
+	margin-bottom: -1px;
 }
 
-.voice-packs__installed-only {
-	@apply text-xs flex-none;
+.voice-packs__tab {
+	@apply px-3 pt-1 pb-2 text-sm font-semibold cursor-pointer;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--text-color-secondary);
+	transition: color 0.15s, border-color 0.15s;
+}
+
+.voice-packs__tab:hover {
+	color: var(--text-color);
+}
+
+.voice-packs__tab:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: -2px;
+	border-radius: 4px 4px 0 0;
+}
+
+.voice-packs__tab--active,
+.voice-packs__tab--active:hover {
+	color: var(--accent-text);
+	border-bottom-color: rgb(var(--primary-600));
+}
+
+.voice-packs__sidebar__switch {
+	@apply text-xs flex-none pb-2;
 	color: var(--text-color-secondary);
 }
 
@@ -87,11 +113,13 @@
 	@apply flex flex-wrap gap-1 mt-1;
 }
 
-.voice-packs__engine-card--available {
+.voice-packs__engine-card--available,
+.voice-packs__engine-card--unavailable {
 	border-style: dashed;
 }
 
-.voice-packs__engine-card--available .voice-packs__engine-card__name {
+.voice-packs__engine-card--available .voice-packs__engine-card__name,
+.voice-packs__engine-card--unavailable .voice-packs__engine-card__name {
 	color: var(--text-color-secondary);
 }
 
@@ -125,6 +153,15 @@
 .voice-packs__description {
 	@apply text-sm m-0;
 	color: var(--text-color);
+}
+
+.voice-packs__api-problem {
+	@apply flex items-start gap-2 text-sm m-0;
+	color: var(--accent-text);
+}
+
+.voice-packs__api-problem .pi {
+	@apply mt-0.5;
 }
 
 .voice-packs__section-header {

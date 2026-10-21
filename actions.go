@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -263,6 +264,20 @@ func (app *App) ReloadVoicePacks() {
 		Detail:  "Voice Packs reloaded successfully",
 	})
 	status.Set(status.Ready, "")
+}
+
+func (app *App) CheckApiEngines() string {
+	availability := modelManager.CheckApiEngines(context.Background())
+	availabilityJSON, err := json.Marshal(availability)
+	if err != nil {
+		response.Error(util.MessageData{
+			Summary: "Failed to check the online engines",
+			Detail:  err.Error(),
+			Cause:   err,
+		})
+		return "{}"
+	}
+	return string(availabilityJSON)
 }
 
 //</editor-fold>

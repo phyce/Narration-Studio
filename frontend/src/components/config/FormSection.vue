@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, ref} from 'vue';
-import Tooltip from 'primevue/tooltip';
+import Tooltip from '../../util/tooltip';
 import type {ConfigFieldMetadata} from '../../interfaces/config';
 
 interface Props {
@@ -41,7 +41,7 @@ const description = computed(() => props.metadata?.description);
 			   class="pi pi-question-circle config-section__help-icon"
 			   @click.stop></i>
 		</button>
-		<div v-show="!isCollapsed" class="config-section__content">
+		<div v-show="!isCollapsed" class="config-section__content config-fields">
 			<slot></slot>
 		</div>
 	</section>
@@ -49,7 +49,6 @@ const description = computed(() => props.metadata?.description);
 
 <style scoped>
 .config-section {
-	margin-bottom: 0.5rem;
 	border: 1px solid var(--surface-border);
 	border-radius: 6px;
 	background-color: var(--app-card);
@@ -97,6 +96,6 @@ const description = computed(() => props.metadata?.description);
 }
 
 .config-section__content {
-	padding: 0.25rem 0.75rem 0.5rem;
+	padding: 0.75rem;
 }
 </style>

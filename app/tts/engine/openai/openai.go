@@ -72,6 +72,16 @@ func (openAI *OpenAI) FetchModels() map[string]engine.Model {
 
 // </editor-fold>
 
+func (openAI *OpenAI) CheckAvailability(ctx context.Context) error {
+	apiKey := config.GetEngine().Api.OpenAI.ApiKey
+	if apiKey == "" {
+		return engine.ErrApiKeyNotSet
+	}
+	return engine.CheckApiAnswers(ctx, "OpenAI", "https://api.openai.com/v1/models", map[string]string{
+		"Authorization": "Bearer " + apiKey,
+	})
+}
+
 // <editor-fold desc="Other">
 func FetchModels() map[string]engine.Model {
 	if config.GetEngine().Api.OpenAI.ApiKey == "" {

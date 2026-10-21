@@ -1,6 +1,7 @@
 package python
 
 import (
+	"nstudio/app/common/audio"
 	"nstudio/app/tts/engine"
 )
 
@@ -25,9 +26,28 @@ type Manifest struct {
 type Runtime struct {
 	Python         string            `json:"python"`
 	Entrypoint     string            `json:"entrypoint"`
+	Executable     string            `json:"executable,omitempty"`
 	BootTimeoutSec int               `json:"bootTimeoutSec"`
 	Env            map[string]string `json:"env"`
 	Prepare        *Prepare          `json:"prepare,omitempty"`
+}
+
+func (packRuntime Runtime) RunsPython() bool {
+	return packRuntime.Executable == ""
+}
+
+func (packRuntime Runtime) Program() string {
+	if packRuntime.RunsPython() {
+		return packRuntime.Python
+	}
+	return packRuntime.Executable
+}
+
+func (packRuntime Runtime) RunnerFiles() []string {
+	if packRuntime.RunsPython() {
+		return []string{packRuntime.Python, packRuntime.Entrypoint}
+	}
+	return []string{packRuntime.Executable}
 }
 
 type Prepare struct {
@@ -43,9 +63,29 @@ type ManifestModel struct {
 }
 
 type ManifestVoice struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Gender string `json:"gender"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Gender     string `json:"gender"`
+	SampleRate int    `json:"sampleRate,omitempty"`
+}
+
+func (manifest *Manifest) findModel(modelID string) (*ManifestModel, bool) {
+	for index := range manifest.Models {
+		if manifest.Models[index].ID == modelID {
+			return &manifest.Models[index], true
+		}
+	}
+	return nil, false
+}
+
+func (manifestModel *ManifestModel) VoiceFormat(voice string, modelFormat audio.StreamFormat) audio.StreamFormat {
+	for _, manifestVoice := range manifestModel.Voices {
+		if (manifestVoice.ID == voice || manifestVoice.Name == voice) && manifestVoice.SampleRate > 0 {
+			modelFormat.SampleRate = manifestVoice.SampleRate
+			return modelFormat
+		}
+	}
+	return modelFormat
 }
 
 func (manifestModel *ManifestModel) ToVoices() []engine.Voice {

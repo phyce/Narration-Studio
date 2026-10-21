@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -330,6 +331,75 @@ func TestPythonStreamSynthesize(t *testing.T) {
 			t.Errorf("PCM mismatch: got %d bytes, want %d", len(result.data), len(expected))
 		}
 	})
+}
+
+func TestExecutableRunnerSpeaksEachVoiceInItsOwnFormat(t *testing.T) {
+	executablePath, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+
+	manifest := Manifest{
+		ID:   "fake-native-pack",
+		Name: "Fake Native Pack",
+		Runtime: Runtime{
+			Executable: filepath.Base(executablePath),
+			Env:        map[string]string{"NSTUDIO_FAKE_STREAM_RUNNER": "1"},
+		},
+		Models: []ManifestModel{{
+			ID:   "fake-model",
+			Name: "Fake Model",
+			Voices: []ManifestVoice{
+				{ID: "wide", Name: "Wide Voice"},
+				{ID: "narrow", Name: "Narrow Voice", SampleRate: 8000},
+			},
+		}},
+	}
+	nativeEngine := New(manifest, filepath.Dir(executablePath))
+	if err := nativeEngine.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+	t.Cleanup(func() { _ = nativeEngine.Stop("") })
+
+	for _, testCase := range []struct {
+		voice              string
+		expectedSampleRate int
+	}{
+		{voice: "wide", expectedSampleRate: 24000},
+		{voice: "narrow", expectedSampleRate: 8000},
+		{voice: "Narrow Voice", expectedSampleRate: 8000},
+	} {
+		t.Run(testCase.voice, func(t *testing.T) {
+			stream, err := nativeEngine.Synthesize(context.Background(), engine.SpeechRequest{Model: "fake-model", Voice: testCase.voice, Text: "hello"})
+			if err != nil {
+				t.Fatalf("Synthesize: %v", err)
+			}
+			audioObject, err := stream.ReadAll()
+			if err != nil {
+				t.Fatalf("ReadAll: %v", err)
+			}
+			if audioObject.Metadata.SampleRate != testCase.expectedSampleRate {
+				t.Errorf("sample rate = %d, want %d", audioObject.Metadata.SampleRate, testCase.expectedSampleRate)
+			}
+			if expected := fakePCMForText("hello"); !bytes.Equal(audioObject.Data, expected) {
+				t.Errorf("PCM mismatch: got %d bytes, want %d", len(audioObject.Data), len(expected))
+			}
+		})
+	}
+}
+
+func TestExecutableRunnerGetsNoPythonEnvironment(t *testing.T) {
+	t.Setenv("PYTHONPATH", "parent-python-path")
+	environment := childProcessEnvironment("bundle", Runtime{Executable: "runner.exe", Env: map[string]string{"RUNNER_SETTING": "on"}})
+
+	for _, expectedEntry := range []string{"PYTHONPATH=parent-python-path", "RUNNER_SETTING=on"} {
+		if !slices.Contains(environment, expectedEntry) {
+			t.Errorf("environment lacks %s", expectedEntry)
+		}
+	}
+	if slices.Contains(environment, "PYTHONUNBUFFERED=1") {
+		t.Error("an executable runner got the Python runner environment")
+	}
 }
 
 type engineStreamResult struct {

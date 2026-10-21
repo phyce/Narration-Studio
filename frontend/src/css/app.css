@@ -99,6 +99,10 @@
 }
 
 /* Settings form fields (components/config/*) */
+.config-fields {
+	@apply flex flex-col gap-3;
+}
+
 .config-field__label {
 	font-size: 0.875rem;
 }

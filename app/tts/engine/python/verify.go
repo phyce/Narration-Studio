@@ -47,14 +47,15 @@ func verifyModel(ctx context.Context, verifyingRunner *runner, model ManifestMod
 		return nil
 	}
 
-	speech := audio.NewProducedStream(verifyingRunner.format, func(writer *audio.StreamWriter) error {
-		return verifyingRunner.streamSynth(ctx, runnerRequest{Op: "synth", Model: model.ID, Voice: voice, Text: verificationText}, writer)
+	format := model.VoiceFormat(voice, verifyingRunner.format)
+	speech := audio.NewProducedStream(format, func(writer *audio.StreamWriter) error {
+		return verifyingRunner.streamSynth(ctx, runnerRequest{Op: "synth", Model: model.ID, Voice: voice, Text: verificationText}, format, writer)
 	})
 	pcm, err := io.ReadAll(speech)
 	if err != nil {
 		return response.Err("speak a test sentence: %w", err)
 	}
-	if !soundsLikeSpeech(pcm, verifyingRunner.format) {
+	if !soundsLikeSpeech(pcm, format) {
 		return response.Err("the test sentence produced no audible audio (%d bytes)", len(pcm))
 	}
 	return nil

@@ -97,6 +97,16 @@ func (labs *ElevenLabs) FetchModels() map[string]engine.Model {
 
 // </editor-fold>
 
+func (labs *ElevenLabs) CheckAvailability(ctx context.Context) error {
+	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey
+	if apiKey == "" {
+		return engine.ErrApiKeyNotSet
+	}
+	return engine.CheckApiAnswers(ctx, "ElevenLabs", "https://api.elevenlabs.io/v1/models", map[string]string{
+		"xi-api-key": apiKey,
+	})
+}
+
 // <editor-fold desc="Other">
 func (labs *ElevenLabs) sendRequest(ctx context.Context, voiceID string, data ElevenLabsRequest) (io.ReadCloser, error) {
 	apiKey := config.GetEngine().Api.ElevenLabs.ApiKey

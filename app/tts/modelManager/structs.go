@@ -81,3 +81,9 @@ type modelManager struct {
 	IsGUIMode bool
 	released  bool
 }
+
+type ApiAvailability struct {
+	Available     bool   `json:"available"`
+	MissingApiKey bool   `json:"missingApiKey"`
+	Reason        string `json:"reason,omitempty"`
+}

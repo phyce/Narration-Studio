@@ -512,6 +512,7 @@ export class Settings {
     "outputType": OutputType$0.Option;
     "outputPath": string;
     "debug": boolean;
+    "activityLogDays": number;
     "audioCache"?: AudioCacheSettings;
     "server"?: ServerSettings;
     "localEnginePacksPath"?: string;
@@ -527,6 +528,9 @@ export class Settings {
         if (!("debug" in $$source)) {
             this["debug"] = false;
         }
+        if (!("activityLogDays" in $$source)) {
+            this["activityLogDays"] = 0;
+        }
 
         Object.assign(this, $$source);
     }
@@ -535,14 +539,14 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField3_0 = $$createType16;
-        const $$createField4_0 = $$createType17;
+        const $$createField4_0 = $$createType16;
+        const $$createField5_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("audioCache" in $$parsedSource) {
-            $$parsedSource["audioCache"] = $$createField3_0($$parsedSource["audioCache"]);
+            $$parsedSource["audioCache"] = $$createField4_0($$parsedSource["audioCache"]);
         }
         if ("server" in $$parsedSource) {
-            $$parsedSource["server"] = $$createField4_0($$parsedSource["server"]);
+            $$parsedSource["server"] = $$createField5_0($$parsedSource["server"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }

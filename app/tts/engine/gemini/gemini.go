@@ -97,6 +97,16 @@ func (gemini *Gemini) FetchModels() map[string]engine.Model {
 
 // </editor-fold>
 
+func (gemini *Gemini) CheckAvailability(ctx context.Context) error {
+	apiKey := config.GetEngine().Api.Gemini.ApiKey
+	if apiKey == "" {
+		return engine.ErrApiKeyNotSet
+	}
+	return engine.CheckApiAnswers(ctx, "Gemini", "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", map[string]string{
+		"x-goog-api-key": apiKey,
+	})
+}
+
 // <editor-fold desc="Other">
 func FetchModels() map[string]engine.Model {
 	if config.GetEngine().Api.Gemini.ApiKey == "" {

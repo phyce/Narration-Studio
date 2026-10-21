@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed} from 'vue';
 import Checkbox from 'primevue/checkbox';
-import Tooltip from 'primevue/tooltip';
+import Tooltip from '../../util/tooltip';
 import type {ConfigFieldMetadata} from '../../interfaces/config';
 
 interface Props {
@@ -56,7 +56,6 @@ const description = computed(() => props.metadata?.description);
 	display: flex;
 	flex-direction: column;
 	gap: 0.375rem;
-	margin-bottom: 0.75rem;
 }
 
 .config-field--disabled {

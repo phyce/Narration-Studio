@@ -286,7 +286,7 @@ func extractBundle(ctx context.Context, bundlePath, buildPath string, expectedMa
 		return response.Err("%w", err)
 	}
 	if runtime.GOOS != "windows" {
-		_ = os.Chmod(filepath.Join(buildPath, filepath.FromSlash(manifest.Runtime.Python)), 0o755)
+		_ = os.Chmod(filepath.Join(buildPath, filepath.FromSlash(manifest.Runtime.Program())), 0o755)
 	}
 	return writeInstallState(buildPath, installStateExtracted)
 }
@@ -612,16 +612,17 @@ func validateManifest(manifest *python.Manifest, bundlePath string) error {
 	if !runsOnThisPlatform(*manifest) {
 		return response.Err("bundle is for %s/%s, this computer is %s/%s", manifest.OS, manifest.Arch, runtime.GOOS, runtime.GOARCH)
 	}
-	if manifest.Runtime.Python == "" || manifest.Runtime.Entrypoint == "" {
-		return response.Err("manifest runtime is missing python or entrypoint")
-	}
-	interpreterPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Python))
-	if _, err := os.Stat(interpreterPath); err != nil {
-		return response.Err("bundle missing python at %s: %w", interpreterPath, err)
-	}
-	entrypointPath := filepath.Join(bundlePath, filepath.FromSlash(manifest.Runtime.Entrypoint))
-	if _, err := os.Stat(entrypointPath); err != nil {
-		return response.Err("bundle missing entrypoint at %s: %w", entrypointPath, err)
+	for _, runnerFile := range manifest.Runtime.RunnerFiles() {
+		if runnerFile == "" {
+			return response.Err("manifest runtime names neither an executable nor python and an entrypoint")
+		}
+		runnerFilePath := filepath.Join(bundlePath, filepath.FromSlash(runnerFile))
+		if !isInside(bundlePath, runnerFilePath) {
+			return response.Err("manifest runtime names a file outside the bundle: %s", runnerFile)
+		}
+		if _, err := os.Stat(runnerFilePath); err != nil {
+			return response.Err("bundle missing its runner file %s: %w", runnerFilePath, err)
+		}
 	}
 	return nil
 }

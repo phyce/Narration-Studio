@@ -10,8 +10,6 @@ interface Props {
 	getValueByPath: (path: string) => any;
 	setValueByPath: (path: string, value: any) => void;
 	disabled?: boolean;
-	// Nesting level below the first field the form renders (Settings starts at the root, the
-	// Voice Packs settings dialog at one engine), so only the outermost boxes start expanded.
 	level?: number;
 }
 
@@ -26,7 +24,6 @@ function childrenOf(path: string): ConfigField[] {
 		f.path.startsWith(prefix) && !f.path.slice(prefix.length).includes('.'));
 }
 
-// A section whose fields are all hidden (e.g. a server pool entry with no settings) isn't rendered.
 function hasVisibleContent(f: ConfigField): boolean {
 	if (f.metadata?.hidden || isFieldHidden(f)) return false;
 	if (f.metadata?.type !== 'object') return true;
@@ -54,7 +51,6 @@ function isFieldDisabled(f: ConfigField): boolean {
 </script>
 
 <template>
-	<!-- If it's an object type, render as a section with recursive children -->
 	<FormSection
 		v-if="isObject"
 		v-show="visibleChildren.length > 0"
@@ -74,7 +70,6 @@ function isFieldDisabled(f: ConfigField): boolean {
 		/>
 	</FormSection>
 
-	<!-- If it's a regular field, render the field factory -->
 	<FieldFactory
 		v-else
 		:field="field"

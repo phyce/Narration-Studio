@@ -27,9 +27,6 @@ func Configure(t *testing.T) string {
 	return UseNewOutputPath(t)
 }
 
-// Configure re-initializes config per test, which races the Activity Log
-// flusher reading the config path; packages whose tests log through response
-// initialize once here instead and take a fresh output path per test.
 func RunWithTemporaryConfig(m *testing.M) int {
 	configRootPath, err := os.MkdirTemp("", "nstudio-test-config")
 	if err != nil {

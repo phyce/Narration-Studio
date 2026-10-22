@@ -59,8 +59,6 @@ const selectedModelKeys = ref<{key: string, label: string, engine: string, model
 const selectedModels: Record<string, any> = reactive({});
 const selectedVoices: Record<string, any> = reactive({});
 
-// Rows whose stored model or voice is not currently available (engine
-// disabled, model not enabled, voice gone) keep their data but get flagged.
 const voiceIssues = computed<Record<string, string>>(() => {
 	const issues: Record<string, string> = {};
 	for (const [rowKey, character] of Object.entries(characterVoices.value)) {
@@ -141,9 +139,6 @@ async function getCharacterVoices() {
 		if (voiceOption && voiceOption[voice]) {
 			selectedVoices[name] = voiceOption[voice];
 		} else {
-			// Stored model/voice is not currently available (engine disabled,
-			// pack uninstalled, ...). Keep the stored assignment — only the
-			// dropdown shows unselected.
 			selectedVoices[name] = null;
 		}
 
@@ -159,7 +154,6 @@ async function loadProfiles() {
 		const result = await GetProfiles();
 		profileOptions.value = JSON.parse(result);
 
-		// The remembered profile may have been deleted since; fall back to the default one.
 		const profile = profileOptions.value.find(p => p.id === selectedProfile.value)
 			?? profileOptions.value.find(p => p.id === 'default')
 			?? profileOptions.value[0];
@@ -361,7 +355,6 @@ function onModelSelect(nodeKey: TreeNode, characterKey: string) {
 	const rowVoiceOptions = Object.values(voiceOptions.value[`${engineId}:${modelId}`] ?? {});
 	voiceOptionsMap.value[characterKey] = rowVoiceOptions;
 
-	// A voice from the previous model must not survive a model switch.
 	const voiceStillAvailable = (voiceID: string) => rowVoiceOptions.some(option => option.voiceID === voiceID);
 	const currentVoice = selectedVoices[characterKey];
 	if (currentVoice && !voiceStillAvailable(currentVoice.voiceID)) {
@@ -388,7 +381,6 @@ function buildProfileVoices(): Record<string, CharacterVoice> {
 
 			const [engine, model] = modelKey.split(':');
 			const voiceOption = selectedVoices[key];
-			// Stored voice id only carries over while the model is unchanged.
 			const voiceID = voiceOption ? voiceOption.voiceID : (modelKey === voice.key ? voice.voice : '');
 
 			const newKey = key.startsWith('_') ? voice.name : key;
@@ -405,7 +397,6 @@ function buildProfileVoices(): Record<string, CharacterVoice> {
 		}, {} as Record<string, CharacterVoice>);
 }
 
-// Compares what the page would save with what the backend has stored.
 function voicesFingerprint(voices: Record<string, CharacterVoice>): string {
 	return JSON.stringify(Object.entries(voices)
 		.filter(([, voice]) => voice.key && voice.name?.trim())

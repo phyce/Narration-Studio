@@ -23,6 +23,7 @@ export default {
 				'text-surface-700 dark:text-surface-300 bg-surface-100 dark:bg-surface-500/20': props.severity == 'secondary',
 				'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20': props.severity == 'info',
 				'text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-500/20': props.severity == 'warning',
+				'text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-400/20': props.severity == 'gold',
 				'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-500/20': props.severity == 'danger',
 				'text-surface-0 dark:text-surface-900 bg-surface-900 dark:bg-surface-0': props.severity == 'contrast'
 			}

@@ -29,8 +29,6 @@ func testStatus() DaemonStatusInfo {
 	}
 }
 
-// The daemon polls its own status on a timer for its whole lifetime, so a write
-// that changes nothing must not reach the disk.
 func TestWriteDaemonStatusSkipsUnchangedWrites(t *testing.T) {
 	useTemporaryStatusDirectory(t)
 	status := testStatus()
@@ -39,7 +37,6 @@ func TestWriteDaemonStatusSkipsUnchangedWrites(t *testing.T) {
 		t.Fatalf("first write: %v", err)
 	}
 
-	// Replace the file with a sentinel: a redundant write would overwrite it.
 	const sentinel = "untouched"
 	statusPath := GetStatusFilePath()
 	if err := os.WriteFile(statusPath, []byte(sentinel), 0644); err != nil {
@@ -84,8 +81,6 @@ func TestWriteDaemonStatusPersistsChanges(t *testing.T) {
 	}
 }
 
-// A temp directory cleaner wiping the file must not leave the daemon looking
-// dead just because the in-process cache still matches.
 func TestWriteDaemonStatusRewritesMissingFile(t *testing.T) {
 	useTemporaryStatusDirectory(t)
 	status := testStatus()

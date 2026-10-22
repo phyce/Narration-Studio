@@ -134,7 +134,6 @@ func (manager *ProfileManager) RemoveVoiceConfig(profileID, character string) er
 }
 
 func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (*util.CharacterVoice, error) {
-	// Override voices (prefixed with "::") should be resolved without saving to the profile
 	if strings.HasPrefix(character, "::") {
 		allocatedVoice, err := manager.AllocateVoiceForProfile(character, profileID)
 		if err != nil {
@@ -161,7 +160,7 @@ func (manager *ProfileManager) GetOrAllocateVoice(profileID, character string) (
 			return voice, nil
 		}
 		response.NewWarn(fmt.Sprintf(
-			"Voice %s:%s assigned to %q is disabled or unavailable — allocating a replacement",
+			"Voice %s:%s assigned to %q is disabled or unavailable",
 			voice.Engine, voice.Model, character,
 		))
 	}

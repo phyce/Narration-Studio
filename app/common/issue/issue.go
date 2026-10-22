@@ -7,7 +7,6 @@ import (
 )
 
 func Panic(message string, err error) {
-	//TODO: Add some form of crash dump/log
 
 	showErrorDialog(
 		message,

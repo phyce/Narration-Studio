@@ -14,9 +14,14 @@ import (
 	"github.com/go-ole/go-ole/oleutil"
 )
 
-// comInit initializes COM on the current OS thread.
-// It tries COINIT_MULTITHREADED first, then falls back to COINIT_APARTMENTTHREADED
-// for hosts that already set STA mode. S_FALSE (already initialized) is accepted.
+const (
+	comResultAlreadyInitialized   = 0x00000001
+	comErrorChangedThreadingMode  = 0x80010106
+	sapiAudioFormat22kHz16BitMono = 22
+	sapiStreamModeCreateForWrite  = 3
+	sapiSpeakFlagsDefault         = 0
+)
+
 func comInit() error {
 	err := ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
 	if err != nil {
@@ -25,15 +30,15 @@ func comInit() error {
 			return response.Err("%w", err)
 		}
 		code := oleErr.Code()
-		if code == 0x00000001 { // S_FALSE — already initialized, OK
+		if code == comResultAlreadyInitialized {
 			return nil
 		}
-		if code == 0x80010106 { // RPC_E_CHANGED_MODE — host uses different mode, try STA
+		if code == comErrorChangedThreadingMode {
 			err2 := ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
 			if err2 != nil {
 				oleErr2, ok := err2.(*ole.OleError)
-				if ok && oleErr2.Code() == 0x00000001 {
-					return nil // already initialized
+				if ok && oleErr2.Code() == comResultAlreadyInitialized {
+					return nil
 				}
 				return response.Err("%w", err2)
 			}
@@ -140,7 +145,6 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 		return nil, response.Err("COM init failed: %w", err)
 	}
 
-	// Create SpVoice
 	voiceUnknown, err := oleutil.CreateObject("SAPI.SpVoice")
 	if err != nil {
 		return nil, response.Err("failed to create SAPI.SpVoice: %w", err)
@@ -153,7 +157,6 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	}
 	defer voice.Release()
 
-	// Find and set the desired voice
 	tokensResult, err := oleutil.CallMethod(voice, "GetVoices", "", "")
 	if err != nil {
 		return nil, response.Err("failed to get voices: %w", err)
@@ -201,7 +204,6 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 		return nil, response.Err("voice '%s' not found", voiceID)
 	}
 
-	// Set rate and volume
 	if rate != 0 {
 		oleutil.PutProperty(voice, "Rate", rate)
 	}
@@ -209,7 +211,6 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 		oleutil.PutProperty(voice, "Volume", volume)
 	}
 
-	// Create SpFileStream for output
 	streamUnknown, err := oleutil.CreateObject("SAPI.SpFileStream")
 	if err != nil {
 		return nil, response.Err("failed to create SAPI.SpFileStream: %w", err)
@@ -222,7 +223,6 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 	}
 	defer stream.Release()
 
-	// Create temp file for WAV output
 	tempDir, err := os.MkdirTemp("", "mssapi5-*")
 	if err != nil {
 		return nil, response.Err("failed to create temp directory: %w", err)
@@ -231,7 +231,6 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 
 	tempFile := filepath.Join(tempDir, "output.wav")
 
-	// Set audio format (22050 Hz, 16-bit, mono)
 	formatUnknown, err := oleutil.CreateObject("SAPI.SpAudioFormat")
 	if err != nil {
 		return nil, response.Err("failed to create SpAudioFormat: %w", err)
@@ -255,7 +254,6 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 		return nil, response.Err("failed to open output stream: %w", err)
 	}
 
-	// Set the output stream
 	_, err = oleutil.PutPropertyRef(voice, "AudioOutputStream", stream)
 	if err != nil {
 		oleutil.CallMethod(stream, "Close")
@@ -269,10 +267,8 @@ func synthesize(voiceID string, text string, rate int, volume int) ([]byte, erro
 		return nil, response.Err("SAPI5 Speak failed: %w", err)
 	}
 
-	// Close stream
 	oleutil.CallMethod(stream, "Close")
 
-	// Read the generated WAV file
 	wavBytes, err := os.ReadFile(tempFile)
 	if err != nil {
 		return nil, response.Err("failed to read generated WAV: %w", err)

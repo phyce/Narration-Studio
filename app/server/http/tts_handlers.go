@@ -198,8 +198,6 @@ func handleProfileTTSRequest(context echo.Context) error {
 		}
 	}
 
-	// Cache misses on streamable formats return chunks as the engine produces
-	// them; cache hits and whole-file formats stay on the buffered path below.
 	if audioObject == nil && canStream(outputFormat, audioOpts) {
 		stream, err := tts.SynthesizeStream(context.Request().Context(), voice, request.Text)
 		if err != nil {

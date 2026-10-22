@@ -7,8 +7,6 @@ import (
 	"sync"
 )
 
-// Producers never block: the queue is elastic so generation can run ahead of
-// playback. The limit only guards against a consumer that never reads.
 var streamQueueLimit = 64 * 1024 * 1024
 
 var (
@@ -152,8 +150,6 @@ func (stream *Stream) Close() error {
 	return nil
 }
 
-// Done closes when the producer finished (success or error), not when playback
-// finished — it is the model-pool release hook.
 func (stream *Stream) Done() <-chan struct{} {
 	return stream.done
 }

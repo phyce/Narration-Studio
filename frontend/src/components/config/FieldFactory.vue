@@ -28,12 +28,10 @@ const value = computed({
 });
 
 const fieldType = computed(() => {
-	// Use metadata type if available
 	if (props.field.metadata?.type) {
 		return props.field.metadata.type;
 	}
 
-	// Fall back to inferring type from value
 	const val = props.field.value;
 	if (typeof val === 'boolean') return 'checkbox';
 	if (typeof val === 'number') return 'number';
@@ -45,7 +43,6 @@ const fieldType = computed(() => {
 </script>
 
 <template>
-	<!-- Object type renders as a section (no direct field) -->
 	<FormSection
 		v-if="fieldType === 'object'"
 		:path="field.path"
@@ -54,7 +51,6 @@ const fieldType = computed(() => {
 		<slot></slot>
 	</FormSection>
 
-	<!-- Text input -->
 	<TextField
 		v-else-if="fieldType === 'text'"
 		v-model="value"
@@ -62,7 +58,6 @@ const fieldType = computed(() => {
 		:metadata="field.metadata"
 	/>
 
-	<!-- Password input -->
 	<PasswordField
 		v-else-if="fieldType === 'password'"
 		v-model="value"
@@ -70,7 +65,6 @@ const fieldType = computed(() => {
 		:metadata="field.metadata"
 	/>
 
-	<!-- Number input -->
 	<NumberField
 		v-else-if="fieldType === 'number'"
 		v-model="value"
@@ -78,7 +72,6 @@ const fieldType = computed(() => {
 		:metadata="field.metadata"
 	/>
 
-	<!-- Checkbox -->
 	<Checkbox
 		v-else-if="fieldType === 'checkbox'"
 		v-model="value"
@@ -87,7 +80,6 @@ const fieldType = computed(() => {
 		:disabled="disabled"
 	/>
 
-	<!-- Dropdown -->
 	<Dropdown
 		v-else-if="fieldType === 'dropdown'"
 		v-model="value"
@@ -95,7 +87,6 @@ const fieldType = computed(() => {
 		:metadata="field.metadata"
 	/>
 
-	<!-- Path picker -->
 	<PathField
 		v-else-if="fieldType === 'path'"
 		v-model="value"
@@ -103,7 +94,6 @@ const fieldType = computed(() => {
 		:metadata="field.metadata"
 	/>
 
-	<!-- Fallback to text input -->
 	<TextField
 		v-else
 		v-model="value"

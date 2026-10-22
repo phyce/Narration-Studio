@@ -17,9 +17,6 @@ import (
 	"nstudio/app/tts/engine/enginetest"
 )
 
-// TestMain doubles as the pack runner when re-executed by the test itself:
-// the manifest's Runtime.Env injects NSTUDIO_FAKE_STREAM_RUNNER, so the
-// spawned "python interpreter" is this binary speaking the streaming protocol.
 func TestMain(m *testing.M) {
 	if os.Getenv("NSTUDIO_FAKE_STREAM_RUNNER") == "1" {
 		runFakeStreamRunner()

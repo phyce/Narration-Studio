@@ -68,7 +68,6 @@ func calculateEngine(name string) (engine.Engine, error) {
 }
 
 func calculateVoice(engine engine.Engine, name string) (string, string, error) {
-	//If the name contains a colon that means an override was provided
 	if strings.Contains(name, ":") {
 		segments := strings.Split(name, ":")
 

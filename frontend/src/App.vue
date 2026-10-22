@@ -114,7 +114,6 @@ onUnmounted(() => {
 	overflow-wrap: anywhere;
 }
 
-/* The icon is centred in its own column, whatever the height of the text next to it. */
 .toast-content__icon {
 	display: flex;
 	align-items: center;

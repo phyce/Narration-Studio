@@ -4,7 +4,7 @@ import Dropdown from 'primevue/dropdown';
 import ProgressBar from 'primevue/progressbar';
 import {computed, ref, watch} from 'vue';
 import type {AvailablePack, InstalledPack} from '../interfaces/enginePack';
-import {compareVersions, findUpdate, isSameBuild, newestFirst} from '../../util/enginePacks';
+import {compareVersions, findUpdate, isSameBuild, newestFirst, targetVersionText, variantText, versionText} from '../../util/enginePacks';
 
 interface Props {
 	builds: AvailablePack[];
@@ -46,7 +46,7 @@ const versionOptions = computed(() => {
 const variantOptions = computed(() => sortedBuilds.value
 	.filter(build => build.manifest.version === selectedVersion.value)
 	.map(build => ({
-		label: (build.manifest.variant || 'default') + (build.local ? ' (local file)' : ''),
+		label: (build.manifest.variant ? variantText(build.manifest.variant) : 'Default') + (build.local ? ' (local file)' : ''),
 		value: buildKey(build),
 		variant: build.manifest.variant,
 	})));
@@ -65,12 +65,18 @@ const installLabel = computed(() => {
 	if (!build.compatible) return 'Needs a different Narration Studio version';
 	if (!props.installed) return 'Install';
 	if (selectedIsInstalled.value) return 'Reinstall';
-	if (build.manifest.version === props.installed.manifest.version) return `Switch to ${build.manifest.variant}`;
+	if (build.manifest.version === props.installed.manifest.version) return `Switch to ${variantText(build.manifest.variant)}`;
 	if (build.manifest.variant === props.installed.manifest.variant
 		&& compareVersions(build.manifest.version, props.installed.manifest.version) > 0) {
-		return `Update to ${build.manifest.version}`;
+		return `Update to ${targetVersionText(build.manifest, props.installed.manifest)}`;
 	}
-	return `Install ${build.manifest.version} instead`;
+	return `Install ${targetVersionText(build.manifest, props.installed.manifest)} instead`;
+});
+
+const updateText = computed(() => {
+	if (!update.value || !props.installed) return '';
+	const target = targetVersionText(update.value.manifest, props.installed.manifest);
+	return `${target.charAt(0).toUpperCase()}${target.slice(1)} is available.`;
 });
 
 const progressText = computed(() => {
@@ -120,35 +126,43 @@ function formatDate(isoDate: string | undefined): string {
 <template>
 	<div class="voice-packs__builds">
 		<div v-if="installed" class="voice-packs__builds__installed">
-			<span><strong>Installed:</strong> {{ installed.manifest.version }}<template v-if="installed.manifest.variant"> · {{ installed.manifest.variant }}</template></span>
+			<span><strong>Installed:</strong> {{ versionText(installed.manifest) }}<template v-if="installed.manifest.variant"> · {{ variantText(installed.manifest.variant) }}</template></span>
 			<span v-if="!installed.compatible" class="voice-packs__builds__warning">
 				This version needs a different version of Narration Studio. Install another version below.
 			</span>
 			<span v-else-if="update && !busy" class="voice-packs__builds__update">
-				Version {{ update.manifest.version }} is available.
+				{{ updateText }}
 			</span>
 		</div>
 
 		<div v-if="builds.length" class="voice-packs__builds__picker">
+			<div class="voice-packs__builds__field">
+				<span class="voice-packs__builds__label">Engine Version</span>
+				<span class="voice-packs__builds__value">{{ selectedBuild?.manifest.engineVersion || '—' }}</span>
+			</div>
 			<label class="voice-packs__builds__field">
-				<span>Version</span>
-				<Dropdown v-model="selectedVersion" :options="versionOptions" optionLabel="label" optionValue="value" :disabled="busy"/>
+				<span class="voice-packs__builds__label">Pack Version</span>
+				<Dropdown v-if="versionOptions.length > 1" v-model="selectedVersion" :options="versionOptions" optionLabel="label" optionValue="value" :disabled="busy"/>
+				<span v-else class="voice-packs__builds__value">{{ versionOptions[0]?.label }}</span>
 			</label>
 			<label v-if="variantOptions.length > 1 || selectedBuild?.manifest.variant" class="voice-packs__builds__field">
-				<span>Variant</span>
-				<Dropdown v-model="selectedBuildKey" :options="variantOptions" optionLabel="label" optionValue="value" :disabled="busy"/>
+				<span class="voice-packs__builds__label">Variant</span>
+				<Dropdown v-if="variantOptions.length > 1" v-model="selectedBuildKey" :options="variantOptions" optionLabel="label" optionValue="value" :disabled="busy"/>
+				<span v-else class="voice-packs__builds__value">{{ variantOptions[0]?.label }}</span>
 			</label>
-			<template v-if="busy">
-				<Button v-if="pausable" icon="pi pi-pause" label="Pause" severity="secondary" @click="emit('pause')"/>
-				<Button icon="pi pi-times" label="Cancel" severity="danger" text @click="emit('cancel')"/>
-			</template>
-			<Button
-				v-else
-				:icon="selectedBuild?.paused ? 'pi pi-play' : 'pi pi-download'"
-				:label="installLabel"
-				:disabled="!selectedBuild || !selectedBuild.compatible"
-				@click="selectedBuild && emit('install', selectedBuild)"
-			/>
+			<div class="voice-packs__builds__actions">
+				<template v-if="busy">
+					<Button v-if="pausable" icon="pi pi-pause" label="Pause" severity="secondary" @click="emit('pause')"/>
+					<Button icon="pi pi-times" label="Cancel" severity="danger" text @click="emit('cancel')"/>
+				</template>
+				<Button
+					v-else
+					:icon="selectedBuild?.paused ? 'pi pi-play' : 'pi pi-download'"
+					:label="installLabel"
+					:disabled="!selectedBuild || !selectedBuild.compatible"
+					@click="selectedBuild && emit('install', selectedBuild)"
+				/>
+			</div>
 		</div>
 		<p v-else class="voice-packs__builds__none">
 			{{ installed ? 'No other versions are available to download right now.' : 'No versions of this engine are available to download right now.' }}
@@ -160,9 +174,6 @@ function formatDate(isoDate: string | undefined): string {
 		</div>
 
 		<div v-if="selectedBuild" class="voice-packs__builds__meta">
-			<div v-if="selectedBuild.manifest.variantDescription">
-				<strong>{{ selectedBuild.manifest.variant }}:</strong> {{ selectedBuild.manifest.variantDescription }}
-			</div>
 			<div><strong>Download size:</strong> {{ formatSize(selectedBuild.bundleSize) }}</div>
 			<div v-if="selectedBuild.manifest.approxInstallSizeMB">
 				<strong>Disk space after install:</strong> ~{{ selectedBuild.manifest.approxInstallSizeMB }} MB
@@ -176,7 +187,7 @@ function formatDate(isoDate: string | undefined): string {
 			<div v-if="selectedBuild.local"><strong>From:</strong> local file</div>
 		</div>
 		<div v-if="selectedBuild?.notes" class="voice-packs__builds__notes">
-			<strong>What's new in {{ selectedBuild.manifest.version }}</strong>
+			<strong>What's new in pack {{ selectedBuild.manifest.version }}</strong>
 			<p>{{ selectedBuild.notes }}</p>
 		</div>
 	</div>

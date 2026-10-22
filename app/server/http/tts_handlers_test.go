@@ -15,8 +15,6 @@ import (
 
 var errClientGone = errors.New("client disconnected")
 
-// truncatingResponseWriter fails every write once failAfter bytes have landed,
-// standing in for a client that hangs up mid-stream.
 type truncatingResponseWriter struct {
 	headers   http.Header
 	written   bytes.Buffer
@@ -84,8 +82,6 @@ func TestStreamTTSResponseCompletion(t *testing.T) {
 		}
 	})
 
-	// The regression this guards: a mid-stream client disconnect must be
-	// distinguishable from success, otherwise the caller caches a partial clip.
 	t.Run("ClientDisconnectReportsIncomplete", func(t *testing.T) {
 		responseWriter := newTruncatingResponseWriter(1024)
 		stream := filledPipeStream(payloadSize)

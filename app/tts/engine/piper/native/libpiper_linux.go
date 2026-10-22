@@ -8,8 +8,6 @@ package native
 #include <stdlib.h>
 #include <stddef.h>
 
-// --- Piper C types ---
-
 typedef void piper_synthesizer_t;
 
 typedef struct {
@@ -48,16 +46,12 @@ typedef struct {
 	size_t       num_alignments;
 } piper_audio_chunk_t;
 
-// --- Function pointer types ---
-
 typedef piper_synthesizer_t *(*fn_piper_create)(const char *, const char *, const char *);
 typedef piper_synthesizer_t *(*fn_piper_create_ex)(const char *, const char *, const char *, const piper_create_options_t *);
 typedef void                 (*fn_piper_free)(piper_synthesizer_t *);
 typedef piper_synthesize_options_t (*fn_piper_default_opts)(piper_synthesizer_t *);
 typedef int (*fn_piper_synth_start)(piper_synthesizer_t *, const char *, const piper_synthesize_options_t *);
 typedef int (*fn_piper_synth_next)(piper_synthesizer_t *, piper_audio_chunk_t *);
-
-// --- Globals ---
 
 static void               *_handle            = NULL;
 static fn_piper_create     _piper_create       = NULL;
@@ -97,9 +91,6 @@ static int load_libpiper(const char *path) {
 
 	return 0;
 }
-
-// --- C wrappers (called from Go) ---
-// Accept void* for the synthesizer so Go can pass unsafe.Pointer directly.
 
 static void *call_create(const char *m, const char *c, const char *e) {
 	return _piper_create(m, c, e);
@@ -171,7 +162,6 @@ func loadSO() {
 		C.free(unsafe.Pointer(cPath))
 	}
 
-	// Try next to the executable first, then fall back to the system search path.
 	candidates := []string{
 		filepath.Join(exeDir, "libpiper.so"),
 		"libpiper.so",
@@ -188,13 +178,11 @@ func loadSO() {
 	}
 }
 
-// IsGPUAvailable returns true when libpiper.so exposes piper_create_ex (GPU build).
 func IsGPUAvailable() bool {
 	libpiperOnce.Do(loadSO)
 	return gpuCapable
 }
 
-// IsNativeAvailable returns true if libpiper.so loaded successfully.
 func IsNativeAvailable() bool {
 	libpiperOnce.Do(loadSO)
 	return nativeAvailable

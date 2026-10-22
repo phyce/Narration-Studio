@@ -3,10 +3,7 @@
     Runs the Go test suite and prints a clean, flat tick/cross line per test.
 
 .DESCRIPTION
-    By default skips the API engine tests (OpenAI, ElevenLabs, Google, Gemini) —
-    they make real, BILLABLE calls using the keys in your app config or the
-    matching *_API_KEY environment variables, and the Gemini suite paces itself
-    against rate limits so it is also slow.
+    By default skips the API engine tests (OpenAI, ElevenLabs, Google, Gemini):
 
     -All    Run everything, including the API engine tests.
     -Run    Pass a `go test -run` pattern to run a subset (e.g. -Run TestSettingsPage).
@@ -24,12 +21,10 @@ param(
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
-# Emoji are built from code points so this file stays pure ASCII (Windows PowerShell 5.1
-# mangles non-ASCII in BOM-less scripts). UTF-8 console output so they actually render.
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$tick  = [char]::ConvertFromUtf32(0x2705) # white heavy check mark
-$cross = [char]::ConvertFromUtf32(0x274C) # cross mark
-$dash  = [char]::ConvertFromUtf32(0x23ED) # skip (next track)
+$tick  = [char]::ConvertFromUtf32(0x2705)
+$cross = [char]::ConvertFromUtf32(0x274C)
+$dash  = [char]::ConvertFromUtf32(0x23ED)
 
 Push-Location $ProjectRoot
 try {
@@ -59,7 +54,6 @@ try {
     }
     $exitCode = $LASTEXITCODE
 
-    # Show only leaf tests; drop parent groups whose name is a prefix of a subtest.
     $names = @($results | ForEach-Object { $_.Name })
     $leaves = $results | Where-Object {
         $prefix = $_.Name + '/'
@@ -77,7 +71,6 @@ try {
         else { $icon = $dash; $color = 'DarkGray' }
         Write-Host "$icon $name" -ForegroundColor $color
 
-        # Print the test's own messages (the t.Skip / t.Fatalf reason), dropping framing.
         if ($output.ContainsKey($name)) {
             foreach ($line in $output[$name]) {
                 $text = $line.TrimEnd()

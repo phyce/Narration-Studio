@@ -15,7 +15,6 @@ var formMetadataFS embed.FS
 //go:embed defaults/config.form.darwin.json
 var formMetadataDarwinFS embed.FS
 
-// FieldCondition describes a single condition for hideWhen/disableWhen.
 type FieldCondition struct {
 	Field string      `json:"field"`
 	Value interface{} `json:"value"`
@@ -68,8 +67,6 @@ type ConfigSchema struct {
 
 var formMetadata map[string]FieldMetadata
 
-// NativeAvailableFunc is set at startup to avoid a circular import between config and pipernative.
-// It returns true when libpiper.dll is present and usable.
 var NativeAvailableFunc func() bool
 
 func LoadFormMetadata() error {
@@ -128,8 +125,8 @@ func GetConfigSchema() (*ConfigSchema, error) {
 	// referencing DLL availability without persisting this value to config.
 	nativeAvail := NativeAvailableFunc != nil && NativeAvailableFunc()
 	schema.Fields = append(schema.Fields, ConfigField{
-		Path:  "engine.local.piper.nativeAvailable",
-		Value: nativeAvail,
+		Path:     "engine.local.piper.nativeAvailable",
+		Value:    nativeAvail,
 		Metadata: &FieldMetadata{Hidden: true, Type: "checkbox"},
 	})
 

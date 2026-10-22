@@ -11,8 +11,8 @@ type Manifest struct {
 	ID                  string          `json:"id"`
 	Name                string          `json:"name"`
 	Version             string          `json:"version"`
+	EngineVersion       string          `json:"engineVersion,omitempty"`
 	Variant             string          `json:"variant"`
-	VariantDescription  string          `json:"variantDescription,omitempty"`
 	Description         string          `json:"description"`
 	Type                string          `json:"type"`
 	Tags                []string        `json:"tags"`

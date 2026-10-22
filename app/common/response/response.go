@@ -69,7 +69,6 @@ func Error(data util.MessageData) error {
 	return trace(errors.New(data.Summary))
 }
 
-// Send user notification
 func Alert(message string, err error) error {
 	message = fmt.Sprintf(message, err)
 	log.Error(message)

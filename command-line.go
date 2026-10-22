@@ -133,7 +133,6 @@ func handleStop() {
 func handleLogs() {
 	logFilePath := daemon.GetLogFilePath()
 
-	// Check if log file exists
 	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
 		fmt.Printf("Log file does not exist: %s\n", logFilePath)
 		fmt.Println("Server may not be running or hasn't created logs yet.")
@@ -151,7 +150,6 @@ func handleLogs() {
 	}
 	defer file.Close()
 
-	// Seek to end - 2048 bytes (approx) to show some context if file is large
 	stat, _ := file.Stat()
 	if stat.Size() > 2048 {
 		file.Seek(-2048, io.SeekEnd)
@@ -159,7 +157,6 @@ func handleLogs() {
 
 	reader := bufio.NewReader(file)
 	if stat.Size() > 2048 {
-		// Read until newline to avoid partial line
 		reader.ReadBytes('\n')
 	}
 

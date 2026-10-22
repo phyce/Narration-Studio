@@ -28,11 +28,6 @@ var (
 	ErrRunnerTimeout = errors.New("python runner timed out")
 )
 
-// runner drives the bundle's runner (runner.py, or its own program) over the streaming stdio protocol
-// (docs/python-engine-protocol.md): stdin carries JSON-line requests, stdout
-// is a raw s16le PCM firehose routed straight into the active stream writer,
-// stderr carries JSON event lines (ready/done/error) interleaved with
-// free-form log lines.
 type runner struct {
 	engineID   string
 	bundlePath string
@@ -153,10 +148,6 @@ func (pythonRunner *runner) exitFailure() error {
 	return response.Err("%w", ErrRunnerExited)
 }
 
-// routeStdout owns stdout for the life of the process. PCM bytes are mirrored
-// into the active sink (or discarded between requests); routedBytes always
-// counts the current request's bytes so completion can be detected even after
-// the consumer abandoned the stream.
 func (pythonRunner *runner) routeStdout() {
 	chunk := make([]byte, 32*1024)
 	for {
@@ -177,8 +168,6 @@ func (pythonRunner *runner) routeStdout() {
 	}
 }
 
-// readEvents parses stderr: JSON objects carrying an "event" field are
-// protocol events; anything else is treated as a runner log line.
 func (pythonRunner *runner) readEvents() {
 	scanner := bufio.NewScanner(pythonRunner.stderr)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -292,8 +281,6 @@ func (pythonRunner *runner) writeRequest(request runnerRequest) error {
 	return nil
 }
 
-// request performs a non-streaming op (load/unload) and returns its terminal
-// event.
 func (pythonRunner *runner) request(request runnerRequest, timeout time.Duration) (runnerEvent, error) {
 	if pythonRunner.exited.Load() {
 		return runnerEvent{}, pythonRunner.exitFailure()
@@ -487,9 +474,6 @@ func (pythonRunner *runner) currentRoutedBytes() int64 {
 	return pythonRunner.routedBytes
 }
 
-// awaitRoutedBytes waits until the request's full PCM payload has cleared the
-// stdout pipe. The runner emits done only after writing everything, so this is
-// a pipe-flush wait, not a generation wait.
 func (pythonRunner *runner) awaitRoutedBytes(expectedBytes int64) {
 	if expectedBytes <= 0 {
 		pythonRunner.drainQuiet()

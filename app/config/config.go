@@ -98,7 +98,6 @@ func GetCurrentConfigPath() string {
 	return filepath.Dir(manager.filePath)
 }
 
-// DefaultActivityLogDays applies to configs saved before the setting existed.
 const DefaultActivityLogDays = 2
 
 func GetCurrentConfigFile() string {
@@ -255,7 +254,6 @@ func SetValueToPath(path string, value string) error {
 	for i, part := range parts {
 		if current.Kind() == reflect.Ptr {
 			if current.IsNil() {
-				// Initialize the pointer to a new struct
 				current.Set(reflect.New(current.Type().Elem()))
 			}
 			current = current.Elem()
@@ -271,23 +269,19 @@ func SetValueToPath(path string, value string) error {
 		}
 
 		if i == len(parts)-1 {
-			// This is the target field to set
 			if !field.CanSet() {
 				return fmt.Errorf("Cannot set field '%s'", part)
 			}
 
 			newValuePtr := reflect.New(field.Type())
 
-			// Unmarshal the JSON value into the new instance
 			err := json.Unmarshal([]byte(value), newValuePtr.Interface())
 			if err != nil {
 				return fmt.Errorf("Failed to unmarshal value: %w", err)
 			}
 
-			// Set the field to the new value (dereference the pointer)
 			field.Set(newValuePtr.Elem())
 
-			// Save the updated config to disk
 			updatedConfigs, err := json.MarshalIndent(manager.config, "", "\t")
 			if err != nil {
 				return err
@@ -305,7 +299,6 @@ func SetValueToPath(path string, value string) error {
 
 			return nil
 		} else {
-			// Traverse to the next nested struct
 			current = field
 		}
 	}

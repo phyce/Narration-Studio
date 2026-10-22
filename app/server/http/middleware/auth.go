@@ -43,10 +43,6 @@ func AdminAuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 		if authSettings.AdminKey == "" {
 			return next(context)
-			//return context.JSON(http.StatusForbidden, map[string]string{
-			//	"error":   "Forbidden",
-			//	"message": "Admin key not configured",
-			//})
 		}
 
 		authHeader := context.Request().Header.Get("Authorization")

@@ -8,7 +8,6 @@ import (
 
 func findEngines(config *Base) {
 	if runtime.GOOS != "windows" {
-		// Currently only Windows installers are supported
 		return
 	}
 

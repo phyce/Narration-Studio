@@ -320,6 +320,7 @@ func RegisterEngine(baseEngine tts.Engine) error {
 		Engine: baseEngine,
 		Models: make(map[string]*ModelPool),
 	}
+	manager.Engines[engineID] = entry
 
 	toggles := config.GetEngineToggles()
 
@@ -343,8 +344,6 @@ func RegisterEngine(baseEngine tts.Engine) error {
 
 		entry.Models[modelID] = pool
 	}
-
-	manager.Engines[engineID] = entry
 
 	for _, model := range baseEngine.Models {
 		RegisterModel(model)

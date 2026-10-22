@@ -19,8 +19,6 @@ var (
 	answerPollInterval = 250 * time.Millisecond
 )
 
-// ErrStartCancelled is returned by StartDaemon when StopDaemon stopped the server while it was
-// still starting.
 var ErrStartCancelled = errors.New("the server was stopped while it was starting")
 
 var (
@@ -49,8 +47,6 @@ func Initialize() {
 	})
 }
 
-// StartDaemon returns once the server answers, however long loading its models takes, or with an
-// error if it exits first. The wait doesn't hold the lock, so StopDaemon can cancel it.
 func StartDaemon(launchDaemon func() error) error {
 	mutex.Lock()
 	if !handedOff {
@@ -102,9 +98,6 @@ func watchDaemon() {
 	}
 }
 
-// Taking the engines needs an answering daemon (a PID file can be stale, its PID
-// reused); giving them back needs only a dead one, so a slow-loading daemon
-// doesn't bounce them back and forth.
 func syncWithDaemon() {
 	running := daemonRunning()
 

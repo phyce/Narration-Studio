@@ -181,9 +181,6 @@ const chains = computed<Chain[]>(() => {
 	return result;
 });
 
-// Rows are added a few per frame instead of all at once, so the list (and its scrollbar) grows
-// smoothly when the log opens or a page of older entries arrives. Each step is a fraction of what's
-// left, so a big page starts fast and slows down towards the end.
 const visibleCount = ref(initialRows);
 let revealFrame = 0;
 
@@ -224,7 +221,6 @@ function isExpandable(chain: Chain): boolean {
 	return chain.frames.length > 1 || !!chain.representative.detail;
 }
 
-// Outermost (user-facing) frame first, drilling down into causes.
 function orderedFrames(chain: Chain): Entry[] {
 	return chain.frames.slice().reverse();
 }

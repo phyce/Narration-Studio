@@ -379,19 +379,12 @@ func TestServerEndpoints(t *testing.T) {
 	})
 }
 
-// TestServerEngineMatrix synthesizes through the HTTP server with every
-// registered local engine/model, enabled and started the way the product does
-// it (toggles + RefreshModels — piper only knows its voices once the model is
-// running). Piper models come from the real user config when present; python
-// pack engines are opt-in (NSTUDIO_TEST_PACKS=1) because loading their models
-// can download weights.
 func TestServerEngineMatrix(t *testing.T) {
 	originalConfig := config.Get()
 	realConfig := readRealUserConfig(t)
 	working := config.Get()
 	working.Engine.Local = realConfig.Engine.Local
-	// Native piper resolves espeak-ng-data relative to the executable, which
-	// for a test binary is a temp directory — use the subprocess mode.
+
 	working.Engine.Local.Piper.UseExecutable = true
 	if err := config.Set(working); err != nil {
 		t.Fatalf("apply real local engine config: %v", err)
@@ -467,10 +460,6 @@ func TestServerEngineMatrix(t *testing.T) {
 	}
 }
 
-// TestServerStreamingCache covers the tee-capture path that only runs on a
-// streamed cache miss: a completed stream must be stored and then served from
-// the buffered cache-hit path, while a stream the client abandons must leave
-// nothing behind — caching a truncated capture would poison every later hit.
 func TestServerStreamingCache(t *testing.T) {
 	const profileID = "server-cache-test"
 	const character = "narrator"
@@ -557,8 +546,6 @@ func TestServerStreamingCache(t *testing.T) {
 	})
 
 	t.Run("SkipsCacheOnClientDisconnect", func(t *testing.T) {
-		// Long enough that the response cannot fit in the socket buffers, so the
-		// handler is guaranteed to still be pumping when the client hangs up.
 		abandonedText := strings.TrimSpace(strings.Repeat("This sentence keeps the synthesizer busy for a good long while. ", 12))
 
 		requestContext, cancelRequest := context.WithCancel(context.Background())
@@ -583,8 +570,6 @@ func TestServerStreamingCache(t *testing.T) {
 			t.Fatalf("read stream prefix: %v", readErr)
 		}
 
-		// The handler only notices the dead socket on its next write, so poll
-		// rather than checking once.
 		deadline := time.Now().Add(3 * time.Second)
 		for time.Now().Before(deadline) {
 			if cached, found := cacheManager.GetCachedAudio(profileID, character, abandonedText); found {
@@ -595,10 +580,6 @@ func TestServerStreamingCache(t *testing.T) {
 	})
 }
 
-// TestServerAPIEngines makes one BILLABLE synthesis call per configured API
-// engine through the HTTP server. Skipped by scripts/test.ps1 by default;
-// keys resolve from *_API_KEY environment variables, falling back to the real
-// user config.
 func TestServerAPIEngines(t *testing.T) {
 	originalConfig := config.Get()
 	realConfig := readRealUserConfig(t)

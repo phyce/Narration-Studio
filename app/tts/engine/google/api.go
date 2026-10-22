@@ -14,9 +14,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-// ensureClient lazily creates the shared texttospeech client. It is created
-// against context.Background() because it outlives any single request; Stop
-// closes it.
 func (google *Google) ensureClient() (*texttospeech.Client, error) {
 	google.clientMutex.Lock()
 	defer google.clientMutex.Unlock()
@@ -131,7 +128,6 @@ func (google *Google) fetchVoices(model string) ([]engine.Voice, error) {
 		return nil, response.Err("Failed to list voices: %v", err)
 	}
 
-	// Initialize cache map if nil (safety check)
 	if google.voiceCache == nil {
 		google.voiceCache = make(map[string][]engine.Voice)
 	}

@@ -37,7 +37,6 @@
 	--primary-highlight-inverse: var(--primary-300);
 	--primary-highlight-hover-opacity: 0.3;
 
-	/* App palette. Bars are darkest, then page content, then panels and cards on top of it. */
 	--app-bar: #1c1c1c;
 	--app-bg: #262626;
 	--app-panel: #2f2f2f;
@@ -105,7 +104,6 @@ body {
 	background-color: #5c5c5c;
 }
 
-/* Script highlighting in the Monaco editor (Sandbox, Script Editor) */
 .matching-sentence {
 	color: white !important;
 	background-color: #3f6212;
@@ -117,7 +115,6 @@ body {
 	background-color: rgba(234, 88, 12, 0.28);
 }
 
-/* PrimeVue ProgressBar (unstyled mode): indeterminate animation */
 .progressbar-value-animate::before {
 	will-change: left, right;
 	animation: progressbar-indeterminate 2.1s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
@@ -151,7 +148,6 @@ body {
 	}
 }
 
-/* Hourglass shown by the footer while the status is Loading */
 .icon {
 	position: relative;
 	display: inline-block;

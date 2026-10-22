@@ -15,11 +15,11 @@ func TestVoicePacksPage(t *testing.T) {
 	})
 
 	t.Run("RefreshModels", func(t *testing.T) {
-		app.RefreshModels() // void; must not panic
+		app.RefreshModels()
 	})
 
 	t.Run("ReloadVoicePacks", func(t *testing.T) {
-		app.ReloadVoicePacks() // void; must not panic
+		app.ReloadVoicePacks()
 	})
 
 	t.Run("EnginePackFetchAvailable", func(t *testing.T) {

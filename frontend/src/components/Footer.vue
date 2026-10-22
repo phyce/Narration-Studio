@@ -7,8 +7,12 @@ import {GetStatus, OpenActivityLog} from "../../bindings/nstudio/app";
 
 const status = ref<number>(Status.Unknown);
 const title = ref<string>("");
+let latestSequence = 0;
 
-function updateStatus(data: { status: Status; message: string }) {
+function updateStatus(data: { status: Status; message: string; sequence?: number }) {
+	const sequence = data.sequence ?? 0;
+	if (sequence < latestSequence) return;
+	latestSequence = sequence;
 	status.value = data.status ?? Status.Unknown;
 	title.value = data.message;
 }

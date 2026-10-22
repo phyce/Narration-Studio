@@ -53,7 +53,6 @@ func (openAI *OpenAI) Synthesize(ctx context.Context, request engine.SpeechReque
 		return nil, response.Err("%w", err)
 	}
 
-	// The pcm response format is s16le 24 kHz mono.
 	format := audio.StreamFormat{SampleRate: 24000, Channels: 1, BitDepth: 16}
 	return audio.NewProducedStream(format, func(writer *audio.StreamWriter) error {
 		defer body.Close()

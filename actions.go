@@ -38,10 +38,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-//This is the entry point for all actions coming from the frontend
-
 // <editor-fold desc="Sandbox">
-/* TODO: combine with ProcessScript as they're mostly identical */
 func (app *App) Play(
 	script string,
 	saveNewCharacters bool,
@@ -1015,8 +1012,6 @@ func (app *App) GetServerLogs() string {
 	return string(jsonData)
 }
 
-// GetConfigFilePath is the config file this app instance uses; the Server page offers it as the
-// default when the server should run with a custom config.
 func (app *App) GetConfigFilePath() string {
 	return config.GetCurrentConfigFile()
 }

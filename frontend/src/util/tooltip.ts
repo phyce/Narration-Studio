@@ -26,9 +26,6 @@ const positionsToTry: Record<TooltipPosition, TooltipPosition[]> = {
 
 const extendable = Tooltip as ObjectDirective & {extend(name: string, options: object): ObjectDirective};
 
-// PrimeVue flips a tooltip to the other side when it doesn't fit, but never slides it along,
-// so a tooltip centred on an icon near the window's edge was cut off. Its fit-content width
-// also shrank a tooltip near the right edge instead of letting it move.
 export default extendable.extend('tooltip', {
 	methods: {
 		align(this: TooltipInstance, host: TooltipHost) {

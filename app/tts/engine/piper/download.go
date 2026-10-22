@@ -54,7 +54,6 @@ func (p *progressReader) maybeEmit(force bool) {
 		}
 	}
 
-	// Throttle to at most ~10 emits/sec and only on percent change, unless forced.
 	if !force && pct == p.lastPct && time.Since(p.lastEmit) < 100*time.Millisecond {
 		return
 	}
@@ -100,8 +99,6 @@ type githubRelease struct {
 	} `json:"assets"`
 }
 
-// parseReleaseBody extracts description (line 1), language (line 2), and voice
-// count (line 3, e.g. "64 Voices") from a release body.
 func parseReleaseBody(body string) (description, language string, voices int) {
 	lines := strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
 	get := func(i int) string {
@@ -145,10 +142,6 @@ func getModelsDir() (string, error) {
 	return expanded, nil
 }
 
-// userModelsDir returns the per-user writable fallback path for Piper models.
-// On Windows we use %USERPROFILE%\Narration Studio\piper\models to match the
-// other user-data paths (output, cache). Other platforms fall back to
-// os.UserConfigDir().
 func userModelsDir() (string, error) {
 	if runtime.GOOS == "windows" {
 		home, err := os.UserHomeDir()
@@ -179,9 +172,6 @@ func isWritable(dir string) bool {
 	return true
 }
 
-// ensureWritableModelsDir returns a writable models directory. If the configured
-// one isn't writable (e.g. Program Files without admin), it falls back to the
-// user config dir and updates the saved config to match.
 func ensureWritableModelsDir() (string, error) {
 	current, err := getModelsDir()
 	if err == nil && isWritable(current) {
@@ -422,7 +412,6 @@ func DeleteModel(modelID string) error {
 	}
 
 	folder := filepath.Join(modelsDir, modelID)
-	// Safety: ensure the folder is actually a child of the models dir
 	absModelsDir, _ := filepath.Abs(modelsDir)
 	absFolder, _ := filepath.Abs(folder)
 	if !strings.HasPrefix(absFolder, absModelsDir+string(os.PathSeparator)) {

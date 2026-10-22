@@ -84,19 +84,15 @@ func setupRoutes(server *echo.Echo) {
 	api := server.Group("")
 	api.Use(customMiddleware.AuthMiddleware)
 
-	// TTS endpoints
 	api.POST("/tts", handleProfileTTSRequest)
 	api.POST("/tts/:engineId/:modelId/:voiceId", handleSimpleTTS)
 
-	// Engine endpoints
 	api.GET("/engines", engines.GetEngines)
 	api.GET("/engines/:engineId/models", engines.GetModels)
 	api.GET("/engines/:engineId/models/:modelId/voices", engines.GetVoices)
 
-	// Voice tree endpoint
 	api.GET("/voices", engines.GetAllVoices)
 
-	// Profile endpoints
 	api.GET("/profiles", handleListProfiles)
 	api.POST("/profiles", handleCreateProfile)
 	api.GET("/profiles/:profileId", handleGetProfile)
@@ -107,11 +103,9 @@ func setupRoutes(server *echo.Echo) {
 	api.POST("/profiles/:profileId/voices/:character", profiles.SetCharacterVoice)
 	api.DELETE("/profiles/:profileId/voices/:character", profiles.DeleteCharacterVoice)
 
-	// Admin-only endpoints
 	admin := server.Group("")
 	admin.Use(customMiddleware.AdminAuthMiddleware)
 
-	// Config endpoints
 	admin.GET("/config", configRoute.Get)
 	admin.POST("/config", configRoute.Update)
 	admin.PATCH("/config", configRoute.Patch)

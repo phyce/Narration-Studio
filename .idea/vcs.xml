@@ -2,10 +2,6 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/lib/build/build-cpu/espeak_ng/src/espeak_ng_external" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/lib/build/build-cpu/espeak_ng/src/espeak_ng_external-build/_deps/sonic-git-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/lib/build/build-directml/espeak_ng/src/espeak_ng_external" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/lib/build/build-directml/espeak_ng/src/espeak_ng_external-build/_deps/sonic-git-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/lib/libpiper-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../Narration-Studio-Engines" vcs="Git" />
   </component>
 </project>

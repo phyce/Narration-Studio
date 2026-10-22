@@ -45,7 +45,6 @@ Write-Host "Project:  $ProjectRoot"
 Write-Host "Output:   $OutputDir"
 Write-Host ""
 
-# --- Verify toolchain ---
 $GoPath = (Get-Command go -ErrorAction SilentlyContinue).Source
 $GccPath = (Get-Command gcc -ErrorAction SilentlyContinue).Source
 
@@ -61,7 +60,6 @@ if (-not $GccPath) {
 Write-Host "  go:  $GoPath"
 Write-Host "  gcc: $GccPath"
 
-# Verify CGO is enabled
 $cgoEnabled = & go env CGO_ENABLED 2>&1
 if ($cgoEnabled -ne "1") {
     Write-Host "  CGO_ENABLED is '$cgoEnabled', setting to 1" -ForegroundColor Yellow
@@ -69,7 +67,6 @@ if ($cgoEnabled -ne "1") {
 }
 Write-Host ""
 
-# --- Clean ---
 if ($Clean -and (Test-Path $OutputDir)) {
     Write-Host "Cleaning $OutputDir..." -ForegroundColor Yellow
     Remove-Item $OutputDir -Recurse -Force
@@ -77,12 +74,10 @@ if ($Clean -and (Test-Path $OutputDir)) {
     Write-Host ""
 }
 
-# --- Create output directory ---
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir | Out-Null
 }
 
-# --- Build ---
 Write-Host "Building nstudio.dll..." -ForegroundColor Cyan
 
 $dllPath = Join-Path $OutputDir "nstudio.dll"
@@ -100,18 +95,15 @@ try {
 
 Write-Host "  Built: $dllPath" -ForegroundColor Green
 
-# Check for generated header
 $headerPath = Join-Path $OutputDir "nstudio.h"
 if (Test-Path $headerPath) {
     Write-Host "  Header: $headerPath" -ForegroundColor Green
 }
 Write-Host ""
 
-# --- Copy runtime dependencies ---
 if (-not $SkipDeps) {
     Write-Host "Copying runtime dependencies..." -ForegroundColor Cyan
 
-    # DLLs to copy (searched in project root, then build/bin, then lib install dirs, then piper engine dir)
     $searchPaths = @(
         $ProjectRoot,
         (Join-Path $ProjectRoot "build\bin"),
@@ -126,14 +118,12 @@ if (-not $SkipDeps) {
         "onnxruntime_providers_shared.dll"
     )
 
-    # Piper native DLL dependencies
     $piperFiles = @(
         "espeak-ng.dll",
         "piper_phonemize.dll",
         "libtashkeel_model.ort"
     )
 
-    # Optional DLLs (won't error if missing)
     $optionalDlls = @(
         "libpiper_directml.dll",
         "DirectML.dll"
@@ -166,7 +156,6 @@ if (-not $SkipDeps) {
         }
     }
 
-    # Copy piper engine files
     foreach ($file in $piperFiles) {
         $found = $false
         foreach ($searchPath in $searchPaths) {
@@ -183,7 +172,6 @@ if (-not $SkipDeps) {
         }
     }
 
-    # Copy espeak-ng-data directory
     $espeakSearchPaths = @(
         (Join-Path $ProjectRoot "build\bin\espeak-ng-data"),
         (Join-Path $ProjectRoot "build\windows\installer\engines\piper\espeak-ng-data"),
@@ -211,7 +199,6 @@ if (-not $SkipDeps) {
     Write-Host ""
 }
 
-# --- Summary ---
 Write-Host "=== Build complete ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "Contents of $OutputDir :"

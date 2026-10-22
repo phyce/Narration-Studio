@@ -1,7 +1,4 @@
 import {Engine} from '../components/interfaces/engine';
-// import {GetEngines} from "../../wailsjs/go/main/App";
-// import {useToast} from "primevue/usetoast";
-// const toast = useToast();
 
 export function formatToTreeSelectData(engines: Engine[]) {
 	return engines
@@ -24,14 +21,3 @@ export function formatToTreeSelectData(engines: Engine[]) {
 			}))
 		}));
 }
-
-// export async function getEngines() {
-// 	const result = await GetEngines();
-// 	try {
-// 		const engines: Engine[] = JSON.parse(result);
-//
-// 		return engines;
-// 	} catch (issue) {
-// 		toast.add({ severity: 'issue', summary: 'Error getting engines:', detail: issue, life: 5000});
-// 	}
-// }

@@ -16,9 +16,6 @@ import (
 
 var httpClient = &http.Client{}
 
-// requestTimeout is a fallback deadline for callers that pass an undeadlined
-// context. Generous because Gemini synthesizes the whole clip inline; user
-// stop still cancels immediately through ctx.
 const requestTimeout = 2 * time.Minute
 
 func (gemini *Gemini) sendRequest(ctx context.Context, request GeminiRequest, modelName string) ([]byte, error) {

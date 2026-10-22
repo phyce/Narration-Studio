@@ -21,10 +21,6 @@ import (
 	"unsafe"
 )
 
-// ---------------------------------------------------------------------------
-// Internal state
-// ---------------------------------------------------------------------------
-
 var (
 	initialized bool
 	initMu      sync.Mutex
@@ -49,7 +45,6 @@ func checkInit() bool {
 	return true
 }
 
-// returnJSON marshals v to JSON, copies to C-heap, writes to *out.
 func returnJSON(v interface{}, out **C.char) C.int {
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -60,11 +55,6 @@ func returnJSON(v interface{}, out **C.char) C.int {
 	return 0
 }
 
-// ---------------------------------------------------------------------------
-// Lifecycle
-// ---------------------------------------------------------------------------
-
-// main is required by c-shared build mode but never called.
 func main() {}
 
 //export NStudioInit
@@ -82,7 +72,6 @@ func NStudioInit(configJSON *C.char) C.int {
 		}
 	}()
 
-	// Parse optional init config
 	type initOpts struct {
 		ModelsDirectory string `json:"modelsDirectory"`
 		EspeakDataDir   string `json:"espeakDataDir"`
@@ -99,13 +88,11 @@ func NStudioInit(configJSON *C.char) C.int {
 		}
 	}
 
-	// Initialize core systems
 	if err := initializeApp(opts.ConfigFile); err != nil {
 		setLastError(-6, fmt.Sprintf("initializeApp failed: %v", err))
 		return -6
 	}
 
-	// Apply overrides from init options
 	if opts.ModelsDirectory != "" {
 		config.SetValueToPath("engine.local.piper.modelsDirectory", fmt.Sprintf("%q", opts.ModelsDirectory))
 	}
@@ -113,10 +100,8 @@ func NStudioInit(configJSON *C.char) C.int {
 		config.SetValueToPath("engine.local.piper.espeakDataDir", fmt.Sprintf("%q", opts.EspeakDataDir))
 	}
 
-	// Initialize model manager (no speaker output in DLL mode)
 	modelManager.Initialize(false)
 
-	// Register all engines
 	registerEngines()
 
 	initialized = true
@@ -136,10 +121,6 @@ func NStudioFree(ptr unsafe.Pointer) {
 		C.free(ptr)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TTS Generation
-// ---------------------------------------------------------------------------
 
 //export NStudioGenerate
 func NStudioGenerate(requestJSON *C.char, outData **C.char, outLen *C.int, outMeta **C.char) (errCode C.int) {
@@ -196,11 +177,9 @@ func NStudioGenerate(requestJSON *C.char, outData **C.char, outLen *C.int, outMe
 		return -4
 	}
 
-	// Copy audio data to C heap
 	*outLen = C.int(len(outputBytes))
 	*outData = (*C.char)(C.CBytes(outputBytes))
 
-	// Build and return metadata
 	meta := struct {
 		SampleRate int    `json:"sampleRate"`
 		Channels   int    `json:"channels"`
@@ -293,10 +272,6 @@ func NStudioGenerateForProfile(requestJSON *C.char, outData **C.char, outLen *C.
 
 	return 0
 }
-
-// ---------------------------------------------------------------------------
-// Engine / Voice Discovery
-// ---------------------------------------------------------------------------
 
 //export NStudioGetEngines
 func NStudioGetEngines(outJSON **C.char) C.int {
@@ -401,10 +376,6 @@ func NStudioGetAllVoices(outJSON **C.char) C.int {
 	return returnJSON(result, outJSON)
 }
 
-// ---------------------------------------------------------------------------
-// Configuration & Settings Schema
-// ---------------------------------------------------------------------------
-
 //export NStudioGetConfigSchema
 func NStudioGetConfigSchema(outJSON **C.char) C.int {
 	if !checkInit() {
@@ -464,10 +435,6 @@ func NStudioSetConfigValue(path *C.char, valueJSON *C.char) C.int {
 
 	return 0
 }
-
-// ---------------------------------------------------------------------------
-// Profiles
-// ---------------------------------------------------------------------------
 
 //export NStudioGetProfiles
 func NStudioGetProfiles(outJSON **C.char) C.int {
@@ -577,10 +544,6 @@ func NStudioSetProfileVoice(profileID *C.char, character *C.char, voiceJSON *C.c
 	return 0
 }
 
-// ---------------------------------------------------------------------------
-// Model Management
-// ---------------------------------------------------------------------------
-
 //export NStudioReloadModels
 func NStudioReloadModels() C.int {
 	if !checkInit() {
@@ -625,10 +588,6 @@ func NStudioSetModelToggle(key *C.char, enabled C.int) C.int {
 
 	return 0
 }
-
-// ---------------------------------------------------------------------------
-// Error Handling
-// ---------------------------------------------------------------------------
 
 //export NStudioGetLastError
 func NStudioGetLastError(outJSON **C.char) C.int {

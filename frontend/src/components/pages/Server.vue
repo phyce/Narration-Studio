@@ -36,7 +36,6 @@ const host = ref<string>('localhost');
 const appConfigFile = ref<string>('');
 const customConfigFile = ref<string>('');
 const useCustomConfig = ref<boolean>(false);
-// The field shows the app's own config file until "Use custom config file" is ticked.
 const configFile = computed({
 	get: () => useCustomConfig.value ? customConfigFile.value : appConfigFile.value,
 	set: (value: string) => { customConfigFile.value = value; },
@@ -107,7 +106,6 @@ function handleLogsScroll() {
 	autoScrollEnabled.value = isAtBottom;
 }
 
-// Starting waits for the server to load its models, which can take minutes; Stop cancels it.
 async function startServer() {
 	starting.value = true;
 	try {

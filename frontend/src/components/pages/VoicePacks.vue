@@ -12,7 +12,7 @@ import EnginePackBuilds from '../common/EnginePackBuilds.vue';
 import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue';
 import {ApiAvailability, Engine, Model} from '../interfaces/engine';
 import type {AvailablePack, EnginePackListing, InstalledPack, PythonManifest} from '../interfaces/enginePack';
-import {findUpdate, newestFirst} from '../../util/enginePacks';
+import {findUpdate, newestFirst, variantText, versionText} from '../../util/enginePacks';
 import {
 	CheckApiEngines,
 	EnginePackCancelInstall,
@@ -72,6 +72,7 @@ function getTagSeverity(tag: string): string {
 		case 'local': return 'success';
 		case 'api': return 'info';
 		case 'gpu': return 'warning';
+		case 'fast': return 'gold';
 		default: return 'secondary';
 	}
 }
@@ -128,6 +129,7 @@ function weightsDownloadNote(manifest: PythonManifest): string {
 const installBusy = reactive<Record<string, boolean>>({});
 const installedOnly = ref<boolean>(false);
 const importBusy = ref<boolean>(false);
+const refreshingPacks = ref<boolean>(false);
 
 const showSettingsDialog = ref(false);
 const settingsConfig = ref<configBase>({} as configBase);
@@ -237,6 +239,8 @@ const filteredEngines = computed<SidebarEntry[]>(() => {
 	return list;
 });
 
+const firstUninstalledIndex = computed(() => filteredEngines.value.findIndex(entry => !entry.installed));
+
 function selectFirstVisibleEngine() {
 	if (filteredEngines.value.some(entry => entry.id === selectedEngineId.value)) return;
 	selectedEngineId.value = filteredEngines.value[0]?.id ?? '';
@@ -314,7 +318,7 @@ const selectedEnabledCount = computed(() =>
 const selectedSubtitle = computed(() => {
 	const entry = selectedEntry.value;
 	if (!entry) return '';
-	const kind = entry.type === 'api' ? 'Online service' : 'Runs on this computer';
+	const kind = entry.type === 'api' ? 'Online service' : 'Local engine';
 	const parts = [kind];
 	if (!entry.installed) {
 		parts.push('not installed');
@@ -336,7 +340,7 @@ const selectedSubtitle = computed(() => {
 	}
 	const installedManifest = entry.installedPack?.manifest;
 	if (installedManifest) {
-		parts.push(`version ${installedManifest.version}${installedManifest.variant ? ` (${installedManifest.variant})` : ''}`);
+		parts.push(`version ${versionText(installedManifest)}${installedManifest.variant ? ` (${variantText(installedManifest.variant)})` : ''}`);
 	}
 	return parts.join(' · ');
 });
@@ -351,7 +355,16 @@ async function loadData() {
 
 	engines.value = JSON.parse(enginesResult);
 	models.value = JSON.parse(modelsResult);
+	applyPackListing(packsResult);
 
+	const savedToggles = settings.modelToggles;
+	Object.entries(models.value).forEach(([, model]) => {
+		const toggleKey = `${model.engine}:${model.id}`;
+		modelToggles[toggleKey] = savedToggles[toggleKey] ?? false;
+	});
+}
+
+function applyPackListing(packsResult: string) {
 	try {
 		const listing: Partial<EnginePackListing> = JSON.parse(packsResult) || {};
 		availablePacks.value = listing.packs ?? [];
@@ -360,12 +373,16 @@ async function loadData() {
 		availablePacks.value = [];
 		installedPacks.value = [];
 	}
+}
 
-	const savedToggles = settings.modelToggles;
-	Object.entries(models.value).forEach(([, model]) => {
-		const toggleKey = `${model.engine}:${model.id}`;
-		modelToggles[toggleKey] = savedToggles[toggleKey] ?? false;
-	});
+async function refreshAvailablePacks() {
+	if (refreshingPacks.value) return;
+	refreshingPacks.value = true;
+	try {
+		applyPackListing(await EnginePackFetchAvailable().catch(() => '{}'));
+	} finally {
+		refreshingPacks.value = false;
+	}
 }
 
 async function checkApiEngines() {
@@ -385,7 +402,7 @@ async function checkApiEngines() {
 async function installPack(pack: AvailablePack) {
 	if (pack.local && !pack.paused) {
 		confirmLocalInstall(
-			`${pack.manifest.name} ${pack.manifest.version} (${pack.manifest.variant})`,
+			`${pack.manifest.name} ${versionText(pack.manifest)} (${variantText(pack.manifest.variant)})`,
 			pack.bundleUrl,
 			weightsDownloadNote(pack.manifest),
 			() => runInstall(pack),
@@ -618,8 +635,8 @@ onBeforeUnmount(() => {
 				<Button
 					v-else
 					icon="pi pi-refresh"
-					title="Reload engines and voice packs"
-					aria-label="Reload engines and voice packs"
+					title="Reload installed engines and voice packs"
+					aria-label="Reload installed engines and voice packs"
 					severity="secondary"
 					size="small"
 					:loading="reloadModelsButtonDisabled"
@@ -658,69 +675,83 @@ onBeforeUnmount(() => {
 				</div>
 			</div>
 			<div id="vp-engine-list" class="voice-packs__sidebar__list" role="tabpanel">
-				<div
-					v-for="entry in filteredEngines"
-					:key="entry.id"
-					class="voice-packs__engine-card"
-					:class="{
-						'voice-packs__engine-card--active': selectedEngineId === entry.id,
-						'voice-packs__engine-card--available': !entry.installed,
-						'voice-packs__engine-card--unavailable': entry.type === 'api' && isUnavailable(entry.id),
-					}"
-					@click="selectEngine(entry.id)"
-				>
-					<div class="voice-packs__engine-card__header">
-						<span class="voice-packs__engine-card__name">{{ entry.name }}</span>
-						<i v-if="!entry.installed" class="pi pi-download voice-packs__engine-card__status" title="Not installed"></i>
-						<span v-else class="voice-packs__engine-card__count" :title="`${entry.modelCount} model${entry.modelCount === 1 ? '' : 's'}`">
-							{{ entry.modelCount }}
-						</span>
+				<template v-for="(entry, index) in filteredEngines" :key="entry.id">
+					<div v-if="index > 0 && index === firstUninstalledIndex" class="voice-packs__sidebar__separator" role="separator">
+						Not installed
 					</div>
-					<div class="voice-packs__engine-card__tags">
-						<Tag
-							v-for="tag in (entry.tags ?? [])"
-							:key="tag"
-							:value="tag"
-							:severity="getTagSeverity(tag)"
-							rounded
-							class="voice-packs__tag-pill"
-						/>
-						<Tag v-if="!entry.installed" value="available" rounded class="voice-packs__tag-pill"/>
-						<Tag
-							v-if="entry.type === 'api' && isUnavailable(entry.id)"
-							:value="apiAvailability[entry.id].missingApiKey ? 'no API key' : 'not available'"
-							:severity="apiAvailability[entry.id].missingApiKey ? 'secondary' : 'danger'"
-							:title="apiAvailability[entry.id].reason"
-							rounded
-							class="voice-packs__tag-pill"
-						/>
-						<Tag v-if="entry.hasUpdate" value="update" severity="warning" rounded class="voice-packs__tag-pill"/>
-						<Tag
-							v-if="entry.paused && !installBusy[entry.id]"
-							value="paused"
-							severity="secondary"
-							rounded
-							class="voice-packs__tag-pill"
-						/>
-						<Tag
-							v-if="entry.installedPack && !entry.installedPack.compatible"
-							value="needs another version"
-							severity="danger"
-							rounded
-							class="voice-packs__tag-pill"
+					<div
+						class="voice-packs__engine-card"
+						:class="{
+							'voice-packs__engine-card--active': selectedEngineId === entry.id,
+							'voice-packs__engine-card--available': !entry.installed,
+							'voice-packs__engine-card--unavailable': entry.type === 'api' && isUnavailable(entry.id),
+						}"
+						@click="selectEngine(entry.id)"
+					>
+						<div class="voice-packs__engine-card__header">
+							<span class="voice-packs__engine-card__name">{{ entry.name }}</span>
+							<i v-if="!entry.installed" class="pi pi-download voice-packs__engine-card__status" title="Not installed"></i>
+							<span v-else class="voice-packs__engine-card__count" :title="`${entry.modelCount} model${entry.modelCount === 1 ? '' : 's'}`">
+								{{ entry.modelCount }}
+							</span>
+						</div>
+						<div class="voice-packs__engine-card__tags">
+							<Tag
+								v-for="tag in (entry.tags ?? [])"
+								:key="tag"
+								:value="tag"
+								:severity="getTagSeverity(tag)"
+								rounded
+								class="voice-packs__tag-pill"
+							/>
+							<Tag
+								v-if="entry.type === 'api' && isUnavailable(entry.id)"
+								:value="apiAvailability[entry.id].missingApiKey ? 'no API key' : 'not available'"
+								:severity="apiAvailability[entry.id].missingApiKey ? 'secondary' : 'danger'"
+								:title="apiAvailability[entry.id].reason"
+								rounded
+								class="voice-packs__tag-pill"
+							/>
+							<Tag v-if="entry.hasUpdate" value="update" severity="warning" rounded class="voice-packs__tag-pill"/>
+							<Tag
+								v-if="entry.paused && !installBusy[entry.id]"
+								value="paused"
+								severity="secondary"
+								rounded
+								class="voice-packs__tag-pill"
+							/>
+							<Tag
+								v-if="entry.installedPack && !entry.installedPack.compatible"
+								value="needs another version"
+								severity="danger"
+								rounded
+								class="voice-packs__tag-pill"
+							/>
+						</div>
+						<ProgressBar
+							v-if="installBusy[entry.id]"
+							:value="installProgress[entry.id] ?? 0"
+							:mode="installStage[entry.id] === 'verifying' ? 'indeterminate' : 'determinate'"
+							class="voice-packs__engine-card__progress"
+							:showValue="false"
 						/>
 					</div>
-					<ProgressBar
-						v-if="installBusy[entry.id]"
-						:value="installProgress[entry.id] ?? 0"
-						:mode="installStage[entry.id] === 'verifying' ? 'indeterminate' : 'determinate'"
-						class="voice-packs__engine-card__progress"
-						:showValue="false"
-					/>
-				</div>
+				</template>
 				<div v-if="filteredEngines.length === 0" class="voice-packs__sidebar__empty">
 					No engines match these filters.
 				</div>
+				<Button
+					v-if="engineTab === 'local'"
+					icon="pi pi-cloud-download"
+					label="Refresh available packs"
+					severity="secondary"
+					text
+					size="small"
+					class="voice-packs__sidebar__refresh-packs"
+					:loading="refreshingPacks"
+					:disabled="refreshingPacks"
+					@click="refreshAvailablePacks"
+				/>
 			</div>
 		</aside>
 
@@ -899,9 +930,7 @@ onBeforeUnmount(() => {
 				<p class="voice-packs__trust__warning">
 					<i class="pi pi-exclamation-triangle"></i>
 					<span>
-						Engine packs run their own code on this computer, with the same access to your files as
-						Narration Studio. Only install packs from sources you trust — a pack from an untrusted
-						source could damage your system or steal your data.
+						Engine packs run can execute code on this computer. Only install packs from sources you trust.
 					</span>
 				</p>
 				<div class="voice-packs__trust__details">

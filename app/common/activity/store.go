@@ -12,9 +12,6 @@ import (
 	"nstudio/app/config"
 )
 
-// Every launch writes its own file, logs/<date>/<time>.jsonl under the config folder, so the
-// Activity Log only ever shows the current session. Date folders older than
-// settings.activityLogDays are deleted when a launch first writes.
 const logsFolderName = "logs"
 const dateFolderLayout = "2006-01-02"
 const sessionFileLayout = "15-04-05"
@@ -38,7 +35,6 @@ func logsPath() string {
 	return filepath.Join(configPath, logsFolderName)
 }
 
-// A config path change (tests) starts a new file in the new location.
 func sessionFile() string {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
@@ -67,8 +63,6 @@ func keepDays() int {
 	return days
 }
 
-// createSessionFile reserves logs/<date>/<time>.jsonl; two processes started in the same second
-// (the desktop app and its server) get <time>-2.jsonl and so on.
 func createSessionFile(logsPath string, started time.Time) string {
 	dateFolderPath := filepath.Join(logsPath, started.Format(dateFolderLayout))
 	baseName := started.Format(sessionFileLayout)
@@ -94,7 +88,6 @@ func createSessionFile(logsPath string, started time.Time) string {
 	return firstChoice
 }
 
-// removeExpiredLogs deletes date folders outside the last keepDays days (today counts as one).
 func removeExpiredLogs(logsPath string, keepDays int, now time.Time) {
 	entries, err := os.ReadDir(logsPath)
 	if err != nil {
@@ -117,8 +110,6 @@ func removeExpiredLogs(logsPath string, keepDays int, now time.Time) {
 	}
 }
 
-// moveLegacyLogs moves the single activity.jsonl (+ .1/.2) that older versions kept in the config
-// folder into the date folder of its last write, so it expires like the rest.
 func moveLegacyLogs(configPath string, logsPath string) {
 	for _, suffix := range []string{"", ".1", ".2"} {
 		legacyPath := filepath.Join(configPath, legacyLogFileName+suffix)
@@ -142,7 +133,6 @@ func writeBatch(entries []Entry) error {
 
 	rotateIfTooLarge(logFilePath)
 
-	// Another launch's cleanup may have removed the folder of a session that spans several days.
 	if err := os.MkdirAll(filepath.Dir(logFilePath), 0755); err != nil {
 		return err
 	}

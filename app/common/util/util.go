@@ -26,7 +26,6 @@ func GetKeys[KeyType comparable, ValueType any](inputMap map[KeyType]ValueType) 
 
 func GenerateFilename(message CharacterMessage, index int, outputPath string) string {
 	currentTime := time.Now()
-	//datePath := currentTime.Format("2006-01-02_15-04-05")
 	datePath := currentTime.Format("2006-01-02")
 
 	text := TruncateString(message.Text, 20)
@@ -49,7 +48,6 @@ func GenerateFilename(message CharacterMessage, index int, outputPath string) st
 func ExpandPath(path string) (error, string) {
 	switch runtime.GOOS {
 	case "windows":
-		//$WINDIR is %WINDIR%
 		path = os.ExpandEnv(convertPercentVars(path))
 		break
 	case "darwin", "linux":

@@ -9,14 +9,14 @@ import (
 type ServerMode string
 
 const (
-	ModeGUI        ServerMode = "gui"        // Default Wails GUI mode
-	ModeHTTP       ServerMode = "http"       // HTTP REST API server
-	ModeWebSocket  ServerMode = "websocket"  // WebSocket server
-	ModeGRPC       ServerMode = "grpc"       // gRPC server
-	ModeTCP        ServerMode = "tcp"        // TCP socket server
-	ModeNamedPipe  ServerMode = "namedpipe"  // Named pipe server
-	ModeFileSystem ServerMode = "filesystem" // File-based communication
-	ModeLibrary    ServerMode = "library"    // Shared library mode
+	ModeGUI        ServerMode = "gui"
+	ModeHTTP       ServerMode = "http"
+	ModeWebSocket  ServerMode = "websocket"
+	ModeGRPC       ServerMode = "grpc"
+	ModeTCP        ServerMode = "tcp"
+	ModeNamedPipe  ServerMode = "namedpipe"
+	ModeFileSystem ServerMode = "filesystem"
+	ModeLibrary    ServerMode = "library"
 )
 
 type ServerConfig struct {

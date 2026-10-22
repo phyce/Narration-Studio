@@ -1,6 +1,8 @@
 package status
 
 import (
+	"sync"
+
 	"nstudio/app/common/activity"
 	"nstudio/app/common/eventManager"
 )
@@ -19,14 +21,18 @@ const (
 )
 
 type StatusEvent struct {
-	Status  ID     `json:"status"`
-	Message string `json:"message"`
+	Status   ID     `json:"status"`
+	Message  string `json:"message"`
+	Sequence uint64 `json:"sequence"`
 }
 
-var currentStatus = StatusEvent{
-	Status:  Unknown,
-	Message: "",
-}
+var (
+	statusMutex   sync.Mutex
+	currentStatus = StatusEvent{
+		Status:  Unknown,
+		Message: "",
+	}
+)
 
 func Label(status ID) string {
 	switch status {
@@ -50,11 +56,15 @@ func Label(status ID) string {
 }
 
 func Set(status ID, message string) {
+	statusMutex.Lock()
 	currentStatus = StatusEvent{
-		Status:  status,
-		Message: message,
+		Status:   status,
+		Message:  message,
+		Sequence: currentStatus.Sequence + 1,
 	}
-	eventManager.GetInstance().EmitEvent("status", currentStatus)
+	event := currentStatus
+	statusMutex.Unlock()
+	eventManager.GetInstance().EmitEvent("status", event)
 
 	label := Label(status)
 	entry := activity.Record(activity.Entry{
@@ -68,5 +78,7 @@ func Set(status ID, message string) {
 }
 
 func Get() StatusEvent {
+	statusMutex.Lock()
+	defer statusMutex.Unlock()
 	return currentStatus
 }

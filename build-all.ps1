@@ -30,7 +30,6 @@ $ScriptsDir = Join-Path $PSScriptRoot "scripts"
 Write-Host "=== Narration Studio - Full Build ===" -ForegroundColor Cyan
 Write-Host ""
 
-# Step 1: Build libpiper
 if (-not $SkipLibpiper) {
     Write-Host "--- Step 1: Building libpiper ---" -ForegroundColor Yellow
     & "$ScriptsDir\build-libpiper.ps1"
@@ -40,7 +39,6 @@ if (-not $SkipLibpiper) {
     Write-Host "--- Step 1: Skipping libpiper (using existing DLLs) ---" -ForegroundColor DarkGray
 }
 
-# Step 2: Build desktop app + installer
 if (-not $SkipApp) {
     Write-Host "--- Step 2: Building desktop app ---" -ForegroundColor Yellow
     & "$ScriptsDir\build.ps1"
@@ -50,7 +48,6 @@ if (-not $SkipApp) {
     Write-Host "--- Step 2: Skipping desktop app ---" -ForegroundColor DarkGray
 }
 
-# Step 3: Build DLL
 if (-not $SkipDLL) {
     Write-Host "--- Step 3: Building DLL ---" -ForegroundColor Yellow
     & "$ScriptsDir\build-dll.ps1"

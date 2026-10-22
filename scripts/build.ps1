@@ -3,9 +3,6 @@
     Builds the Narration Studio desktop app (GUI + CLI) and NSIS installer (Wails v3).
 #>
 
-# NOTE: deliberately NOT "Stop" — native tools (npm/go/wails3) print warnings to
-# stderr (e.g. Browserslist), which under "Stop" abort the script even on success.
-# Each native command's $LASTEXITCODE is checked explicitly instead.
 $ErrorActionPreference = "Continue"
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -14,7 +11,6 @@ Push-Location $ProjectRoot
 try {
     Write-Host "=== Narration Studio Build (Wails v3) ===" -ForegroundColor Cyan
 
-    # Make the wails3 CLI reachable (installed via `go install .../v3/cmd/wails3`).
     $env:Path += ";$(go env GOPATH)\bin"
 
     if (-not (Test-Path "build/bin")) {
@@ -40,11 +36,6 @@ try {
     Copy-Item -Path "build/bin/nstudio-cli.exe" -Destination "build/windows/installer/nstudio-cli.exe" -Force
 
     Write-Host "Generating Windows resources (icon + version info)..." -ForegroundColor Cyan
-    # wails.json is the single source of truth for version/company info (it also feeds
-    # info.go at runtime). We embed an icon + version + manifest resource with
-    # goversioninfo. v2's `wails build` did this; v3's `wails3 generate syso` produces a
-    # version block the Windows version API can't read, so we use goversioninfo (already
-    # a dependency). Files are written without a BOM (goversioninfo parses them as JSON).
     $appInfo = Get-Content -Raw "wails.json" | ConvertFrom-Json
     $verParts = @($appInfo.Info.productVersion.Split('.')) + @('0', '0', '0')
     $noBomUtf8 = New-Object System.Text.UTF8Encoding($false)

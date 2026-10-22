@@ -25,9 +25,6 @@ var (
 	sessionRunning sync.Mutex
 )
 
-// beginSession supersedes any active session: cancel it, wait for its
-// GenerateSpeech to fully unwind, then take ownership — two scripts can never
-// interleave on the speaker.
 func beginSession() (*playbackSession, func()) {
 	sessionMutex.Lock()
 	if activeSession != nil {

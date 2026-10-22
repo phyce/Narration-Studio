@@ -17,8 +17,6 @@ var (
 	serverPort        int
 )
 
-// The first write is synchronous so the status file, the desktop's only way to
-// find the server, exists before the server starts answering.
 func Initialize(mode, host string, port int) {
 	startTime = time.Now()
 	atomic.StoreInt64(&processedMessages, 0)

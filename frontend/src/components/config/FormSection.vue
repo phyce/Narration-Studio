@@ -17,7 +17,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const vTooltip = Tooltip;
 
-// Only the outermost boxes start expanded.
 const isCollapsed = ref(props.collapsed ?? props.depth > 0);
 
 const label = computed(() => {

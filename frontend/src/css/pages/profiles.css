@@ -23,7 +23,6 @@
 	border-radius: 6px;
 }
 
-/* pi-exclamation-circle, overlaid left of the dropdown chevron */
 .profiles__model--invalid::after {
 	font-family: 'primeicons';
 	content: '\e989';

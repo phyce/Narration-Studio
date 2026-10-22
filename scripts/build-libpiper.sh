@@ -21,7 +21,6 @@
 
 set -euo pipefail
 
-# --- ANSI colours ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -34,7 +33,6 @@ success() { echo -e "${GREEN}$*${NC}"; }
 warn()    { echo -e "${YELLOW}$*${NC}"; }
 error()   { echo -e "${RED}ERROR: $*${NC}" >&2; exit 1; }
 
-# --- Configuration ---
 PIPER_GIT_REPO="https://github.com/OHF-Voice/piper1-gpl.git"
 PIPER_GIT_COMMIT="32b95f8c1f0dc0ce27a6acd1143de331f61af777"
 
@@ -50,7 +48,6 @@ BUILD_TYPE="Release"
 CLEAN=false
 USE_GPU=false
 
-# --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --clean)
@@ -91,7 +88,6 @@ echo "Source     : $SOURCE_DIR"
 echo "Runtime    : $RUNTIME_DIR"
 echo ""
 
-# --- Check dependencies ---
 info "Checking dependencies..."
 for tool in gcc g++ cmake ninja git; do
     path="$(command -v "$tool" 2>/dev/null || true)"
@@ -102,7 +98,6 @@ for tool in gcc g++ cmake ninja git; do
 done
 echo ""
 
-# --- Clean ---
 if $CLEAN; then
     warn "Cleaning..."
     for dir in "$BUILD_DIR" "$INSTALL_DIR"; do
@@ -113,7 +108,6 @@ if $CLEAN; then
     done
     if [[ -d "$RUNTIME_DIR" ]]; then
         for item in libpiper.so libonnxruntime*.so* espeak-ng-data; do
-            # Use glob expansion carefully
             for target in "$RUNTIME_DIR"/$item; do
                 if [[ -e "$target" ]]; then
                     rm -rf "$target"
@@ -128,7 +122,6 @@ fi
 
 mkdir -p "$SAFE_ROOT"
 
-# --- Clone source and apply patches (only on fresh clone) ---
 FRESH_CLONE=false
 if [[ ! -d "$SOURCE_DIR/.git" ]]; then
     info "Cloning piper1-gpl..."
@@ -151,7 +144,6 @@ if $FRESH_CLONE; then
     git checkout "$PIPER_GIT_COMMIT" --force
     echo "  Checked out $(git rev-parse --short HEAD)"
 
-    # Apply patches
     if [[ ! -f "$MINGW_PATCH" ]]; then
         error "Patch file not found: $MINGW_PATCH"
     fi
@@ -170,7 +162,6 @@ if $FRESH_CLONE; then
 fi
 echo ""
 
-# --- Configure ---
 if $USE_GPU; then
     info "=== Configuring CMake (GPU) ==="
 else
@@ -185,7 +176,6 @@ cmake -G Ninja \
     -DCMAKE_CXX_COMPILER=g++ \
     ${USE_GPU:+-DPIPER_USE_GPU=ON}
 
-# --- Build ---
 if $USE_GPU; then
     info "=== Building (GPU) ==="
 else
@@ -193,7 +183,6 @@ else
 fi
 cmake --build "$BUILD_DIR" --config "$BUILD_TYPE"
 
-# --- Install ---
 if $USE_GPU; then
     info "=== Installing (GPU) ==="
 else
@@ -208,11 +197,9 @@ else
 fi
 echo ""
 
-# --- Stage runtime files ---
 info "Staging runtime files to $RUNTIME_DIR ..."
 mkdir -p "$RUNTIME_DIR"
 
-# Find libpiper.so (check root, lib/, bin/ within install dir)
 PIPER_LIB=""
 for search_dir in "$INSTALL_DIR" "$INSTALL_DIR/lib" "$INSTALL_DIR/bin"; do
     for name in libpiper.so piper.so; do
@@ -222,7 +209,6 @@ for search_dir in "$INSTALL_DIR" "$INSTALL_DIR/lib" "$INSTALL_DIR/bin"; do
             break 2
         fi
     done
-    # Also match versioned .so files (e.g. libpiper.so.1.0.0)
     for candidate in "$search_dir"/libpiper.so.* "$search_dir"/piper.so.*; do
         if [[ -f "$candidate" ]]; then
             PIPER_LIB="$candidate"
@@ -238,7 +224,6 @@ fi
 cp "$PIPER_LIB" "$RUNTIME_DIR/libpiper.so"
 echo "  Copied $(basename "$PIPER_LIB") -> libpiper.so"
 
-# Copy onnxruntime .so files
 INSTALL_LIB_DIR="$INSTALL_DIR/lib"
 if [[ -d "$INSTALL_LIB_DIR" ]]; then
     for f in "$INSTALL_LIB_DIR"/libonnxruntime*.so*; do
@@ -248,7 +233,6 @@ if [[ -d "$INSTALL_LIB_DIR" ]]; then
     done
 fi
 
-# Copy espeak-ng-data
 ESPEAK_DATA_SRC="$INSTALL_DIR/espeak-ng-data"
 if [[ -d "$ESPEAK_DATA_SRC" ]]; then
     ESPEAK_DATA_DEST="$RUNTIME_DIR/espeak-ng-data"
@@ -259,7 +243,6 @@ fi
 
 echo ""
 
-# --- Summary ---
 success "=== Build complete ==="
 echo ""
 echo "Contents of $RUNTIME_DIR :"

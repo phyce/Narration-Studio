@@ -98,8 +98,6 @@ watch(() => props.visible, (v) => {
 onMounted(() => {
 	Events.On('piper.download.progress', (event: any) => {
 		const p = event.data as { modelId: string; percent: number; done: boolean };
-		// On done, pin to 100 — onDownload's cleanup removes it once the Promise resolves.
-		// Deleting here would briefly show 0% before the button label flips back to "Download".
 		progress[p.modelId] = p.done ? 100 : p.percent;
 	});
 });

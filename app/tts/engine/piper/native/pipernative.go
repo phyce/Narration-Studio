@@ -35,7 +35,6 @@ func (piper *Piper) Initialize() error {
 	piper.modelsDir = settings.ModelsDirectory
 	piper.useGPU = settings.UseGPU
 
-	// Use configured espeak data dir, or search for it
 	espeakDir := ""
 	if settings.EspeakDataDir != "" {
 		if _, err := os.Stat(settings.EspeakDataDir); err == nil {
@@ -72,7 +71,6 @@ func (piper *Piper) Initialize() error {
 	return nil
 }
 
-// autoDetect looks for a models directory next to the running executable.
 func (piper *Piper) autoDetect(settings *config.Piper) {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -97,7 +95,6 @@ func (piper *Piper) Start(modelName string) error {
 		return nil
 	}
 
-	// Load voice metadata
 	metadataPath := filepath.Join(piper.modelsDir, modelName, fmt.Sprintf("%s.metadata.json", modelName))
 	response.Debug(util.MessageData{
 		Summary: "piper metadata for model: " + modelName,
@@ -114,7 +111,6 @@ func (piper *Piper) Start(modelName string) error {
 		return response.Err("%w", err)
 	}
 
-	// Create synthesizer
 	onnxPath := filepath.Join(piper.modelsDir, modelName, fmt.Sprintf("%s.onnx", modelName))
 	configPath := onnxPath + ".json"
 

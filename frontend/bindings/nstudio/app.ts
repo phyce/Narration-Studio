@@ -72,10 +72,6 @@ export function GetAvailableModels(): $CancellablePromise<string> {
     return $Call.ByID(2005304584);
 }
 
-/**
- * GetConfigFilePath is the config file this app instance uses; the Server page offers it as the
- * default when the server should run with a custom config.
- */
 export function GetConfigFilePath(): $CancellablePromise<string> {
     return $Call.ByID(612796076);
 }
@@ -173,7 +169,6 @@ export function PiperFetchAvailableModels(): $CancellablePromise<string> {
 
 /**
  * <editor-fold desc="Sandbox">
- *  TODO: combine with ProcessScript as they're mostly identical
  */
 export function Play(script: string, saveNewCharacters: boolean, overrideVoices: string, profileID: string): $CancellablePromise<void> {
     return $Call.ByID(4166957835, script, saveNewCharacters, overrideVoices, profileID);

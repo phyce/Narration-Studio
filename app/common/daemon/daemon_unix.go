@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-// IsDaemonChild returns true if this process is running as a daemon child
 func IsDaemonChild() bool {
 	return os.Getenv("NSTUDIO_DAEMON_CHILD") == "1"
 }
@@ -24,7 +23,6 @@ func IsProcessRunning(pid int) bool {
 		return false
 	}
 
-	// On Unix-like systems, send signal 0 to check if process exists
 	err = process.Signal(syscall.Signal(0))
 	return err == nil
 }
@@ -34,7 +32,7 @@ func GetDaemonStatus() (bool, int, error) {
 	pidBytes, err := os.ReadFile(pidFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, 0, nil // Not running, no PID file
+			return false, 0, nil
 		}
 		return false, 0, fmt.Errorf("error reading PID file: %v", err)
 	}
@@ -117,7 +115,6 @@ func Daemonize() (int, error) {
 	command.Stderr = logFileHandle
 	command.Stdin = nil
 
-	// Set environment variable to mark this as daemon child
 	command.Env = append(os.Environ(), "NSTUDIO_DAEMON_CHILD=1")
 
 	command.SysProcAttr = &syscall.SysProcAttr{

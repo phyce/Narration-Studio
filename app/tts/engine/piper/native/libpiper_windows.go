@@ -31,7 +31,6 @@ var (
 )
 
 func loadDLL() {
-	// Probe for DirectML DLL
 	libpiperDirectML = syscall.NewLazyDLL("libpiper_directml.dll")
 	if err := libpiperDirectML.Load(); err == nil {
 		gpuAvailable = true
@@ -39,13 +38,11 @@ func loadDLL() {
 		libpiperDirectML = nil
 	}
 
-	// Always load CPU DLL references
 	libpiper = syscall.NewLazyDLL("libpiper.dll")
 	if err := libpiper.Load(); err == nil {
 		nativeAvailable = true
 	}
 
-	// Set up procs from CPU DLL (default)
 	procCreate = libpiper.NewProc("piper_create")
 	procCreateEx = libpiper.NewProc("piper_create_ex")
 	procFree = libpiper.NewProc("piper_free")
@@ -54,19 +51,16 @@ func loadDLL() {
 	procSynthesizeNext = libpiper.NewProc("piper_synthesize_next")
 }
 
-// IsGPUAvailable returns true if the DirectML-enabled DLL is present.
 func IsGPUAvailable() bool {
 	libpiperOnce.Do(loadDLL)
 	return gpuAvailable
 }
 
-// IsNativeAvailable returns true if libpiper.dll loaded successfully.
 func IsNativeAvailable() bool {
 	libpiperOnce.Do(loadDLL)
 	return nativeAvailable
 }
 
-// cSynthesizeOptions mirrors the C struct piper_synthesize_options.
 type cSynthesizeOptions struct {
 	SpeakerID   int32
 	LengthScale float32
@@ -74,7 +68,6 @@ type cSynthesizeOptions struct {
 	NoiseWScale float32
 }
 
-// cAudioChunk mirrors the C struct piper_audio_chunk (x86_64 layout).
 type cAudioChunk struct {
 	Samples       uintptr // const float *
 	NumSamples    uintptr // size_t
@@ -89,7 +82,7 @@ type cAudioChunk struct {
 }
 
 type Synthesizer struct {
-	synth  uintptr // opaque pointer to piper_synthesizer
+	synth  uintptr
 	usedDL *syscall.LazyDLL
 }
 
@@ -107,16 +100,13 @@ func NewSynthesizer(modelPath, configPath, espeakDataPath string, useGPU bool) (
 	cConfig, _ := syscall.BytePtrFromString(configPath)
 	cEspeak, _ := syscall.BytePtrFromString(espeakDataPath)
 
-	// Try DirectML if requested and available
 	if useGPU && gpuAvailable {
 		synth, err := tryCreateWithDLL(libpiperDirectML, cModel, cConfig, cEspeak, "directml")
 		if err == nil {
 			return synth, nil
 		}
-		// DirectML failed, fall back to CPU
 	}
 
-	// CPU path
 	if err := procCreate.Find(); err != nil {
 		return nil, fmt.Errorf("libpiper.dll not available: %w", err)
 	}
@@ -134,7 +124,6 @@ func NewSynthesizer(modelPath, configPath, espeakDataPath string, useGPU bool) (
 	return &Synthesizer{synth: r1, usedDL: libpiper}, nil
 }
 
-// tryCreateWithDLL attempts to create a synthesizer using a specific DLL with piper_create_ex.
 func tryCreateWithDLL(dll *syscall.LazyDLL, cModel, cConfig, cEspeak *byte, provider string) (*Synthesizer, error) {
 	createEx := dll.NewProc("piper_create_ex")
 	if err := createEx.Find(); err != nil {
@@ -165,8 +154,6 @@ func (s *Synthesizer) Free() {
 	}
 }
 
-// DefaultOptions returns the default synthesis options from the voice model config.
-// On Windows x64 ABI, structs >8 bytes are returned via a hidden first pointer parameter.
 func (s *Synthesizer) DefaultOptions() SynthesizeOptions {
 	var cOpts cSynthesizeOptions
 	defOptsProc := s.usedDL.NewProc("piper_default_synthesize_options")
@@ -182,7 +169,6 @@ func (s *Synthesizer) DefaultOptions() SynthesizeOptions {
 	}
 }
 
-// Synthesize runs text-to-speech and returns int16 PCM bytes and the sample rate.
 func (s *Synthesizer) Synthesize(text string, opts *SynthesizeOptions) ([]byte, int, error) {
 	cText, _ := syscall.BytePtrFromString(text)
 

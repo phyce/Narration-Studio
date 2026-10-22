@@ -45,7 +45,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# --- Configuration ---
 $PiperGitRepo   = "https://github.com/OHF-Voice/piper1-gpl.git"
 $PiperGitCommit = "32b95f8c1f0dc0ce27a6acd1143de331f61af777"
 
@@ -56,10 +55,8 @@ $MingwPatch   = Join-Path $LibDir "libpiper-mingw.patch"
 $DirectMLPatch = Join-Path $LibDir "libpiper-directml.patch"
 $RuntimeDir   = Join-Path $ProjectRoot "build\bin"
 
-# Build artifacts go into lib/build-* subdirectories
 $SafeRoot = Join-Path $LibDir "build"
 
-# Where CMake source lives (the libpiper subfolder within the repo)
 $CmakeSourceDir = Join-Path $SourceDir "libpiper"
 
 Write-Host "=== libpiper build script ===" -ForegroundColor Cyan
@@ -69,14 +66,12 @@ Write-Host "Source:     $SourceDir"
 Write-Host "Runtime:    $RuntimeDir"
 Write-Host ""
 
-# --- Ensure MinGW toolchain (MSYS2 UCRT64 preferred, standalone MinGW as fallback) ---
 $Msys2Bin = "C:\msys64\ucrt64\bin"
 if (Test-Path $Msys2Bin) {
     $env:PATH = "$Msys2Bin;$env:PATH"
     Write-Host "Added MSYS2 UCRT64 to PATH: $Msys2Bin" -ForegroundColor Green
 }
 
-# Discover tools from PATH (works with MSYS2, standalone MinGW, or CI-provided tools)
 $GccPath = (Get-Command gcc -ErrorAction SilentlyContinue).Source
 $GxxPath = (Get-Command g++ -ErrorAction SilentlyContinue).Source
 $CmakePath = (Get-Command cmake -ErrorAction SilentlyContinue).Source
@@ -102,7 +97,6 @@ if ($GccPath -like "*cygwin*") {
 }
 Write-Host ""
 
-# --- Clean ---
 if ($Clean) {
     Write-Host "Cleaning..." -ForegroundColor Yellow
     foreach ($dir in @("$SafeRoot\build-cpu", "$SafeRoot\build-directml", "$SafeRoot\install-cpu", "$SafeRoot\install-directml")) {
@@ -128,7 +122,6 @@ if (-not (Test-Path $SafeRoot)) {
     New-Item -ItemType Directory -Path $SafeRoot | Out-Null
 }
 
-# --- Clone source and apply patches (only on fresh clone) ---
 $freshClone = $false
 if (-not (Test-Path (Join-Path $SourceDir ".git"))) {
     Write-Host "Cloning piper1-gpl..." -ForegroundColor Cyan
@@ -145,7 +138,6 @@ if (-not (Test-Path (Join-Path $SourceDir ".git"))) {
     Write-Host "Source already cloned at $SourceDir" -ForegroundColor Green
 }
 
-# Checkout pinned commit (only on fresh clone)
 if ($freshClone) {
     Write-Host "Checking out commit $PiperGitCommit ..." -ForegroundColor Cyan
     Push-Location $SourceDir
@@ -163,7 +155,6 @@ if ($freshClone) {
         }
         Write-Host "  Checked out $(git rev-parse --short HEAD)"
 
-        # Apply patches
         foreach ($patch in @($MingwPatch, $DirectMLPatch)) {
             if (-not (Test-Path $patch)) {
                 Write-Error "Patch file not found: $patch"
@@ -183,7 +174,6 @@ if ($freshClone) {
 }
 Write-Host ""
 
-# --- Helper: Configure, build, install ---
 function Build-Variant {
     param(
         [string]$VariantName,
@@ -194,9 +184,7 @@ function Build-Variant {
 
     Write-Host "=== Building $VariantName variant ===" -ForegroundColor Cyan
 
-    # Configure
     Write-Host "Configuring CMake ($VariantName)..." -ForegroundColor Cyan
-    # CMake interprets backslashes as escape sequences in path strings, so use forward slashes.
     $GccFwd = $GccPath.Replace('\', '/')
     $GxxFwd = $GxxPath.Replace('\', '/')
     $NinjaFwd = $NinjaPath.Replace('\', '/')
@@ -217,7 +205,6 @@ function Build-Variant {
         exit 1
     }
 
-    # Build
     Write-Host "Building ($VariantName)..." -ForegroundColor Cyan
     cmake --build $BuildDir --config $BuildType
     if ($LASTEXITCODE -ne 0) {
@@ -225,7 +212,6 @@ function Build-Variant {
         exit 1
     }
 
-    # Install
     Write-Host "Installing ($VariantName)..." -ForegroundColor Cyan
     cmake --install $BuildDir --config $BuildType
     if ($LASTEXITCODE -ne 0) {
@@ -237,12 +223,11 @@ function Build-Variant {
     Write-Host ""
 }
 
-# --- Helper: Find and stage runtime files ---
 function Stage-Runtime {
     param(
         [string]$InstallDir,
-        [string]$DllOutputName,  # e.g. "libpiper.dll" or "libpiper_directml.dll"
-        [switch]$CopyEspeakData  # Only copy espeak-ng-data once
+        [string]$DllOutputName,
+        [switch]$CopyEspeakData
     )
 
     Write-Host "Staging $DllOutputName to $RuntimeDir ..." -ForegroundColor Cyan
@@ -251,7 +236,6 @@ function Stage-Runtime {
         New-Item -ItemType Directory -Path $RuntimeDir | Out-Null
     }
 
-    # Find piper shared library
     $PiperLib = $null
     foreach ($name in @("libpiper.dll", "piper.dll")) {
         foreach ($searchDir in @($InstallDir, (Join-Path $InstallDir "lib"), (Join-Path $InstallDir "bin"))) {
@@ -269,11 +253,9 @@ function Stage-Runtime {
         exit 1
     }
 
-    # Copy as the requested output name
     Copy-Item $PiperLib -Destination (Join-Path $RuntimeDir $DllOutputName) -Force
     Write-Host "  Copied $(Split-Path $PiperLib -Leaf) -> $DllOutputName"
 
-    # Copy onnxruntime DLLs
     $InstallLibDir = Join-Path $InstallDir "lib"
     if (Test-Path $InstallLibDir) {
         Get-ChildItem $InstallLibDir -Filter "onnxruntime*" -File | Where-Object {
@@ -283,7 +265,6 @@ function Stage-Runtime {
             Write-Host "  Copied $($_.Name)"
         }
 
-        # Copy DirectML.dll if present
         $directmlDll = Join-Path $InstallLibDir "DirectML.dll"
         if (Test-Path $directmlDll) {
             Copy-Item $directmlDll -Destination $RuntimeDir -Force
@@ -291,7 +272,6 @@ function Stage-Runtime {
         }
     }
 
-    # Copy espeak-ng-data (only once)
     if ($CopyEspeakData) {
         $EspeakDataDir = Join-Path $InstallDir "espeak-ng-data"
         if (Test-Path $EspeakDataDir) {
@@ -307,7 +287,6 @@ function Stage-Runtime {
     Write-Host ""
 }
 
-# --- Build CPU variant ---
 if (-not $SkipCPU) {
     Build-Variant `
         -VariantName "CPU" `
@@ -344,7 +323,6 @@ if (-not $SkipDirectML) {
         Write-Host "OnnxRuntime.DirectML already in cache." -ForegroundColor Green
     }
 
-    # Stage DirectML.h from the committed repo copy into CMake source tree.
     $directmlIncludeDir = Join-Path $CmakeSourceDir "lib\Microsoft.AI.DirectML.1.15.2\include"
     $repoDirectMLHeader = Join-Path $ProjectRoot "lib\directml-headers\DirectML.h"
     Write-Host "Staging DirectML.h from repo..." -ForegroundColor Cyan
@@ -359,7 +337,6 @@ if (-not $SkipDirectML) {
     Write-Host ""
 }
 
-# --- Build DirectML variant ---
 if (-not $SkipDirectML) {
     $DirectMLHeaderDir = (Join-Path $ProjectRoot "lib\directml-headers").Replace('\', '/')
     $dmlBuildDir = Join-Path $SafeRoot "build-directml"
@@ -367,7 +344,6 @@ if (-not $SkipDirectML) {
 
     Write-Host "=== Building DirectML variant ===" -ForegroundColor Cyan
 
-    # Configure (this triggers ORT NuGet download/extraction)
     $GccFwd = $GccPath.Replace('\', '/'); $GxxFwd = $GxxPath.Replace('\', '/'); $NinjaFwd = $NinjaPath.Replace('\', '/')
     $cmakeArgs = @(
         "-G", "Ninja", "-S", $CmakeSourceDir, "-B", $dmlBuildDir,
@@ -379,7 +355,6 @@ if (-not $SkipDirectML) {
     & cmake @cmakeArgs
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake configure failed (DirectML)."; exit 1 }
 
-    # Copy DirectML.h next to dml_provider_factory.h in ORT include dir
     $ortIncludeDir = Join-Path $CmakeSourceDir "lib\Microsoft.ML.OnnxRuntime.DirectML.1.22.1\build\native\include"
     if (Test-Path $ortIncludeDir) {
         $src = Join-Path $ProjectRoot "lib\directml-headers\DirectML.h"
@@ -387,7 +362,6 @@ if (-not $SkipDirectML) {
         Write-Host "  Copied DirectML.h into ORT include dir" -ForegroundColor Green
     }
 
-    # Build + Install
     cmake --build $dmlBuildDir --config $BuildType
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed (DirectML)."; exit 1 }
     cmake --install $dmlBuildDir --config $BuildType
@@ -398,7 +372,6 @@ if (-not $SkipDirectML) {
     Stage-Runtime -InstallDir $dmlInstallDir -DllOutputName "libpiper_directml.dll"
 }
 
-# --- Summary ---
 Write-Host "=== Build complete ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "Contents of $RuntimeDir :"

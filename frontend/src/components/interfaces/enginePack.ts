@@ -1,4 +1,3 @@
-// Mirror the Go-side python.Manifest, pack.AvailablePack and pack.InstalledPack.
 export interface ManifestVoice {
 	id: string;
 	name: string;
@@ -17,8 +16,8 @@ export interface PythonManifest {
 	id: string;
 	name: string;
 	version: string;
+	engineVersion?: string;
 	variant: string;
-	variantDescription?: string;
 	description?: string;
 	type: 'local' | 'api';
 	tags: string[] | null;

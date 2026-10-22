@@ -12,6 +12,20 @@ export function compareVersions(left: string, right: string): number {
 	return 0;
 }
 
+export function variantText(variant: string): string {
+	return variant.toUpperCase();
+}
+
+export function versionText(manifest: PythonManifest): string {
+	return manifest.engineVersion ? `${manifest.engineVersion} · pack ${manifest.version}` : manifest.version;
+}
+
+export function targetVersionText(build: PythonManifest, installed: PythonManifest): string {
+	return build.engineVersion && build.engineVersion !== installed.engineVersion
+		? `version ${build.engineVersion}`
+		: `pack ${build.version}`;
+}
+
 export function isSameBuild(left: PythonManifest, right: PythonManifest): boolean {
 	return left.id === right.id && left.version === right.version && left.variant === right.variant;
 }

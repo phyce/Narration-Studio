@@ -32,10 +32,6 @@ const (
 )
 
 // <editor-fold desc="Stream Router">
-// streamRouter owns the piper process stdout for the lifetime of the process
-// and mirrors it into the sink of the in-flight request; between requests
-// output is discarded. Write never fails — piper's stdout must always keep
-// draining or the subprocess stalls.
 type streamRouter struct {
 	mu        sync.Mutex
 	sink      io.Writer
@@ -75,12 +71,10 @@ func (router *streamRouter) QuietSince() time.Duration {
 
 //</editor-fold>
 
-// isNativeMode returns true when the engine should use the native DLL instead of the binary.
 func (piper *Piper) isNativeMode() bool {
 	return !config.GetEngine().Local.Piper.UseExecutable
 }
 
-// getNative lazily creates the native engine instance.
 func (piper *Piper) getNative() *native.Piper {
 	if piper.native == nil {
 		piper.native = &native.Piper{}
@@ -202,8 +196,6 @@ func (piper *Piper) Start(modelName string) error {
 	return nil
 }
 
-// readModelSampleRate reads the output rate piper will synthesize at from the
-// model's onnx config; models that ship without one keep the piper default.
 func readModelSampleRate(configPath string) int {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -314,11 +306,6 @@ func (piper *Piper) Synthesize(ctx context.Context, request engine.SpeechRequest
 	return piper.streamUtterance(request.Model, payload)
 }
 
-// streamUtterance sends one json-input line to the piper process and returns a
-// live stream fed by its stdout. The instance mutex serializes requests on the
-// one process; completion is piper's stderr " sec)" sentinel followed by a
-// quiet-drain of stdout, because the sentinel can beat the last audio bytes
-// through the pipe buffers.
 func (piper *Piper) streamUtterance(model string, payload []byte) (*audio.Stream, error) {
 	instance, err := piper.ensureRunning(model)
 	if err != nil {
@@ -473,8 +460,6 @@ func FetchModels() map[string]engine.Model {
 	return scanInstalledModels()
 }
 
-// scanInstalledModels walks the Piper models directory and returns every
-// subfolder that contains the three required files as an engine.Model entry.
 func scanInstalledModels() map[string]engine.Model {
 	result := make(map[string]engine.Model)
 

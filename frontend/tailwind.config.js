@@ -1,7 +1,5 @@
 module.exports = {
 	content: ['./index.html', './activitylog.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-	// The app is dark-only: index.html and activitylog.html set class="dark" on <html>, so the
-	// PrimeVue presets' dark: styles never depend on the Windows light/dark setting.
 	darkMode: 'class',
 	theme: {
 		extend: {
@@ -44,4 +42,3 @@ module.exports = {
 	},
 	plugins: [],
 }
-

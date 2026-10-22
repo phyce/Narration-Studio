@@ -147,7 +147,6 @@ func TestStartDaemonTakesEnginesBackWhenDaemonDiesWhileStarting(t *testing.T) {
 	}
 }
 
-// Loading models can take minutes; there is no deadline while the daemon is alive.
 func TestStartDaemonWaitsForADaemonThatIsStillLoading(t *testing.T) {
 	fake := useFakeDaemon(t, false)
 

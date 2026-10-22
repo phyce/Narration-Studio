@@ -119,8 +119,6 @@ func TestReleaseAllStopsAndDetachesPools(t *testing.T) {
 	}
 }
 
-// The handoff is only safe if it waits for synthesis that is already running —
-// stopping an engine out from under an in-flight request would truncate it.
 func TestReleaseAllWaitsForInFlightInstance(t *testing.T) {
 	instance := &stubEngine{}
 	pool := newTestPool(instance)
@@ -180,8 +178,6 @@ func TestDrainTimesOutOnStuckInstance(t *testing.T) {
 		t.Errorf("drain gave up after %v, want it to wait out the full timeout", elapsed)
 	}
 
-	// A straggler handed back after the drain must not panic, which is why the
-	// pool channel is never closed.
 	pool.Release(stuck)
 }
 

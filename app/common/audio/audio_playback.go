@@ -104,10 +104,6 @@ func productionComplete(stream *Stream) bool {
 	}
 }
 
-// playbackFeeder pulls the blocking stream reads off the beep callback path:
-// consume() runs in its own goroutine, fill() runs inside the speaker mixer
-// and must never block. On underrun it emits silence rather than stalling the
-// device; beep's contract also forbids returning (0, true).
 type playbackFeeder struct {
 	mu       sync.Mutex
 	queue    []byte

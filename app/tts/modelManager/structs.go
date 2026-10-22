@@ -8,7 +8,7 @@ import (
 
 type ModelPool struct {
 	Instances []tts.Base
-	pool      chan tts.Base // Channel-based pool for free instances
+	pool      chan tts.Base
 	detached  chan struct{}
 }
 
@@ -52,8 +52,6 @@ func (pool *ModelPool) detach() {
 	close(pool.detached)
 }
 
-// The pool channel is never closed: a straggler Release() would panic sending
-// on it. Closing `detached` is what turns new callers away.
 func (pool *ModelPool) drain(timeout time.Duration) []tts.Base {
 	recovered := make([]tts.Base, 0, len(pool.Instances))
 	deadline := time.After(timeout)

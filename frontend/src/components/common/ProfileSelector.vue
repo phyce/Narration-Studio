@@ -33,7 +33,6 @@ async function loadProfiles() {
 		return;
 	}
 
-	// The remembered profile may have been deleted since; fall back to the default one.
 	const remembered = profiles.value.find(profile => profile.id === props.modelValue);
 	const fallback = profiles.value.find(profile => profile.id === 'default') ?? profiles.value[0];
 	const profile = remembered ?? fallback;

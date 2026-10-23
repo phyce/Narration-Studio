@@ -79,7 +79,7 @@ try {
 
     Write-Host "Building Installer..." -ForegroundColor Cyan
     Push-Location build/windows/installer
-    makensis "-DARG_WAILS_AMD64_BINARY=..\..\bin\narration_studio.exe" project.nsi
+    makensis "-DARG_WAILS_AMD64_BINARY=..\..\bin\narration_studio.exe" "-DINFO_PRODUCTVERSION=$($appInfo.Info.productVersion)" project.nsi
     $nsisExit = $LASTEXITCODE
     Pop-Location
     if ($nsisExit -ne 0) { Write-Error "Installer build failed"; exit 1 }

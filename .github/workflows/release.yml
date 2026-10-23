@@ -72,108 +72,27 @@ jobs:
         shell: pwsh
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm install
-
-      - name: Build CLI application
-        run: |
-          if (-not (Test-Path "build/bin")) {
-            New-Item -ItemType Directory -Path "build/bin" | Out-Null
-          }
-          go build -tags cli -o "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe" .
-        shell: pwsh
-
-      - name: Prepare CLI for NSIS installer
-        run: |
-          # Copy CLI to installer directory so NSIS can include it
-          Copy-Item -Path "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe" -Destination "build/windows/installer/nstudio-cli.exe"
-        shell: pwsh
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98
 
       - name: Build piper native DLLs
         run: .\scripts\build-libpiper.ps1
         shell: pwsh
 
-      - name: Save piper native files before clean build
-        run: |
-          # wails build -clean wipes build/bin/, including the piper DLLs that
-          # NSIS needs. Stash them in a temp dir and restore after the clean build.
-          $stash = Join-Path $env:RUNNER_TEMP "piper-native"
-          New-Item -ItemType Directory -Force -Path $stash | Out-Null
-          foreach ($name in @("libpiper.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll", "libpiper_directml.dll", "DirectML.dll")) {
-            $src = Join-Path "build\bin" $name
-            if (Test-Path $src) { Copy-Item $src -Destination $stash -Force }
-          }
-          if (Test-Path "build\bin\espeak-ng-data") {
-            Copy-Item "build\bin\espeak-ng-data" -Destination $stash -Recurse -Force
-          }
-          Get-ChildItem $stash | ForEach-Object { Write-Host "  stashed: $($_.Name)" }
+      - name: Build GUI, CLI and installer
+        run: .\scripts\build.ps1
         shell: pwsh
 
-      - name: Build GUI application (no installer yet)
-        run: wails build -clean -platform windows/amd64
-
-      - name: Restore piper native files into build/bin
+      - name: Name artifacts by version
         run: |
-          $stash = Join-Path $env:RUNNER_TEMP "piper-native"
-          if (-not (Test-Path $stash)) {
-            Write-Error "Stash directory missing: $stash"
-            exit 1
-          }
-          Copy-Item (Join-Path $stash "*") -Destination "build\bin" -Recurse -Force
-          # Sanity-check that NSIS's required files are now in place.
-          foreach ($required in @("libpiper.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll", "espeak-ng-data")) {
-            $path = Join-Path "build\bin" $required
-            if (-not (Test-Path $path)) {
-              Write-Error "Missing after restore: $path"
-              exit 1
-            }
-          }
-        shell: pwsh
-
-      - name: Build NSIS installer
-        run: |
-          $exe = Resolve-Path "build\bin\narration_studio.exe"
-          Push-Location "build\windows\installer"
-          try {
-            makensis "/DARG_WAILS_AMD64_BINARY=$($exe.Path)" project.nsi
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "makensis failed with exit code $LASTEXITCODE"
-              exit 1
-            }
-          } finally {
-            Pop-Location
-          }
-        shell: pwsh
-
-      - name: Prepare artifacts
-        run: |
-          # Copy engine dependencies for installer context
-          Copy-Item -Path "build/windows/installer/engines" -Destination "build/bin/engines" -Recurse -Force
-          # Restore CLI executable (removed by -clean flag during GUI build)
-          Copy-Item -Path "build/windows/installer/nstudio-cli.exe" -Destination "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe"
-          # Rename installer to include version
-          $installer = Get-ChildItem -Path "build/bin" -Filter "*installer.exe" | Select-Object -First 1
-          if ($installer) {
-            Rename-Item $installer.FullName "Narration-Studio-${{ needs.resolve-version.outputs.version }}-Windows-Installer.exe"
-          }
+          Move-Item -Force "build/bin/Narration Studio-amd64-installer.exe" "build/bin/Narration-Studio-${{ needs.resolve-version.outputs.version }}-Windows-Installer.exe"
+          Move-Item -Force "build/bin/nstudio-cli.exe" "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-Windows.exe"
         shell: pwsh
 
       - name: Upload Windows Installer
         if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          $installer = Get-ChildItem -Path "build/bin" -Filter "Narration-Studio-*-Windows-Installer.exe" | Select-Object -First 1
-          if ($installer) {
-            gh release upload ${{ needs.resolve-version.outputs.version }} $installer.FullName --clobber
-          } else {
-            Write-Host "ERROR: Installer not found in build/bin"
-            exit 1
-          }
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/Narration-Studio-${{ needs.resolve-version.outputs.version }}-Windows-Installer.exe" --clobber
         shell: pwsh
 
       - name: Upload Windows CLI
@@ -258,50 +177,20 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - name: Build GUI and CLI
+        run: bash scripts/build-osx.sh
 
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm install
-
-      - name: Build GUI application
-        run: wails build -clean -platform darwin/universal
-
-      - name: Build CLI application
-        run: |
-          mkdir -p build/bin
-          go build -tags cli -o "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-OSX" .
-
-      - name: Embed CLI and Package macOS GUI
+      - name: Package macOS GUI and CLI
         run: |
           cd build/bin
-
-          # Find the app bundle
-          if [ -d "Narration Studio.app" ]; then
-            APP_NAME="Narration Studio.app"
-          elif [ -d "narration_studio.app" ]; then
-            APP_NAME="narration_studio.app"
-          else
-            echo "App bundle not found!"
-            exit 1
-          fi
-
-          # Embed CLI
-          echo "Embedding CLI into $APP_NAME..."
-          cp "nstudio-cli-${{ needs.resolve-version.outputs.version }}-OSX" "$APP_NAME/Contents/MacOS/"
-
-          # Zip it with the versioned name
-          zip -r "Narration-Studio-${{ needs.resolve-version.outputs.version }}-OSX.zip" "$APP_NAME"
+          ditto -c -k --keepParent "Narration Studio.app" "Narration-Studio-${{ needs.resolve-version.outputs.version }}-OSX.zip"
+          cp nstudio-cli-osx "nstudio-cli-${{ needs.resolve-version.outputs.version }}-OSX"
 
       - name: Upload macOS GUI
         if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          cd build/bin
-          gh release upload ${{ needs.resolve-version.outputs.version }} "Narration-Studio-${{ needs.resolve-version.outputs.version }}-OSX.zip" --clobber
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/Narration-Studio-${{ needs.resolve-version.outputs.version }}-OSX.zip" --clobber
 
       - name: Upload macOS CLI
         if: needs.resolve-version.outputs.should_upload == 'true'
@@ -309,9 +198,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload ${{ needs.resolve-version.outputs.version }} "build/bin/nstudio-cli-${{ needs.resolve-version.outputs.version }}-OSX" --clobber
 
-  build-linux-gui-webkit40:
+  build-linux-gui:
+    name: build-linux-gui (WebKit ${{ matrix.webkit }})
     needs: [resolve-version]
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            gtk: gtk3
+            webkit: '4.1'
+            packages: libgtk-3-dev libwebkit2gtk-4.1-dev
+          - runner: ubuntu-24.04
+            gtk: gtk4
+            webkit: '6.0'
+            packages: libgtk-4-dev libwebkitgtk-6.0-dev
+    runs-on: ${{ matrix.runner }}
+    env:
+      ZIP_NAME: Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-${{ matrix.webkit }}.zip
     steps:
       - uses: actions/checkout@v4
 
@@ -328,96 +232,27 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build libgtk-3-dev libwebkit2gtk-4.0-dev libasound2-dev
-
-      - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm install
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config libasound2-dev ${{ matrix.packages }}
 
       - name: Build piper native .so
-        run: chmod +x scripts/build-libpiper.sh && ./scripts/build-libpiper.sh
+        run: bash scripts/build-libpiper.sh
 
-      - name: Save piper native files before clean build
-        run: |
-          mkdir -p /tmp/piper-native
-          cp build/bin/libpiper.so /tmp/piper-native/
-          cp -r build/bin/espeak-ng-data /tmp/piper-native/
-          find build/bin -name 'libonnxruntime*.so*' -exec cp {} /tmp/piper-native/ \;
+      - name: Build GUI and CLI
+        run: bash scripts/build.sh ${{ matrix.gtk }}
 
-      - name: Build GUI (webkit2gtk 4.0)
-        run: wails build -clean -platform linux/amd64
-
-      - name: Package GUI zip (WebKit 4.0)
+      - name: Package GUI zip
         run: |
           mkdir -p staging
-          cp build/bin/narration_studio staging/
-          cp /tmp/piper-native/libpiper.so staging/
-          cp -r /tmp/piper-native/espeak-ng-data staging/
-          find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
-          cd staging && zip -r "../Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.0.zip" .
+          cp build/bin/narration_studio build/bin/nstudio-cli build/bin/libpiper.so staging/
+          cp -r build/bin/espeak-ng-data staging/
+          find build/bin -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
+          cd staging && zip -r "../$ZIP_NAME" .
 
-      - name: Upload GUI zip (WebKit 4.0)
+      - name: Upload GUI zip
         if: needs.resolve-version.outputs.should_upload == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ needs.resolve-version.outputs.version }} "Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.0.zip" --clobber
-
-  build-linux-gui-webkit41:
-    needs: [resolve-version]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.26'
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev
-
-      - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm install
-
-      - name: Build piper native .so
-        run: chmod +x scripts/build-libpiper.sh && ./scripts/build-libpiper.sh
-
-      - name: Save piper native files before clean build
-        run: |
-          mkdir -p /tmp/piper-native
-          cp build/bin/libpiper.so /tmp/piper-native/
-          cp -r build/bin/espeak-ng-data /tmp/piper-native/
-          find build/bin -name 'libonnxruntime*.so*' -exec cp {} /tmp/piper-native/ \;
-
-      - name: Build GUI (webkit2gtk 4.1)
-        run: wails build -clean -platform linux/amd64 -tags webkit2_41
-
-      - name: Package GUI zip (WebKit 4.1)
-        run: |
-          mkdir -p staging
-          cp build/bin/narration_studio staging/
-          cp /tmp/piper-native/libpiper.so staging/
-          cp -r /tmp/piper-native/espeak-ng-data staging/
-          find /tmp/piper-native -name 'libonnxruntime*.so*' -exec cp {} staging/ \;
-          cd staging && zip -r "../Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.1.zip" .
-
-      - name: Upload GUI zip (WebKit 4.1)
-        if: needs.resolve-version.outputs.should_upload == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ needs.resolve-version.outputs.version }} "Narration-Studio-${{ needs.resolve-version.outputs.version }}-Linux-WebKit-4.1.zip" --clobber
+        run: gh release upload ${{ needs.resolve-version.outputs.version }} "$ZIP_NAME" --clobber
 
   build-linux-cli:
     needs: [resolve-version]

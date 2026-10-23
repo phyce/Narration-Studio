@@ -43,11 +43,18 @@ Built in Go using [wails.io](https://wails.io), Vue + Typescript.
 
 ## Live Development
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+Narration Studio uses Wails v3. Install its CLI with
+`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98`, then run `wails3 dev` in the project directory.
+It runs the Vite development server with hot reload of your frontend changes and rebuilds the app when a `.go` file
+changes.
 
 ## Building
 
-To build a redistributable, production mode package, use `wails build`.
+Build Piper's native library first (`scripts/build-libpiper.ps1` on Windows, `scripts/build-libpiper.sh` elsewhere),
+then:
+
+* Windows: `scripts/build.ps1` builds the app, the CLI and the NSIS installer (needs NSIS and the `wails3` CLI).
+* macOS: `scripts/build-osx.sh` builds a universal `Narration Studio.app` with the CLI inside.
+* Linux: `scripts/build.sh [gtk4|gtk3]` builds the app and the CLI for GTK 4 + WebKitGTK 6.0
+  (`libgtk-4-dev libwebkitgtk-6.0-dev`) or GTK 3 + WebKit2GTK 4.1 (`libgtk-3-dev libwebkit2gtk-4.1-dev`), plus
+  `libasound2-dev`.
